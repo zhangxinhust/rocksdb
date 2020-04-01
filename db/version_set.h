@@ -417,6 +417,21 @@ class VersionStorageInfo {
   bool RangeMightExistAfterSortedRun(const Slice& smallest_user_key,
                                      const Slice& largest_user_key,
                                      int last_level, int last_l0_idx);
+  
+  // Information of a path used by a ColumnFamily, including base level, 
+  // the number of levels, current size and capacity. 
+  struct PathInfo {
+    int path_base_level_;
+    int path_num_levels;
+    uint64_t capacity_;
+    uint64_t path_size_;
+
+    PathInfo() = default;
+
+    PathInfo(int base_level, uint64_t capacity) 
+      : path_base_level_(base_level),
+        capacity_(capacity) {}
+  };
 
  private:
   const InternalKeyComparator* internal_comparator_;
@@ -532,6 +547,8 @@ class VersionStorageInfo {
   // If set to true, we will run consistency checks even if RocksDB
   // is compiled in release mode
   bool force_consistency_checks_;
+
+  autovector<PathInfo> multi_path_info_;
 
   friend class Version;
   friend class VersionSet;
