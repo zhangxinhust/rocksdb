@@ -2009,6 +2009,7 @@ void Version::PrepareApply(
   storage_info_.GenerateLevelFilesBrief();
   storage_info_.GenerateLevel0NonOverlapping();
   storage_info_.GenerateBottommostFiles();
+  storage_info_.CheckPathSize();
 }
 
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {

@@ -427,6 +427,8 @@ class VersionStorageInfo {
     uint64_t capacity_;
     uint64_t path_size_;
 
+    PathInfo() = default;
+
     PathInfo(uint64_t capacity) 
       : path_base_level_(std::numeric_limits<int>::max()), 
         capacity_(capacity) {}
@@ -442,6 +444,31 @@ class VersionStorageInfo {
     VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
     assert(path_info.isValid() && path_info.isLevelInRange(level));
     path_info.path_size_ -= f->fd.GetFileSize();
+  }
+
+  void CheckPathSize() {
+    uint32_t pre_path_id = 0;
+    uint64_t path_size = 0;
+
+    for (int level = 0; level < num_levels_; level++) {
+      const auto& level_files = files_[level];
+      if (level_files.empty()) {
+        continue;
+      }
+      uint32_t cur_level_path_id = level_files[0]->fd.GetPathId();
+      if (cur_level_path_id != pre_path_id) {
+        // check PathInfo::path_size_ == actual path size?
+        assert(multi_path_info_[pre_path_id].path_size_ == path_size);
+        pre_path_id = cur_level_path_id;
+        path_size = 0;
+      }
+      for (auto file : level_files) {
+        assert(file->fd.GetPathId() == pre_path_id);
+        path_size += file->fd.GetFileSize();
+      }
+    }
+    // last path id
+    assert(multi_path_info_[pre_path_id].path_size_ == path_size);
   }
 
  private:
