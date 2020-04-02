@@ -1573,7 +1573,7 @@ VersionStorageInfo::VersionStorageInfo(
     const InternalKeyComparator* internal_comparator,
     const Comparator* user_comparator, int levels,
     CompactionStyle compaction_style, VersionStorageInfo* ref_vstorage,
-    bool _force_consistency_checks)
+    bool _force_consistency_checks, const std::vector<DbPath>& cf_paths)
     : internal_comparator_(internal_comparator),
       user_comparator_(user_comparator),
       // cfd is nullptr if Version is dummy
@@ -1612,6 +1612,14 @@ VersionStorageInfo::VersionStorageInfo(
     current_num_deletions_ = ref_vstorage->current_num_deletions_;
     current_num_samples_ = ref_vstorage->current_num_samples_;
     oldest_snapshot_seqnum_ = ref_vstorage->oldest_snapshot_seqnum_;
+    // Copy multi_path_info_ from ref_vstorage
+    multi_path_info_.assign(ref_vstorage->multi_path_info_);
+  } else {
+    // Initialize PathInfo::capacity_ with cf_paths
+    // It's ok that we only initialize capacity and leave other fields to zero.
+    for (auto& cf_path : cf_paths) {
+      multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
+    }
   }
 }
 
@@ -1636,7 +1644,8 @@ Version::Version(ColumnFamilyData* column_family_data, VersionSet* vset,
           (cfd_ == nullptr || cfd_->current() == nullptr)
               ? nullptr
               : cfd_->current()->storage_info(),
-          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks),
+          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks,
+          cfd_->ioptions()->cf_paths),
       vset_(vset),
       next_(this),
       prev_(this),
@@ -2511,6 +2520,12 @@ void VersionStorageInfo::AddFile(int level, FileMetaData* f, Logger* info_log) {
 #endif
   f->refs++;
   level_files->push_back(f);
+
+  // Update PathInfo
+  VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
+  path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
+  path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
+  path_info.path_size_ += f->fd.GetFileSize();
 }
 
 // Version::PrepareApply() need to be called before calling the function, or

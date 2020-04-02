@@ -101,7 +101,8 @@ class VersionStorageInfo {
                      const Comparator* user_comparator, int num_levels,
                      CompactionStyle compaction_style,
                      VersionStorageInfo* src_vstorage,
-                     bool _force_consistency_checks);
+                     bool _force_consistency_checks,
+                     const std::vector<DbPath>& cf_paths);
   ~VersionStorageInfo();
 
   void Reserve(int level, size_t size) { files_[level].reserve(size); }
@@ -419,19 +420,29 @@ class VersionStorageInfo {
                                      int last_level, int last_l0_idx);
   
   // Information of a path used by a ColumnFamily, including base level, 
-  // the number of levels, current size and capacity. 
+  // top levels, current size and capacity. 
   struct PathInfo {
     int path_base_level_;
-    int path_num_levels;
+    int path_top_levels_;
     uint64_t capacity_;
     uint64_t path_size_;
 
-    PathInfo() = default;
-
-    PathInfo(int base_level, uint64_t capacity) 
-      : path_base_level_(base_level),
+    PathInfo(uint64_t capacity) 
+      : path_base_level_(std::numeric_limits<int>::max()), 
         capacity_(capacity) {}
+
+    bool isValid() { return path_base_level_ < path_top_levels_; }
+
+    bool isLevelInRange(int level) { 
+      return path_base_level_ <= level && level <= path_top_levels_; 
+    }
   };
+
+  void DecreasePathSize(int level, FileMetaData* f) {
+    VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
+    assert(path_info.isValid() && path_info.isLevelInRange(level));
+    path_info.path_size_ -= f->fd.GetFileSize();
+  }
 
  private:
   const InternalKeyComparator* internal_comparator_;

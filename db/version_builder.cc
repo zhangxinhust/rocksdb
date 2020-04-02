@@ -497,6 +497,7 @@ class VersionBuilder::Rep {
     if (levels_[level].deleted_files.count(f->fd.GetNumber()) > 0) {
       // f is to-be-deleted table file
       vstorage->RemoveCurrentStats(f);
+      vstorage->DecreasePathSize(level, f);
     } else {
       vstorage->AddFile(level, f, info_log_);
     }
