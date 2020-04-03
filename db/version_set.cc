@@ -1573,7 +1573,7 @@ VersionStorageInfo::VersionStorageInfo(
     const InternalKeyComparator* internal_comparator,
     const Comparator* user_comparator, int levels,
     CompactionStyle compaction_style, VersionStorageInfo* ref_vstorage,
-    bool _force_consistency_checks, const std::vector<DbPath>& cf_paths)
+    bool _force_consistency_checks, const std::vector<DbPath>* cf_paths)
     : internal_comparator_(internal_comparator),
       user_comparator_(user_comparator),
       // cfd is nullptr if Version is dummy
@@ -1617,8 +1617,14 @@ VersionStorageInfo::VersionStorageInfo(
   } else {
     // Initialize PathInfo::capacity_ with cf_paths
     // It's ok that we only initialize capacity and leave other fields to zero.
-    for (auto& cf_path : cf_paths) {
-      multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
+    if (cf_paths == nullptr || cf_paths->empty()) {
+      // According to DBImpl::ValidateOptions, More than four DB paths are not supported yet. 
+      // To make checker happy.
+      multi_path_info_.resize(4);
+    } else {
+      for (auto& cf_path : *cf_paths) {
+        multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
+      }
     }
   }
 }
@@ -1645,7 +1651,7 @@ Version::Version(ColumnFamilyData* column_family_data, VersionSet* vset,
               ? nullptr
               : cfd_->current()->storage_info(),
           cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks,
-          cfd_->ioptions()->cf_paths),
+          cfd_ == nullptr ? nullptr : &(cfd_->ioptions()->cf_paths)),
       vset_(vset),
       next_(this),
       prev_(this),
@@ -2009,7 +2015,7 @@ void Version::PrepareApply(
   storage_info_.GenerateLevelFilesBrief();
   storage_info_.GenerateLevel0NonOverlapping();
   storage_info_.GenerateBottommostFiles();
-  storage_info_.CheckPathSize();
+  // storage_info_.CheckPathSize();
 }
 
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {
@@ -2526,7 +2532,7 @@ void VersionStorageInfo::AddFile(int level, FileMetaData* f, Logger* info_log) {
   VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
   path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
   path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
-  path_info.path_size_ += f->fd.GetFileSize();
+  path_info.add_size_ += f->fd.GetFileSize();
 }
 
 // Version::PrepareApply() need to be called before calling the function, or

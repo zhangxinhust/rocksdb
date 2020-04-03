@@ -102,7 +102,7 @@ class VersionStorageInfo {
                      CompactionStyle compaction_style,
                      VersionStorageInfo* src_vstorage,
                      bool _force_consistency_checks,
-                     const std::vector<DbPath>& cf_paths);
+                     const std::vector<DbPath>* cf_paths);
   ~VersionStorageInfo();
 
   void Reserve(int level, size_t size) { files_[level].reserve(size); }
@@ -425,25 +425,36 @@ class VersionStorageInfo {
     int path_base_level_;
     int path_top_levels_;
     uint64_t capacity_;
-    uint64_t path_size_;
+    uint64_t delete_size_;
+    uint64_t add_size_;
 
-    PathInfo() = default;
+    PathInfo()
+      : path_base_level_(std::numeric_limits<int>::max()),
+        path_top_levels_(0), capacity_(0),
+        delete_size_(0), add_size_(0) {}
 
     PathInfo(uint64_t capacity) 
       : path_base_level_(std::numeric_limits<int>::max()), 
-        capacity_(capacity) {}
+        path_top_levels_(0), capacity_(capacity),
+        delete_size_(0), add_size_(0) {}
 
-    bool isValid() { return path_base_level_ < path_top_levels_; }
+    bool isValid() { return path_base_level_ <= path_top_levels_; }
 
     bool isLevelInRange(int level) { 
       return path_base_level_ <= level && level <= path_top_levels_; 
     }
+
+    uint64_t GetPathSize() {
+      assert(add_size_ >= delete_size_);
+      return add_size_ - delete_size_;
+    }
   };
 
   void DecreasePathSize(int level, FileMetaData* f) {
-    VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
-    assert(path_info.isValid() && path_info.isLevelInRange(level));
-    path_info.path_size_ -= f->fd.GetFileSize();
+    VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()]; 
+    path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
+    path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
+    path_info.delete_size_ += f->fd.GetFileSize();
   }
 
   void CheckPathSize() {
@@ -458,7 +469,8 @@ class VersionStorageInfo {
       uint32_t cur_level_path_id = level_files[0]->fd.GetPathId();
       if (cur_level_path_id != pre_path_id) {
         // check PathInfo::path_size_ == actual path size?
-        assert(multi_path_info_[pre_path_id].path_size_ == path_size);
+        assert(multi_path_info_[pre_path_id].isValid());
+        assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
         pre_path_id = cur_level_path_id;
         path_size = 0;
       }
@@ -468,7 +480,10 @@ class VersionStorageInfo {
       }
     }
     // last path id
-    assert(multi_path_info_[pre_path_id].path_size_ == path_size);
+    if (path_size != 0) {
+      assert(multi_path_info_[pre_path_id].isValid());
+      assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
+    }
   }
 
  private:
