@@ -425,36 +425,27 @@ class VersionStorageInfo {
     int path_base_level_;
     int path_top_levels_;
     uint64_t capacity_;
-    uint64_t delete_size_;
-    uint64_t add_size_;
+    uint64_t path_size_;
 
-    PathInfo()
-      : path_base_level_(std::numeric_limits<int>::max()),
-        path_top_levels_(0), capacity_(0),
-        delete_size_(0), add_size_(0) {}
-
-    PathInfo(uint64_t capacity) 
+    PathInfo(uint64_t capacity = 0) 
       : path_base_level_(std::numeric_limits<int>::max()), 
         path_top_levels_(0), capacity_(capacity),
-        delete_size_(0), add_size_(0) {}
+        path_size_(0) {}
 
-    bool isValid() { return path_base_level_ <= path_top_levels_; }
+    bool isValid() const { return path_base_level_ <= path_top_levels_; }
 
-    bool isLevelInRange(int level) { 
+    bool isLevelInRange(int level) const { 
       return path_base_level_ <= level && level <= path_top_levels_; 
     }
 
-    uint64_t GetPathSize() {
-      assert(add_size_ >= delete_size_);
-      return add_size_ - delete_size_;
-    }
+    uint64_t GetPathSize() const { return path_size_; }
   };
 
-  void DecreasePathSize(int level, FileMetaData* f) {
+  void AccumulatePathSize(int level, FileMetaData* f) {
     VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()]; 
     path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
     path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
-    path_info.delete_size_ += f->fd.GetFileSize();
+    path_info.path_size_ += f->fd.GetFileSize();
   }
 
   void CheckPathSize() {
@@ -469,7 +460,9 @@ class VersionStorageInfo {
       uint32_t cur_level_path_id = level_files[0]->fd.GetPathId();
       if (cur_level_path_id != pre_path_id) {
         // check PathInfo::path_size_ == actual path size?
-        assert(multi_path_info_[pre_path_id].isValid());
+        if (path_size != 0) {
+          assert(multi_path_info_[pre_path_id].isValid());
+        }
         assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
         pre_path_id = cur_level_path_id;
         path_size = 0;
@@ -482,9 +475,11 @@ class VersionStorageInfo {
     // last path id
     if (path_size != 0) {
       assert(multi_path_info_[pre_path_id].isValid());
-      assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
     }
+    assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
   }
+
+  void GeneratePathInfos();
 
  private:
   const InternalKeyComparator* internal_comparator_;

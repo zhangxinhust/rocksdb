@@ -1612,19 +1612,16 @@ VersionStorageInfo::VersionStorageInfo(
     current_num_deletions_ = ref_vstorage->current_num_deletions_;
     current_num_samples_ = ref_vstorage->current_num_samples_;
     oldest_snapshot_seqnum_ = ref_vstorage->oldest_snapshot_seqnum_;
-    // Copy multi_path_info_ from ref_vstorage
-    multi_path_info_.assign(ref_vstorage->multi_path_info_);
+  }
+  // Initialize PathInfo::capacity_ with cf_paths
+  // It's ok that we only initialize capacity and leave other fields to zero.
+  if (cf_paths == nullptr || cf_paths->empty()) {
+    // According to DBImpl::ValidateOptions, More than four DB paths are not supported yet. 
+    // To make checker happy.
+    multi_path_info_.resize(4);
   } else {
-    // Initialize PathInfo::capacity_ with cf_paths
-    // It's ok that we only initialize capacity and leave other fields to zero.
-    if (cf_paths == nullptr || cf_paths->empty()) {
-      // According to DBImpl::ValidateOptions, More than four DB paths are not supported yet. 
-      // To make checker happy.
-      multi_path_info_.resize(4);
-    } else {
-      for (auto& cf_path : *cf_paths) {
-        multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
-      }
+    for (auto& cf_path : *cf_paths) {
+      multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
     }
   }
 }
@@ -2015,7 +2012,8 @@ void Version::PrepareApply(
   storage_info_.GenerateLevelFilesBrief();
   storage_info_.GenerateLevel0NonOverlapping();
   storage_info_.GenerateBottommostFiles();
-  // storage_info_.CheckPathSize();
+  storage_info_.GeneratePathInfos();
+  storage_info_.CheckPathSize();
 }
 
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {
@@ -2527,12 +2525,6 @@ void VersionStorageInfo::AddFile(int level, FileMetaData* f, Logger* info_log) {
 #endif
   f->refs++;
   level_files->push_back(f);
-
-  // Update PathInfo
-  VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()];
-  path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
-  path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
-  path_info.add_size_ += f->fd.GetFileSize();
 }
 
 // Version::PrepareApply() need to be called before calling the function, or
@@ -2632,6 +2624,14 @@ void SortFileByOverlappingRatio(
             });
 }
 }  // namespace
+
+void VersionStorageInfo::GeneratePathInfos() {
+  for (int level = 0; level < num_non_empty_levels_; level++) {
+    for (auto& file : files_[level]) {
+      AccumulatePathSize(level, file);
+    }
+  }
+}
 
 void VersionStorageInfo::UpdateFilesByCompactionPri(
     CompactionPri compaction_pri) {
