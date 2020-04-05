@@ -2013,7 +2013,12 @@ void Version::PrepareApply(
   storage_info_.GenerateLevel0NonOverlapping();
   storage_info_.GenerateBottommostFiles();
   storage_info_.GeneratePathInfos();
-  storage_info_.CheckPathSize();
+#ifndef NDEBUG
+  // CheckPathSize is designed for leveled compaction
+  if (cfd_->ioptions()->compaction_style == kCompactionStyleLevel) {
+    storage_info_.CheckPathSize();
+  }
+#endif
 }
 
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {
