@@ -197,6 +197,14 @@ class VersionStorageInfo {
   // Return idx'th highest score
   double CompactionScore(int idx) const { return compaction_score_[idx]; }
 
+  // Return path id that has idx'th highest score
+  uint32_t PathCompactionScoreId(int idx) const { return path_compaction_scores_[idx].path_id_; }
+
+  // Return idx'th highest score
+  double PathCompactionScore(int idx) const { return path_compaction_scores_[idx].path_compaction_score_; }
+
+  uint32_t GetPathCompactionScoreSize() const { return path_compaction_scores_.size(); }
+
   void GetOverlappingInputs(
       int level, const InternalKey* begin,  // nullptr means before all keys
       const InternalKey* end,               // nullptr means after all keys

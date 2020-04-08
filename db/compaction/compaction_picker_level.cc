@@ -36,6 +36,11 @@ bool LevelCompactionPicker::NeedsCompaction(
       return true;
     }
   }
+  for (uint32_t i = 0; i < vstorage->GetPathCompactionScoreSize(); i++) {
+    if (vstorage->PathCompactionScore(i) >= 1) {
+      return true;
+    }
+  }
   return false;
 }
 
