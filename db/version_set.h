@@ -203,7 +203,7 @@ class VersionStorageInfo {
   // Return idx'th highest score
   double PathCompactionScore(int idx) const { return path_compaction_scores_[idx].path_compaction_score_; }
 
-  uint32_t GetPathCompactionScoreSize() const { return path_compaction_scores_.size(); }
+  int GetPathCompactionScoreSize() const { return static_cast<int>(path_compaction_scores_.size()); }
 
   void GetOverlappingInputs(
       int level, const InternalKey* begin,  // nullptr means before all keys
