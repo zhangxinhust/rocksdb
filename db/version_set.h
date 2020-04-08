@@ -133,6 +133,8 @@ class VersionStorageInfo {
   void ComputeCompactionScore(const ImmutableCFOptions& immutable_cf_options,
                               const MutableCFOptions& mutable_cf_options);
 
+  void ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options);
+
   // Estimate est_comp_needed_bytes_
   void EstimateCompactionBytesNeeded(
       const MutableCFOptions& mutable_cf_options);
@@ -419,6 +421,14 @@ class VersionStorageInfo {
                                      const Slice& largest_user_key,
                                      int last_level, int last_l0_idx);
   
+  struct PathIdWithScore {
+    double path_compaction_score_;
+    uint32_t path_id_;
+
+    PathIdWithScore(double path_compaction_score, uint32_t path_id)
+      : path_compaction_score_(path_compaction_score), path_id_(path_id) {}
+  };
+
   // Information of a path used by a ColumnFamily, including base level, 
   // top levels, current size and capacity. 
   struct PathInfo {
@@ -427,7 +437,7 @@ class VersionStorageInfo {
     uint64_t capacity_;
     uint64_t path_size_;
 
-    PathInfo(uint64_t capacity = 0) 
+    PathInfo(uint64_t capacity = std::numeric_limits<uint64_t>::max()) 
       : path_base_level_(std::numeric_limits<int>::max()), 
         path_top_levels_(0), capacity_(capacity),
         path_size_(0) {}
@@ -439,6 +449,11 @@ class VersionStorageInfo {
     }
 
     uint64_t GetPathSize() const { return path_size_; }
+
+    double CalculateCompactionScore() const { 
+      assert(capacity_ != 0);
+      return static_cast<double>(path_size_) / capacity_;
+    }
   };
 
   void AccumulatePathSize(int level, FileMetaData* f) {
@@ -568,6 +583,9 @@ class VersionStorageInfo {
   std::vector<int> compaction_level_;
   int l0_delay_trigger_count_ = 0;  // Count used to trigger slow down and stop
                                     // for number of L0 files.
+
+  // The CompactionScore of Path means PathSize / capacity
+  std::vector<PathIdWithScore> path_compaction_scores_;
 
   // the following are the sampled temporary stats.
   // the current accumulated size of sampled files.

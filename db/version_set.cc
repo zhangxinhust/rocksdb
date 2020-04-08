@@ -2386,6 +2386,24 @@ void VersionStorageInfo::ComputeCompactionScore(
   EstimateCompactionBytesNeeded(mutable_cf_options);
 }
 
+void VersionStorageInfo::ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options) {
+  assert(!immutable_cf_options.cf_paths.empty());
+  assert(path_compaction_scores_.empty());
+  for (uint32_t path_idx = 0; path_idx < immutable_cf_options.cf_paths.size(); path_idx++) {
+    path_compaction_scores_.push_back(
+      PathIdWithScore(
+        // Other compaction styles are not support currently. 
+        immutable_cf_options.compaction_style == kCompactionStyleLevel ?
+        multi_path_info_[path_idx].CalculateCompactionScore() : 0.0, path_idx));
+  }
+
+  std::sort(path_compaction_scores_.begin(), path_compaction_scores_.end(), 
+    [] (const PathIdWithScore& p1, const PathIdWithScore& p2) {
+      return p1.path_compaction_score_ > p2.path_compaction_score_;
+    }
+  );
+}
+
 void VersionStorageInfo::ComputeFilesMarkedForCompaction() {
   files_marked_for_compaction_.clear();
   int last_qualify_level = 0;
@@ -3491,6 +3509,8 @@ void VersionSet::AppendVersion(ColumnFamilyData* column_family_data,
   v->storage_info()->ComputeCompactionScore(
       *column_family_data->ioptions(),
       *column_family_data->GetLatestMutableCFOptions());
+
+  v->storage_info()->ComputePathCompactionScore(*column_family_data->ioptions());
 
   // Mark v finalized
   v->storage_info_.SetFinalized();
