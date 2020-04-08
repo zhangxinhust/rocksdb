@@ -2387,7 +2387,6 @@ void VersionStorageInfo::ComputeCompactionScore(
 }
 
 void VersionStorageInfo::ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options) {
-  assert(!immutable_cf_options.cf_paths.empty());
   assert(path_compaction_scores_.empty());
   for (uint32_t path_idx = 0; path_idx < immutable_cf_options.cf_paths.size(); path_idx++) {
     path_compaction_scores_.push_back(

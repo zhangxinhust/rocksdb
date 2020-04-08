@@ -451,8 +451,12 @@ class VersionStorageInfo {
     uint64_t GetPathSize() const { return path_size_; }
 
     double CalculateCompactionScore() const { 
-      assert(capacity_ != 0);
-      return static_cast<double>(path_size_) / capacity_;
+      if (capacity_ != 0) {
+        return static_cast<double>(path_size_) / capacity_;
+      } else {
+        // This happens when default ctor of DbPath is called.
+        return std::numeric_limits<double>::max();
+      }
     }
   };
 
