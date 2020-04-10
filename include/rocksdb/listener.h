@@ -93,6 +93,8 @@ enum class CompactionReason : int {
   kExternalSstIngestion,
   // Compaction due to SST file being too old
   kPeriodicCompaction,
+  // [Currently only for Level] Compaction caused by cf path size overflow
+  kPathCompaction,
   // total number of compaction reasons, new reasons must be added above this.
   kNumOfReasons,
 };
