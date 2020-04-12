@@ -247,12 +247,8 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   }
 
   if (start_level_inputs_.empty()) {
-    double path_score = 0;
-    uint32_t path_id = 0;
     for (int i = 0; i < vstorage_->GetPathCompactionScoreSize(); i++) {
-      path_score = vstorage_->PathCompactionScore(i);
-      path_id = vstorage_->PathCompactionScoreId(i);
-      assert(i == 0 || path_score <= vstorage_->PathCompactionScore(i - 1));
+      uint32_t path_id = vstorage_->PathCompactionScoreId(i);
       const autovector<VersionStorageInfo::PathInfo>& path_infos = vstorage_->MultiPathInfos();
       const VersionStorageInfo::PathInfo& path_info = path_infos[path_id];
       assert(path_info.isValid());
