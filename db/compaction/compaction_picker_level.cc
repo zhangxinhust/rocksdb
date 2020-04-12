@@ -246,6 +246,35 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     }
   }
 
+  if (start_level_inputs_.empty()) {
+    double path_score = 0;
+    uint32_t path_id = 0;
+    for (int i = 0; i < vstorage_->GetPathCompactionScoreSize(); i++) {
+      path_score = vstorage_->PathCompactionScore(i);
+      path_id = vstorage_->PathCompactionScoreId(i);
+      assert(i == 0 || path_score <= vstorage_->PathCompactionScore(i - 1));
+      const autovector<VersionStorageInfo::PathInfo>& path_infos = vstorage_->MultiPathInfos();
+      const VersionStorageInfo::PathInfo& path_info = path_infos[path_id];
+      assert(path_info.isValid());
+      const VersionStorageInfo::PathInfo& next_path_info = path_infos[path_id + 1];
+      start_level_ = path_info.path_top_levels_;
+      if (next_path_info.isValid()) {
+        output_level_ = next_path_info.path_base_level_;
+      } else {
+        if (start_level_ >= compaction_picker_->NumberLevels() - 1)
+          continue;
+        output_level_ = start_level_ + 1;
+      }
+
+      if (PickFileToCompact()) {
+        compaction_reason_ = CompactionReason::kPathCompaction;
+        break;
+      } else {
+        start_level_inputs_.clear();
+      }
+    }
+  }
+
   // if we didn't find a compaction, check if there are any files marked for
   // compaction
   if (start_level_inputs_.empty()) {

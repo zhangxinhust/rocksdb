@@ -2388,12 +2388,17 @@ void VersionStorageInfo::ComputeCompactionScore(
 
 void VersionStorageInfo::ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options) {
   assert(path_compaction_scores_.empty());
-  for (uint32_t path_idx = 0; path_idx < immutable_cf_options.cf_paths.size(); path_idx++) {
+  for (int path_idx = 0; 
+    path_idx < static_cast<int>(immutable_cf_options.cf_paths.size()) - 1; 
+    path_idx++) {
+    fprintf(stderr, "VersionStorageInfo::ComputePathCompactionScore check: size: %ld, idx: %d\n", 
+      multi_path_info_.size(), path_idx);
     path_compaction_scores_.push_back(
       PathIdWithScore(
         // Other compaction styles are not support currently. 
         immutable_cf_options.compaction_style == kCompactionStyleLevel ?
         multi_path_info_[path_idx].CalculateCompactionScore() : 0.0, path_idx));
+    fprintf(stderr, "VersionStorageInfo::ComputePathCompactionScore check end\n");
   }
 
   std::sort(path_compaction_scores_.begin(), path_compaction_scores_.end(), 

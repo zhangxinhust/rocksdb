@@ -469,10 +469,13 @@ class VersionStorageInfo {
   };
 
   void AccumulatePathSize(int level, FileMetaData* f) {
+    fprintf(stderr, "AccumulatePathSize: size: %ld, idx: %d\n", 
+      multi_path_info_.size(), f->fd.GetPathId());
     VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()]; 
     path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
     path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
     path_info.path_size_ += f->fd.GetFileSize();
+    fprintf(stderr, "AccumulatePathSize: check end\n");
   }
 
   void CheckPathSize() {
@@ -507,6 +510,11 @@ class VersionStorageInfo {
   }
 
   void GeneratePathInfos();
+
+  const autovector<PathInfo>& MultiPathInfos() {
+    assert(finalized_);
+    return multi_path_info_;
+  }
 
  private:
   const InternalKeyComparator* internal_comparator_;
