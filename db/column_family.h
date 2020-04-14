@@ -26,6 +26,7 @@
 #include "rocksdb/options.h"
 #include "trace_replay/block_cache_tracer.h"
 #include "util/thread_local.h"
+#include "file/path_size_recorder.h"
 
 namespace rocksdb {
 
@@ -679,6 +680,8 @@ class ColumnFamilySet {
   // 2. accessed from a single-threaded write thread
   std::unordered_map<std::string, uint32_t> column_families_;
   std::unordered_map<uint32_t, ColumnFamilyData*> column_family_data_;
+
+  PathSizeRecorder psr_;
 
   uint32_t max_column_family_;
   ColumnFamilyData* dummy_cfd_;
