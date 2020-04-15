@@ -1273,6 +1273,20 @@ void ColumnFamilyData::PathSizeRecorderOnDeleteFile(const std::string& file_path
   column_family_set_->psr_.OnDeleteFile(file_path);
 }
 
+void ColumnFamilyData::PathSizeRecorderOnAddFileWhileDBOpen() {
+  assert(column_family_set_ != nullptr && current_ != nullptr);
+  const VersionStorageInfo* vstorage = current_->storage_info();
+  for (int i = 0; i < vstorage->num_levels(); i++) {
+    if (vstorage->LevelFiles(i).empty())
+      continue;
+    for (auto meta_data : vstorage->LevelFiles(i)) {
+        std::string file_name = 
+          TableFileName(ioptions_.cf_paths, meta_data->fd.GetNumber(), meta_data->fd.GetPathId());
+        column_family_set_->psr_.OnAddFile(file_name, GetID(), meta_data->fd.GetPathId());
+    }
+  }
+}
+
 ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
                                  const ImmutableDBOptions* db_options,
                                  const EnvOptions& env_options,

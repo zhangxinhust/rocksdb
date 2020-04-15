@@ -502,6 +502,8 @@ class ColumnFamilyData {
 
   void PathSizeRecorderOnDeleteFile(const std::string& file_path); 
 
+  void PathSizeRecorderOnAddFileWhileDBOpen();
+
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,
@@ -668,6 +670,10 @@ class ColumnFamilySet {
   void FreeDeadColumnFamilies();
 
   Cache* get_table_cache() { return table_cache_; }
+
+  void PathSizeRecorderDeleteFile(const std::string& fname) {
+    psr_.OnDeleteFile(fname);
+  }
 
  private:
   friend class ColumnFamilyData;
