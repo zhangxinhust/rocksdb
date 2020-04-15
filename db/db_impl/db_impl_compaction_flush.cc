@@ -230,6 +230,10 @@ Status DBImpl::FlushMemTableToOutputFile(
       }
     }
 #endif  // ROCKSDB_LITE
+
+    cfd->PathSizeRecorderOnAddFile(
+      MakeTableFileName(
+        cfd->ioptions()->cf_paths[0].path, file_meta.fd.GetNumber()), 0);
   }
   TEST_SYNC_POINT("DBImpl::FlushMemTableToOutputFile:Finish");
   return s;
@@ -523,6 +527,15 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
       }
     }
 #endif  // ROCKSDB_LITE
+    for (int i = 0; i != num_cfs; ++i) {
+      if (cfds[i]->IsDropped()) {
+        continue;
+      }
+      cfds[i]->PathSizeRecorderOnAddFile(
+        MakeTableFileName(
+            cfds[i]->ioptions()->cf_paths[0].path, file_meta[i].fd.GetNumber()), 0
+      );
+    }
   }
 
   // Need to undo atomic flush if something went wrong, i.e. s is not OK and

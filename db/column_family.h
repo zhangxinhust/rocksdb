@@ -498,6 +498,10 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
 
+  void PathSizeRecorderOnAddFile(const std::string& file_path, uint32_t path_id); 
+
+  void PathSizeRecorderOnDeleteFile(const std::string& file_path); 
+
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,
@@ -681,8 +685,6 @@ class ColumnFamilySet {
   std::unordered_map<std::string, uint32_t> column_families_;
   std::unordered_map<uint32_t, ColumnFamilyData*> column_family_data_;
 
-  PathSizeRecorder psr_;
-
   uint32_t max_column_family_;
   ColumnFamilyData* dummy_cfd_;
   // We don't hold the refcount here, since default column family always exists
@@ -698,6 +700,8 @@ class ColumnFamilySet {
   WriteBufferManager* write_buffer_manager_;
   WriteController* write_controller_;
   BlockCacheTracer* const block_cache_tracer_;
+
+  PathSizeRecorder psr_;
 };
 
 // We use ColumnFamilyMemTablesImpl to provide WriteBatch a way to access

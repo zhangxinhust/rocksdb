@@ -19,7 +19,7 @@ namespace rocksdb {
 
 class PathSizeRecorder {
 public:
-    PathSizeRecorder() = default;
+    PathSizeRecorder(Env* env) : env_(env) {}
 
     void AddCfPaths(uint32_t cfd_id, const std::vector<DbPath>& cf_paths) {
         if (cf_paths.empty())

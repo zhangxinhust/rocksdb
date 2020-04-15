@@ -1262,6 +1262,17 @@ Directory* ColumnFamilyData::GetDataDir(size_t path_id) const {
   return data_dirs_[path_id].get();
 }
 
+void ColumnFamilyData::PathSizeRecorderOnAddFile(const std::string& file_path, 
+                                                 uint32_t path_id) {
+  assert(column_family_set_ != nullptr);
+  column_family_set_->psr_.OnAddFile(file_path, GetID(), path_id);
+}
+
+void ColumnFamilyData::PathSizeRecorderOnDeleteFile(const std::string& file_path) {
+  assert(column_family_set_ != nullptr);
+  column_family_set_->psr_.OnDeleteFile(file_path);
+}
+
 ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
                                  const ImmutableDBOptions* db_options,
                                  const EnvOptions& env_options,
@@ -1280,7 +1291,8 @@ ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
       table_cache_(table_cache),
       write_buffer_manager_(write_buffer_manager),
       write_controller_(write_controller),
-      block_cache_tracer_(block_cache_tracer) {
+      block_cache_tracer_(block_cache_tracer),
+      psr_(db_options_->env) {
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
@@ -1361,6 +1373,8 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
   if (id == 0) {
     default_cfd_cache_ = new_cfd;
   }
+
+  psr_.AddCfPaths(new_cfd->GetID(), new_cfd->ioptions()->cf_paths);
   return new_cfd;
 }
 
