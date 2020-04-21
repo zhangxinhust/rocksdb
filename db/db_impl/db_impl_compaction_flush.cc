@@ -1089,6 +1089,126 @@ Status DBImpl::CompactFilesImpl(
 }
 #endif  // ROCKSDB_LITE
 
+Status DBImpl::ManualCompactionForPathSize(
+  ColumnFamilyHandle* column_family, const int input_path_id,
+  const int output_path_id) {
+  if (column_family == nullptr) {
+    return Status::InvalidArgument("ColumnFamilyHandle must be non-null.");
+  }
+  
+  auto cfd = reinterpret_cast<ColumnFamilyHandleImpl*>(column_family)->cfd();
+  assert(cfd);
+
+  if (cfd->ioptions()->cf_paths.size() <= 1) {
+    return Status::NotSupported("ManualCompactionForPathSize is not supported when "
+                                "the number of file paths is less than or equal to 1.");
+  }
+
+  if (input_path_id >= static_cast<int>(cfd->ioptions()->cf_paths.size())) {
+    return Status::InvalidArgument("Invalid input path id.");
+  }
+
+  if (output_path_id >= static_cast<int>(cfd->ioptions()->cf_paths.size())) {
+    return Status::InvalidArgument("Invalid output path id.");
+  }
+
+  Status s;
+  JobContext job_context(0, true);
+  LogBuffer log_buffer(InfoLogLevel::INFO_LEVEL,
+                       immutable_db_options_.info_log.get());
+
+  // Perform Compaction now.
+  {
+    InstrumentedMutexLock l(&mutex_);
+
+    while (num_running_ingest_file_ > 0 || 
+           bg_bottom_compaction_scheduled_ > 0 ||
+           bg_compaction_scheduled_ > 0) {
+      bg_cv_.Wait();
+    }
+
+    auto* current = cfd->current();
+    current->Ref();
+
+    if (shutting_down_.load(std::memory_order_acquire)) {
+      return Status::ShutdownInProgress();
+    }
+
+    ColumnFamilyMetaData cf_meta;
+    current->GetColumnFamilyMetaData(&cf_meta);
+
+    // Determine the path id to compact by LocalPathSizeAndCapacity.
+    std::vector<std::pair<uint64_t, uint64_t>> path_info =
+      cfd->GetLocalPathInfo();
+    assert(!path_info.empty());
+    int max_fill_rate_path_id = 0;
+    double max_fill_rate = 0;
+    // The last path size is regarded as Unlimited.
+    for (int i = 0; i < static_cast<int>(path_info.size()) - 1; i++) {
+      if (path_info[i].second == 0) {
+        max_fill_rate_path_id = i;
+        max_fill_rate = std::numeric_limits<double>::max();
+        break;
+      }
+      double tmp_rate = static_cast<double>(path_info[i].first) / 
+        (path_info[i].second);
+      if (tmp_rate > max_fill_rate) {
+        max_fill_rate_path_id = i;
+        max_fill_rate = tmp_rate;
+      }
+    }
+
+    std::string input_file_path;
+    if (max_fill_rate_path_id < static_cast<int>(cfd->ioptions()->cf_paths.size())) {
+      input_file_path = cfd->ioptions()->cf_paths[max_fill_rate_path_id].path;
+    } else {
+      assert(!cfd->ioptions()->cf_paths.empty());
+      input_file_path = cfd->ioptions()->cf_paths.back().path;
+    }
+
+    int output_path = output_path_id == -1 ? 
+      (max_fill_rate_path_id + 1) : output_path_id;
+    std::string output_file_path;
+    if (output_path < static_cast<int>(cfd->ioptions()->cf_paths.size())) {
+      output_file_path = cfd->ioptions()->cf_paths[output_path].path;
+    } else {
+      assert(!cfd->ioptions()->cf_paths.empty());
+      output_file_path = cfd->ioptions()->cf_paths.back().path;
+    }
+
+    // Pick files in max_fill_rate_path_id'th path.
+    // Get the lowest level of output_path_id'th path.
+    // auto& levels = cf_meta.levels;
+    // for (int l = 0; l < levels.size(); l++) {
+    //   for (auto& file : levels[l].files) {
+        
+    //   }
+    // }
+
+    std::vector<CompactionInputFiles> input_files;
+
+
+    current->Unref();
+
+  }
+
+  {
+    InstrumentedMutexLock l(&mutex_);
+    FindObsoleteFiles(&job_context, !s.ok());
+  }
+
+  if (job_context.HaveSomethingToClean() ||
+      job_context.HaveSomethingToDelete() || !log_buffer.IsEmpty()) {
+    log_buffer.FlushBufferToLog();
+    if (job_context.HaveSomethingToDelete()) {
+      PurgeObsoleteFiles(job_context);
+    }
+    job_context.Clean();
+  }
+
+  return s;
+}
+
 Status DBImpl::PauseBackgroundWork() {
   InstrumentedMutexLock guard_lock(&mutex_);
   bg_compaction_paused_++;

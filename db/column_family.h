@@ -504,6 +504,10 @@ class ColumnFamilyData {
 
   void PathSizeRecorderOnAddFileWhileDBOpen();
 
+  std::vector<std::pair<uint64_t, uint64_t>> GetLocalPathInfo();
+
+  std::vector<std::pair<uint64_t, uint64_t>> GetGlobalPathInfo();
+
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,

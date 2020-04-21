@@ -263,11 +263,19 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       }
 
       if (PickFileToCompact()) {
-        compaction_reason_ = CompactionReason::kPathCompaction;
+        if (start_level_ == 0) {
+          compaction_reason_ = CompactionReason::kLevelL0FilesNum;
+        } else {
+          compaction_reason_ = CompactionReason::kLevelMaxLevelSize;
+        }
         break;
       } else {
         start_level_inputs_.clear();
       }
+    }
+
+    if (!start_level_inputs_.empty()) {
+      fprintf(stdout, "Path Compaction Triggered.\n");
     }
   }
 

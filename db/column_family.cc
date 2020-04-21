@@ -1287,6 +1287,14 @@ void ColumnFamilyData::PathSizeRecorderOnAddFileWhileDBOpen() {
   }
 }
 
+std::vector<std::pair<uint64_t, uint64_t>> ColumnFamilyData::GetLocalPathInfo() {
+  return column_family_set_->psr_.GetLocalPathSizeAndCapacity(GetID());
+}
+
+std::vector<std::pair<uint64_t, uint64_t>> ColumnFamilyData::GetGlobalPathInfo() {
+  return column_family_set_->psr_.GetGlobalPathSizeAndCapacity(GetID());
+}
+
 ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
                                  const ImmutableDBOptions* db_options,
                                  const EnvOptions& env_options,
