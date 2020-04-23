@@ -273,10 +273,6 @@ void LevelCompactionBuilder::SetupInitialFiles() {
         start_level_inputs_.clear();
       }
     }
-
-    if (!start_level_inputs_.empty()) {
-      fprintf(stdout, "Path Compaction Triggered.\n");
-    }
   }
 
   // if we didn't find a compaction, check if there are any files marked for

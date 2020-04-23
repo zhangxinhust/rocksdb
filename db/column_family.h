@@ -468,11 +468,17 @@ class ColumnFamilyData {
     kMemtableLimit,
     kL0FileCountLimit,
     kPendingCompactionBytes,
+    kPathSizeLimit,
   };
+  // GetWriteStallConditionAndCause is a static member method, 
+  // so we consider adding a parameter global_path_info to trigger 
+  // write stall or write stop by path size for it.
   static std::pair<WriteStallCondition, WriteStallCause>
   GetWriteStallConditionAndCause(int num_unflushed_memtables, int num_l0_files,
                                  uint64_t num_compaction_needed_bytes,
-                                 const MutableCFOptions& mutable_cf_options);
+                                 const MutableCFOptions& mutable_cf_options,
+                                 const std::vector<std::pair<uint64_t, uint64_t>> global_path_info,
+                                 bool is_leveled_compaction);
 
   // Recalculate some small conditions, which are changed only during
   // compaction, adding new memtable and/or
@@ -481,6 +487,8 @@ class ColumnFamilyData {
   // a write stall
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
+
+  void MaybeDeconstructPathSizeWriteStopToken();
 
   void set_initialized() { initialized_.store(true); }
 
@@ -577,6 +585,7 @@ class ColumnFamilyData {
   ColumnFamilySet* column_family_set_;
 
   std::unique_ptr<WriteControllerToken> write_controller_token_;
+  bool is_path_size_stop_token_;
 
   // If true --> this ColumnFamily is currently present in DBImpl::flush_queue_
   bool queued_for_flush_;
@@ -676,7 +685,13 @@ class ColumnFamilySet {
   Cache* get_table_cache() { return table_cache_; }
 
   void PathSizeRecorderDeleteFile(const std::string& fname) {
-    psr_.OnDeleteFile(fname);
+    int cfd_id = psr_.OnDeleteFile(fname);
+    if (cfd_id != -1) {
+      ColumnFamilyData* cfd = GetColumnFamily(cfd_id);
+      if (cfd != nullptr) {
+        cfd->MaybeDeconstructPathSizeWriteStopToken();
+      }
+    }
   }
 
  private:

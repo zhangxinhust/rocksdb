@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <cinttypes>
 
 #include "port/port.h"
 #include "util/mutexlock.h"
@@ -83,24 +84,26 @@ public:
         }
     }
 
-    void OnDeleteFile(const std::string& file_path) {
+    int OnDeleteFile(const std::string& file_path) {
         MutexLock l(&mu_);
         auto tracked_file = tracked_files_.find(file_path);
         if (tracked_file == tracked_files_.end()) {
             // File is not tracked
-            return;
+            return -1;
         }
         SstFile& sstfile = tracked_file->second;
-        auto path = cfd_paths_.find(sstfile.cfd_id_);
-        assert(path != cfd_paths_.end());
+        auto paths = cfd_paths_.find(sstfile.cfd_id_);
+        assert(paths != cfd_paths_.end());
         // Update local path size
-        uint64_t& local_path_size = (path->second)[sstfile.local_path_id_].cfd_local_path_size_;
+        uint64_t& local_path_size = (paths->second)[sstfile.local_path_id_].cfd_local_path_size_;
         assert(local_path_size >= sstfile.file_size_);
         local_path_size -= sstfile.file_size_;
         // Update global path size
-        uint32_t global_path_id = (path->second)[sstfile.local_path_id_].global_path_id_;
+        uint32_t global_path_id = (paths->second)[sstfile.local_path_id_].global_path_id_;
         paths_size_[global_path_id].global_path_size_ -= sstfile.file_size_;
+        int cfd_id = static_cast<int>(sstfile.cfd_id_);
         tracked_files_.erase(tracked_file);
+        return cfd_id;
     }
 
     std::vector<std::pair<uint64_t, uint64_t>> 

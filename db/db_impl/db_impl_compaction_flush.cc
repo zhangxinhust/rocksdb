@@ -1143,11 +1143,15 @@ Status DBImpl::ManualCompactionForPathSize(
     assert(!path_info.empty());
     int max_fill_rate_path_id = 0;
     double max_fill_rate = 0;
+    uint64_t max_fill_rate_path_size = 0;
+    uint64_t max_fill_rate_path_capacity = 0;
     // The last path size is regarded as Unlimited.
     for (int i = 0; i < static_cast<int>(path_info.size()) - 1; i++) {
       if (path_info[i].second == 0) {
         max_fill_rate_path_id = i;
         max_fill_rate = std::numeric_limits<double>::max();
+        max_fill_rate_path_size = path_info[i].first;
+        max_fill_rate_path_capacity = path_info[i].second;
         break;
       }
       double tmp_rate = static_cast<double>(path_info[i].first) / 
@@ -1155,27 +1159,43 @@ Status DBImpl::ManualCompactionForPathSize(
       if (tmp_rate > max_fill_rate) {
         max_fill_rate_path_id = i;
         max_fill_rate = tmp_rate;
+        max_fill_rate_path_size = path_info[i].first;
+        max_fill_rate_path_capacity = path_info[i].second;
       }
     }
 
+    (void)max_fill_rate_path_size;
+    (void)max_fill_rate_path_capacity;
+
     std::string input_file_path;
+    int actual_input_path_id;
     if (max_fill_rate_path_id < static_cast<int>(cfd->ioptions()->cf_paths.size())) {
       input_file_path = cfd->ioptions()->cf_paths[max_fill_rate_path_id].path;
+      actual_input_path_id = max_fill_rate_path_id;
     } else {
       assert(!cfd->ioptions()->cf_paths.empty());
       input_file_path = cfd->ioptions()->cf_paths.back().path;
+      actual_input_path_id = cfd->ioptions()->cf_paths.size() - 1;
     }
 
     int output_path = output_path_id == -1 ? 
       (max_fill_rate_path_id + 1) : output_path_id;
     std::string output_file_path;
+    int actual_output_path_id;
     if (output_path < static_cast<int>(cfd->ioptions()->cf_paths.size())) {
       output_file_path = cfd->ioptions()->cf_paths[output_path].path;
+      actual_output_path_id = output_path;
     } else {
       assert(!cfd->ioptions()->cf_paths.empty());
       output_file_path = cfd->ioptions()->cf_paths.back().path;
+      actual_input_path_id = cfd->ioptions()->cf_paths.size() - 1;
     }
 
+    if (actual_output_path_id < actual_input_path_id) {
+      return Status::InvalidArgument("Output path id is less than input path id.");
+    }
+
+    bool same_path_id = actual_input_path_id == actual_output_path_id;
     // Pick files in max_fill_rate_path_id'th path.
     // Get the lowest level of output_path_id'th path.
     // auto& levels = cf_meta.levels;
@@ -1935,7 +1955,9 @@ Status DBImpl::WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
           ColumnFamilyData::GetWriteStallConditionAndCause(
               cfd->imm()->NumNotFlushed() + 1,
               vstorage->l0_delay_trigger_count() + 1,
-              vstorage->estimated_compaction_needed_bytes(), mutable_cf_options)
+              vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
+              std::move(cfd->GetGlobalPathInfo()),
+              cfd->ioptions()->compaction_style == CompactionStyle::kCompactionStyleLevel)
               .first;
     } while (write_stall_condition != WriteStallCondition::kNormal);
   }
