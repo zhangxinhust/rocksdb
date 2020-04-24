@@ -382,6 +382,22 @@ struct AdvancedColumnFamilyOptions {
   // Dynamically changeable through SetOptions() API
   int level0_stop_writes_trigger = 36;
 
+  // When the amount of data in a file path exceeds capacity_warn_rate, 
+  // we start slowing down writes at this point.
+  //
+  // Default: 90%
+  // 
+  // Dynamically changeable through SetOptions() API
+  double capacity_warn_rate = 90.0 / 100;
+
+  // When the amount of data in a file path exceeds capacity_danger_rate, 
+  // we stop writes at this point.
+  //
+  // Default: 95%
+  // 
+  // Dynamically changeable through SetOptions() API
+  double capacity_danger_rate = 95.0 / 100;
+
   // Target file size for compaction.
   // target_file_size_base is per-file size for level-1.
   // Target file size for level L can be calculated by

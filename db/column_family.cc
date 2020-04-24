@@ -295,6 +295,32 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
                    result.level0_file_num_compaction_trigger);
   }
 
+  if (result.capacity_danger_rate <= 0.0 || 
+      result.capacity_danger_rate > 1.0) {
+    result.capacity_danger_rate = 95.0 / 100;
+  }
+
+  if (result.capacity_warn_rate <= 0.0 || 
+      result.capacity_warn_rate > 1.0) {
+    result.capacity_warn_rate = 90.0 / 100;
+  }
+
+  if (result.capacity_danger_rate < result.capacity_warn_rate) {
+    ROCKS_LOG_WARN(db_options.info_log.get(),
+                   "This condition must be satisfied: "
+                   "capacity_danger_rate(%lf) >= "
+                   "capacity_warn_rate(%lf)",
+                   result.capacity_danger_rate,
+                   result.capacity_warn_rate);
+    result.capacity_danger_rate = result.capacity_warn_rate;
+    ROCKS_LOG_WARN(db_options.info_log.get(),
+                   "Adjust the value to "
+                   "capacity_danger_rate(%lf) "
+                   "capacity_warn_rate(%lf)",
+                   result.capacity_danger_rate,
+                   result.capacity_warn_rate);
+  }
+
   if (result.soft_pending_compaction_bytes_limit == 0) {
     result.soft_pending_compaction_bytes_limit =
         result.hard_pending_compaction_bytes_limit;
@@ -693,11 +719,9 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
     const std::vector<std::pair<uint64_t, uint64_t>> global_path_info,
     bool is_leveled_compaction) {
   bool capacity_warn = false, capacity_danger = false;
-  // Currently we use the preset ratio, 
-  // we will soon support users to set it by Options.
   if (is_leveled_compaction) {
-    const double capacity_warn_rate = 90.0 / 100;
-    const double capacity_danger_rate = 95.0 / 100;
+    const double capacity_warn_rate = mutable_cf_options.capacity_warn_rate;
+    const double capacity_danger_rate = mutable_cf_options.capacity_danger_rate;
     for (auto& size_and_capacity : global_path_info) {
       double rate = static_cast<double>(size_and_capacity.first) / 
         size_and_capacity.second;
@@ -772,8 +796,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       ROCKS_LOG_WARN(
           ioptions_.info_log,
           "[%s] Stopping writes because the data size of a path "
-          "larger than 95%% of the target size.",
-          name_.c_str());
+          "larger than %d%% of the target size.",
+          name_.c_str(), 
+          static_cast<int>(mutable_cf_options.capacity_danger_rate * 100));
     } else if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
       write_controller_token_ = write_controller->GetStopToken();
@@ -815,9 +840,10 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       ROCKS_LOG_WARN(
           ioptions_.info_log,
           "[%s] Stalling writes because the data size of a path "
-          "larger than 90%% of the target size."
+          "larger than %d%% of the target size."
           "rate %" PRIu64,
           name_.c_str(),
+          static_cast<int>(mutable_cf_options.capacity_warn_rate * 100),
           write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kMemtableLimit) {
