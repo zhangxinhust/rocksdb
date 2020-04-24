@@ -1175,7 +1175,8 @@ Status DBImpl::ManualCompactionForPathSize(
     } else {
       assert(!cfd->ioptions()->cf_paths.empty());
       input_file_path = cfd->ioptions()->cf_paths.back().path;
-      actual_input_path_id = cfd->ioptions()->cf_paths.size() - 1;
+      actual_input_path_id = 
+        static_cast<int>(cfd->ioptions()->cf_paths.size()) - 1;
     }
 
     int output_path = output_path_id == -1 ? 
@@ -1188,7 +1189,8 @@ Status DBImpl::ManualCompactionForPathSize(
     } else {
       assert(!cfd->ioptions()->cf_paths.empty());
       output_file_path = cfd->ioptions()->cf_paths.back().path;
-      actual_output_path_id = cfd->ioptions()->cf_paths.size() - 1;
+      actual_output_path_id = 
+        static_cast<int>(cfd->ioptions()->cf_paths.size()) - 1;
     }
 
     if (actual_output_path_id < actual_input_path_id) {
@@ -1957,7 +1959,7 @@ Status DBImpl::WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
               cfd->imm()->NumNotFlushed() + 1,
               vstorage->l0_delay_trigger_count() + 1,
               vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
-              std::move(cfd->GetGlobalPathInfo()),
+              cfd->GetGlobalPathInfo(),
               cfd->ioptions()->compaction_style == CompactionStyle::kCompactionStyleLevel)
               .first;
     } while (write_stall_condition != WriteStallCondition::kNormal);
