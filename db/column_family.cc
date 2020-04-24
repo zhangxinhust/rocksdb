@@ -756,9 +756,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     auto write_stall_condition_and_cause = GetWriteStallConditionAndCause(
         imm()->NumNotFlushed(), vstorage->l0_delay_trigger_count(),
         vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
-        // We use std::move to prevent copying here,
-        // although the compiler may automatically optimize (RVO)
-        std::move(GetGlobalPathInfo()),
+        GetGlobalPathInfo(),
         ioptions_.compaction_style == CompactionStyle::kCompactionStyleLevel);
     write_stall_condition = write_stall_condition_and_cause.first;
     auto write_stall_cause = write_stall_condition_and_cause.second;
@@ -939,7 +937,7 @@ void ColumnFamilyData::MaybeDeconstructPathSizeWriteStopToken() {
   }
   if (is_path_size_stop_token_) {
     const double capacity_danger_rate = 95.0 / 100;
-    auto global_path_info = std::move(GetGlobalPathInfo());
+    auto global_path_info = GetGlobalPathInfo();
     for (auto& size_and_capacity : global_path_info) {
       double rate = static_cast<double>(size_and_capacity.first) / 
         size_and_capacity.second;
