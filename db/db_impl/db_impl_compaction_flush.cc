@@ -1188,14 +1188,15 @@ Status DBImpl::ManualCompactionForPathSize(
     } else {
       assert(!cfd->ioptions()->cf_paths.empty());
       output_file_path = cfd->ioptions()->cf_paths.back().path;
-      actual_input_path_id = cfd->ioptions()->cf_paths.size() - 1;
+      actual_output_path_id = cfd->ioptions()->cf_paths.size() - 1;
     }
 
     if (actual_output_path_id < actual_input_path_id) {
       return Status::InvalidArgument("Output path id is less than input path id.");
     }
 
-    bool same_path_id = actual_input_path_id == actual_output_path_id;
+    // TODO: finish ManualCompactionForPathSize
+    // bool same_path_id = actual_input_path_id == actual_output_path_id;
     // Pick files in max_fill_rate_path_id'th path.
     // Get the lowest level of output_path_id'th path.
     // auto& levels = cf_meta.levels;
@@ -1205,7 +1206,7 @@ Status DBImpl::ManualCompactionForPathSize(
     //   }
     // }
 
-    std::vector<CompactionInputFiles> input_files;
+    // std::vector<CompactionInputFiles> input_files;
 
 
     current->Unref();
