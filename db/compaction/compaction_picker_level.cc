@@ -37,7 +37,8 @@ bool LevelCompactionPicker::NeedsCompaction(
     }
   }
   for (int i = 0; i < vstorage->GetPathCompactionScoreSize(); i++) {
-    if (vstorage->PathCompactionScore(i) >= 1) {
+    // TODO: Use option capacity_warn_rate here. 
+    if (vstorage->PathCompactionScore(i) >= 0.9) {
       return true;
     }
   }

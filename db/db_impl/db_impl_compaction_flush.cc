@@ -1704,8 +1704,21 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
       s = SwitchMemtable(cfd, &context);
     }
     if (s.ok()) {
+      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
+      assert(capactiy_info.size() >= 1);
+      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
+      uint64_t estimate_size = 
+        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
+      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
+      double danger_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_danger_rate;
+      if (capacity_rate >= danger_capacity_rate) {
+        ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                           "[%s] Skip this ColumnFamily to avoid %s's capacity overflow.",
+                           cfd->GetName().c_str(), cfd->ioptions()->cf_paths[0].path.c_str());
+      }
       if (cfd->imm()->NumNotFlushed() != 0 || !cfd->mem()->IsEmpty() ||
-          !cached_recoverable_state_empty_.load()) {
+          !cached_recoverable_state_empty_.load() || 
+          capacity_rate < danger_capacity_rate) {
         flush_memtable_id = cfd->imm()->GetLatestMemTableID();
         flush_req.emplace_back(cfd, flush_memtable_id);
       }
@@ -1829,8 +1842,21 @@ Status DBImpl::AtomicFlushMemTables(
       if (cfd->IsDropped()) {
         continue;
       }
+      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
+      assert(capactiy_info.size() >= 1);
+      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
+      uint64_t estimate_size = 
+        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
+      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
+      double danger_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_danger_rate;
+      if (capacity_rate >= danger_capacity_rate) {
+        ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                           "[%s] Skip this ColumnFamily to avoid %s's capacity overflow.",
+                           cfd->GetName().c_str(), cfd->ioptions()->cf_paths[0].path.c_str());
+      }
       if (cfd->imm()->NumNotFlushed() != 0 || !cfd->mem()->IsEmpty() ||
-          !cached_recoverable_state_empty_.load()) {
+          !cached_recoverable_state_empty_.load() ||
+          capacity_rate < danger_capacity_rate) {
         cfds.emplace_back(cfd);
       }
     }
