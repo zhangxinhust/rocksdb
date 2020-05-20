@@ -1359,9 +1359,9 @@ Directory* ColumnFamilyData::GetDataDir(size_t path_id) const {
 }
 
 void ColumnFamilyData::PathSizeRecorderOnAddFile(const std::string& file_path, 
-                                                 uint32_t path_id) {
+                                                 uint32_t path_id, int level) {
   assert(column_family_set_ != nullptr);
-  column_family_set_->psr_.OnAddFile(file_path, GetID(), path_id);
+  column_family_set_->psr_.OnAddFile(file_path, GetID(), path_id, level);
 }
 
 void ColumnFamilyData::PathSizeRecorderOnDeleteFile(const std::string& file_path) {
@@ -1378,7 +1378,7 @@ void ColumnFamilyData::PathSizeRecorderOnAddFileWhileDBOpen() {
     for (auto meta_data : vstorage->LevelFiles(i)) {
         std::string file_name = 
           TableFileName(ioptions_.cf_paths, meta_data->fd.GetNumber(), meta_data->fd.GetPathId());
-        column_family_set_->psr_.OnAddFile(file_name, GetID(), meta_data->fd.GetPathId());
+        column_family_set_->psr_.OnAddFile(file_name, GetID(), meta_data->fd.GetPathId(), i);
     }
   }
 }
@@ -1389,6 +1389,10 @@ std::vector<std::pair<uint64_t, uint64_t>> ColumnFamilyData::GetLocalPathInfo() 
 
 std::vector<std::pair<uint64_t, uint64_t>> ColumnFamilyData::GetGlobalPathInfo() {
   return column_family_set_->psr_.GetGlobalPathSizeAndCapacity(GetID());
+}
+
+std::vector<PathCompactionInfo> ColumnFamilyData::GetPathCompactionInfo() {
+  return column_family_set_->psr_.GetPathCompactionInfos(GetID());
 }
 
 ColumnFamilySet::ColumnFamilySet(const std::string& dbname,

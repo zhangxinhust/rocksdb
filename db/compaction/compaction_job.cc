@@ -1367,7 +1367,9 @@ Status CompactionJob::FinishCompactionOutputFile(
 #endif
   
   if (meta != nullptr)
-    cfd->PathSizeRecorderOnAddFile(fname, meta->fd.GetPathId());
+    cfd->PathSizeRecorderOnAddFile(
+      fname, meta->fd.GetPathId(), 
+      sub_compact->compaction->output_level());
 
   sub_compact->builder.reset();
   sub_compact->current_output_file_size = 0;

@@ -233,7 +233,7 @@ Status DBImpl::FlushMemTableToOutputFile(
 
     cfd->PathSizeRecorderOnAddFile(
       MakeTableFileName(
-        cfd->ioptions()->cf_paths[0].path, file_meta.fd.GetNumber()), 0);
+        cfd->ioptions()->cf_paths[0].path, file_meta.fd.GetNumber()), 0, 0);
   }
   TEST_SYNC_POINT("DBImpl::FlushMemTableToOutputFile:Finish");
   return s;
@@ -533,8 +533,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
       }
       cfds[i]->PathSizeRecorderOnAddFile(
         MakeTableFileName(
-            cfds[i]->ioptions()->cf_paths[0].path, file_meta[i].fd.GetNumber()), 0
-      );
+            cfds[i]->ioptions()->cf_paths[0].path, file_meta[i].fd.GetNumber()), 0, 0);
     }
   }
 
@@ -1704,21 +1703,8 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
       s = SwitchMemtable(cfd, &context);
     }
     if (s.ok()) {
-      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
-      assert(capactiy_info.size() >= 1);
-      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
-      uint64_t estimate_size = 
-        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
-      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
-      double danger_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_danger_rate;
-      if (capacity_rate >= danger_capacity_rate) {
-        ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                           "[%s] Skip this ColumnFamily to avoid %s's capacity overflow.",
-                           cfd->GetName().c_str(), cfd->ioptions()->cf_paths[0].path.c_str());
-      }
       if (cfd->imm()->NumNotFlushed() != 0 || !cfd->mem()->IsEmpty() ||
-          !cached_recoverable_state_empty_.load() || 
-          capacity_rate < danger_capacity_rate) {
+          !cached_recoverable_state_empty_.load()) {
         flush_memtable_id = cfd->imm()->GetLatestMemTableID();
         flush_req.emplace_back(cfd, flush_memtable_id);
       }
@@ -1842,21 +1828,8 @@ Status DBImpl::AtomicFlushMemTables(
       if (cfd->IsDropped()) {
         continue;
       }
-      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
-      assert(capactiy_info.size() >= 1);
-      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
-      uint64_t estimate_size = 
-        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
-      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
-      double danger_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_danger_rate;
-      if (capacity_rate >= danger_capacity_rate) {
-        ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                           "[%s] Skip this ColumnFamily to avoid %s's capacity overflow.",
-                           cfd->GetName().c_str(), cfd->ioptions()->cf_paths[0].path.c_str());
-      }
       if (cfd->imm()->NumNotFlushed() != 0 || !cfd->mem()->IsEmpty() ||
-          !cached_recoverable_state_empty_.load() ||
-          capacity_rate < danger_capacity_rate) {
+          !cached_recoverable_state_empty_.load()) {
         cfds.emplace_back(cfd);
       }
     }
@@ -2339,6 +2312,26 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
       job_context->superversion_contexts;
   autovector<ColumnFamilyData*> column_families_not_to_flush;
   while (!flush_queue_.empty()) {
+    bool is_compaction_queue_empty = compaction_queue_.empty();
+    bool run_out_of_capacity = false;
+    FlushRequest front_req = flush_queue_.front();
+    for (auto& iter : front_req) {
+      ColumnFamilyData* cfd = iter.first;
+      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
+      assert(capactiy_info.size() >= 1);
+      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
+      uint64_t estimate_size = 
+        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
+      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
+      double warn_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_warn_rate;
+      if (capacity_rate > warn_capacity_rate && !is_compaction_queue_empty) {
+        run_out_of_capacity = true;
+        break;
+      }
+    }
+    if (run_out_of_capacity) {
+      break;
+    }
     // This cfd is already referenced
     const FlushRequest& flush_req = PopFirstFromFlushQueue();
     superversion_contexts.clear();

@@ -506,7 +506,7 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
 
-  void PathSizeRecorderOnAddFile(const std::string& file_path, uint32_t path_id); 
+  void PathSizeRecorderOnAddFile(const std::string& file_path, uint32_t path_id, int level); 
 
   void PathSizeRecorderOnDeleteFile(const std::string& file_path); 
 
@@ -516,6 +516,7 @@ class ColumnFamilyData {
 
   std::vector<std::pair<uint64_t, uint64_t>> GetGlobalPathInfo();
 
+  std::vector<PathCompactionInfo> GetPathCompactionInfo();
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,

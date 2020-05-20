@@ -47,6 +47,7 @@
 #include "table/get_context.h"
 #include "table/multiget_context.h"
 #include "trace_replay/block_cache_tracer.h"
+#include "file/path_size_recorder.h"
 
 namespace rocksdb {
 
@@ -102,7 +103,7 @@ class VersionStorageInfo {
                      CompactionStyle compaction_style,
                      VersionStorageInfo* src_vstorage,
                      bool _force_consistency_checks,
-                     const std::vector<DbPath>* cf_paths);
+                     ColumnFamilyData* cfd = nullptr);
   ~VersionStorageInfo();
 
   void Reserve(int level, size_t size) { files_[level].reserve(size); }
@@ -132,8 +133,6 @@ class VersionStorageInfo {
   // TODO find a better way to pass compaction_options_fifo.
   void ComputeCompactionScore(const ImmutableCFOptions& immutable_cf_options,
                               const MutableCFOptions& mutable_cf_options);
-
-  void ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options);
 
   // Estimate est_comp_needed_bytes_
   void EstimateCompactionBytesNeeded(
@@ -196,14 +195,6 @@ class VersionStorageInfo {
 
   // Return idx'th highest score
   double CompactionScore(int idx) const { return compaction_score_[idx]; }
-
-  // Return path id that has idx'th highest score
-  uint32_t PathCompactionScoreId(int idx) const { return path_compaction_scores_[idx].path_id_; }
-
-  // Return idx'th highest score
-  double PathCompactionScore(int idx) const { return path_compaction_scores_[idx].path_compaction_score_; }
-
-  int GetPathCompactionScoreSize() const { return static_cast<int>(path_compaction_scores_.size()); }
 
   void GetOverlappingInputs(
       int level, const InternalKey* begin,  // nullptr means before all keys
@@ -428,89 +419,13 @@ class VersionStorageInfo {
   bool RangeMightExistAfterSortedRun(const Slice& smallest_user_key,
                                      const Slice& largest_user_key,
                                      int last_level, int last_l0_idx);
-  
-  struct PathIdWithScore {
-    double path_compaction_score_;
-    uint32_t path_id_;
 
-    PathIdWithScore(double path_compaction_score, uint32_t path_id)
-      : path_compaction_score_(path_compaction_score), path_id_(path_id) {}
-  };
-
-  // Information of a path used by a ColumnFamily, including base level, 
-  // top levels, current size and capacity. 
-  struct PathInfo {
-    int path_base_level_;
-    int path_top_levels_;
-    uint64_t capacity_;
-    uint64_t path_size_;
-
-    PathInfo(uint64_t capacity = std::numeric_limits<uint64_t>::max()) 
-      : path_base_level_(std::numeric_limits<int>::max()), 
-        path_top_levels_(0), capacity_(capacity),
-        path_size_(0) {}
-
-    bool isValid() const { return path_base_level_ <= path_top_levels_; }
-
-    bool isLevelInRange(int level) const { 
-      return path_base_level_ <= level && level <= path_top_levels_; 
-    }
-
-    uint64_t GetPathSize() const { return path_size_; }
-
-    double CalculateCompactionScore() const { 
-      if (capacity_ != 0) {
-        return static_cast<double>(path_size_) / capacity_;
-      } else {
-        // This happens when default ctor of DbPath is called.
-        return std::numeric_limits<double>::max();
-      }
-    }
-  };
-
-  void AccumulatePathSize(int level, FileMetaData* f) {
-    VersionStorageInfo::PathInfo& path_info = multi_path_info_[f->fd.GetPathId()]; 
-    path_info.path_base_level_ = std::min(path_info.path_base_level_, level);
-    path_info.path_top_levels_ = std::max(path_info.path_top_levels_, level);
-    path_info.path_size_ += f->fd.GetFileSize();
+  const std::vector<PathCompactionInfo>& GetPathCompactionInfo() const {
+    return path_compaction_info_;
   }
 
-  void CheckPathSize() {
-    uint32_t pre_path_id = 0;
-    uint64_t path_size = 0;
-
-    for (int level = 0; level < num_levels_; level++) {
-      const auto& level_files = files_[level];
-      if (level_files.empty()) {
-        continue;
-      }
-      uint32_t cur_level_path_id = level_files[0]->fd.GetPathId();
-      if (cur_level_path_id != pre_path_id) {
-        // check PathInfo::path_size_ == actual path size?
-        if (path_size != 0) {
-          assert(multi_path_info_[pre_path_id].isValid());
-        }
-        assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
-        pre_path_id = cur_level_path_id;
-        path_size = 0;
-      }
-      for (auto file : level_files) {
-        assert(file->fd.GetPathId() == pre_path_id);
-        path_size += file->fd.GetFileSize();
-      }
-    }
-    // last path id
-    if (path_size != 0) {
-      assert(multi_path_info_[pre_path_id].isValid());
-    }
-    assert(multi_path_info_[pre_path_id].GetPathSize() == path_size);
-  }
-
-  void GeneratePathInfos();
-
-  const autovector<PathInfo>& MultiPathInfos() {
-    assert(finalized_);
-    return multi_path_info_;
+  const std::vector<std::pair<uint64_t, uint64_t>>& GetLocalPathInfo() const {
+    return local_path_size_capacity_;
   }
 
  private:
@@ -601,9 +516,6 @@ class VersionStorageInfo {
   int l0_delay_trigger_count_ = 0;  // Count used to trigger slow down and stop
                                     // for number of L0 files.
 
-  // The CompactionScore of Path means PathSize / capacity
-  std::vector<PathIdWithScore> path_compaction_scores_;
-
   // the following are the sampled temporary stats.
   // the current accumulated size of sampled files.
   uint64_t accumulated_file_size_;
@@ -631,7 +543,11 @@ class VersionStorageInfo {
   // is compiled in release mode
   bool force_consistency_checks_;
 
-  autovector<PathInfo> multi_path_info_;
+  // autovector<PathInfo> multi_path_info_;
+
+  std::vector<PathCompactionInfo> path_compaction_info_;
+
+  std::vector<std::pair<uint64_t, uint64_t>> local_path_size_capacity_;
 
   friend class Version;
   friend class VersionSet;

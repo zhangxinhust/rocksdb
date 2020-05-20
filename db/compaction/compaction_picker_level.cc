@@ -36,11 +36,10 @@ bool LevelCompactionPicker::NeedsCompaction(
       return true;
     }
   }
-  for (int i = 0; i < vstorage->GetPathCompactionScoreSize(); i++) {
-    // TODO: Use option capacity_warn_rate here. 
-    if (vstorage->PathCompactionScore(i) >= 0.9) {
-      return true;
-    }
+  auto& path_compaction_info = vstorage->GetPathCompactionInfo();
+  if (!path_compaction_info.empty()) {
+    return static_cast<double>(path_compaction_info[0].path_size_) /
+           path_compaction_info[0].path_capacity_ > 0.9;
   }
   return false;
 }
@@ -122,6 +121,7 @@ class LevelCompactionBuilder {
 
   const MutableCFOptions& mutable_cf_options_;
   const ImmutableCFOptions& ioptions_;
+  uint32_t AdjustPathId(uint32_t, uint64_t) const;
   // Pick a path ID to place a newly generated file, with its level
   static uint32_t GetPathId(const ImmutableCFOptions& ioptions,
                             const MutableCFOptions& mutable_cf_options,
@@ -248,21 +248,14 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   }
 
   if (start_level_inputs_.empty()) {
-    for (int i = 0; i < vstorage_->GetPathCompactionScoreSize(); i++) {
-      uint32_t path_id = vstorage_->PathCompactionScoreId(i);
-      const autovector<VersionStorageInfo::PathInfo>& path_infos = vstorage_->MultiPathInfos();
-      const VersionStorageInfo::PathInfo& path_info = path_infos[path_id];
-      assert(path_info.isValid());
-      const VersionStorageInfo::PathInfo& next_path_info = path_infos[path_id + 1];
-      start_level_ = path_info.path_top_levels_;
-      if (next_path_info.isValid()) {
-        output_level_ = next_path_info.path_base_level_;
-      } else {
-        if (start_level_ >= compaction_picker_->NumberLevels() - 1)
-          continue;
-        output_level_ = start_level_ + 1;
-      }
-
+    auto& path_compaction_info = vstorage_->GetPathCompactionInfo();
+    for (int i = 0; i < static_cast<int>(path_compaction_info.size()); i++) {
+      start_level_ = path_compaction_info[i].path_top_level_;
+      output_level_ = path_compaction_info[i].next_path_base_level_;
+      assert(start_level_ >= 0 && output_level_ >= 0 &&
+             start_level_ < compaction_picker_->NumberLevels() &&
+             output_level_ < compaction_picker_->NumberLevels());
+      assert(start_level_ <= output_level_);
       if (PickFileToCompact()) {
         if (start_level_ == 0) {
           compaction_reason_ = CompactionReason::kLevelL0FilesNum;
@@ -408,7 +401,29 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
   return c;
 }
 
+uint32_t LevelCompactionBuilder::AdjustPathId(uint32_t path_id, uint64_t total_input_size) const {
+  auto& path_info = vstorage_->GetLocalPathInfo();
+  if (path_info.empty() || path_id >= path_info.size() - 1) {
+    return path_id;
+  }
+  uint64_t path_size = path_info[path_id].first;
+  uint64_t path_capacity = path_info[path_id].second;
+  if (static_cast<double>(path_size + total_input_size) / path_capacity > 0.7) {
+    return static_cast<uint32_t>(path_info.size()) - 1;
+  }
+  return path_id;
+}
+
 Compaction* LevelCompactionBuilder::GetCompaction() {
+  uint32_t path_id = GetPathId(ioptions_, mutable_cf_options_, output_level_);
+  uint64_t total_input_size = 0;
+  for (auto& input_files : compaction_inputs_) {
+    for (auto file : input_files.files) {
+      if (file->fd.GetPathId() == path_id) {
+        total_input_size += file->fd.GetFileSize();
+      }
+    }
+  }
   auto c = new Compaction(
       vstorage_, ioptions_, mutable_cf_options_, std::move(compaction_inputs_),
       output_level_,
@@ -416,7 +431,7 @@ Compaction* LevelCompactionBuilder::GetCompaction() {
                           ioptions_.compaction_style, vstorage_->base_level(),
                           ioptions_.level_compaction_dynamic_level_bytes),
       mutable_cf_options_.max_compaction_bytes,
-      GetPathId(ioptions_, mutable_cf_options_, output_level_),
+      AdjustPathId(path_id, total_input_size),
       GetCompressionType(ioptions_, vstorage_, mutable_cf_options_,
                          output_level_, vstorage_->base_level()),
       GetCompressionOptions(ioptions_, vstorage_, output_level_),

@@ -9,6 +9,8 @@
 #include <vector>
 #include <string>
 #include <cinttypes>
+#include <algorithm>
+#include <set>
 
 #include "port/port.h"
 #include "util/mutexlock.h"
@@ -17,6 +19,13 @@
 #include "include/rocksdb/options.h"
 
 namespace rocksdb {
+
+struct PathCompactionInfo {
+    uint64_t path_size_;
+    uint64_t path_capacity_;
+    int path_top_level_;
+    int next_path_base_level_;
+};
 
 class PathSizeRecorder {
 public:
@@ -45,7 +54,7 @@ public:
         cfd_paths_.insert(std::make_pair(cfd_id, std::move(paths)));
     }
 
-    void OnAddFile(const std::string& file_path, uint32_t cfd_id, uint32_t path_id) {
+    void OnAddFile(const std::string& file_path, uint32_t cfd_id, uint32_t path_id, int level) {
         uint64_t file_size;
         Status s = env_->GetFileSize(file_path, &file_size);
         if (s.ok()) {
@@ -74,13 +83,14 @@ public:
                 assert(path != cfd_paths_.end());
                 // Update local path size
                 uint64_t& local_path_size = (path->second)[path_id].cfd_local_path_size_;
+                (path->second)[path_id].sst_levels_.insert(level);
                 local_path_size += file_size;
                 // Update global path size
                 global_path_id = (path->second)[path_id].global_path_id_;
-                paths_size_[global_path_id].global_path_size_ += file_size; 
+                paths_size_[global_path_id].global_path_size_ += file_size;
             }
             tracked_files_.insert(
-                std::make_pair(file_path, SstFile(cfd_id, path_id, global_path_id, file_size)));
+                std::make_pair(file_path, SstFile(cfd_id, path_id, global_path_id, file_size, level)));
         }
     }
 
@@ -97,6 +107,10 @@ public:
         // Update local path size
         uint64_t& local_path_size = (paths->second)[sstfile.local_path_id_].cfd_local_path_size_;
         assert(local_path_size >= sstfile.file_size_);
+        std::multiset<int>& levels = (paths->second)[sstfile.local_path_id_].sst_levels_;
+        auto levels_iter = levels.lower_bound(sstfile.level_);
+        assert(*levels_iter == sstfile.level_);
+        levels.erase(levels_iter);
         local_path_size -= sstfile.file_size_;
         // Update global path size
         uint32_t global_path_id = (paths->second)[sstfile.local_path_id_].global_path_id_;
@@ -136,6 +150,36 @@ public:
         return result;
     }
 
+    std::vector<PathCompactionInfo> GetPathCompactionInfos(uint32_t cfd_id) {
+        MutexLock l(&mu_);
+        std::vector<PathCompactionInfo> result;
+        auto paths_iter = cfd_paths_.find(cfd_id);
+        if (paths_iter == cfd_paths_.end())
+            return result;
+        std::vector<Path>& paths = paths_iter->second;
+        int* next_level_ptr = nullptr;
+        for (int i = 0; i < static_cast<int>(paths.size()); i++) {
+            if (!paths[i].sst_levels_.empty() && next_level_ptr != nullptr) {
+                *next_level_ptr = *(paths[i].sst_levels_.begin());
+            }
+            if (paths[i].sst_levels_.empty() || i == static_cast<int>(paths.size()) - 1) {
+                continue;
+            } else {
+                int top_level = *(--(paths[i].sst_levels_.end()));
+                result.push_back(PathCompactionInfo {
+                    paths[i].cfd_local_path_size_, paths[i].path_capacity_,
+                    top_level, top_level + 1});
+                next_level_ptr = &(result.back().next_path_base_level_);
+            }
+        }
+        std::sort(result.begin(), result.end(), 
+                  [&] (const PathCompactionInfo& info1, const PathCompactionInfo& info2) {
+                      return static_cast<double>(info1.path_size_) / info1.path_capacity_ >
+                             static_cast<double>(info2.path_size_) / info2.path_capacity_;
+                  });
+        return result;
+    }
+
     // global_path_id_ is a inner auto-increased number for path_id.
     // cfd_local_path_size_ is the size that is maintained by a ColumnFamilyData.
     // path_capacity_ is initialized by ImmutableOptions.cf_paths.
@@ -143,6 +187,7 @@ public:
         uint32_t global_path_id_;
         uint64_t cfd_local_path_size_;
         uint64_t path_capacity_;
+        std::multiset<int> sst_levels_;
 
         Path(uint32_t path_id, uint64_t capacity)
             : global_path_id_(path_id), cfd_local_path_size_(0), path_capacity_(capacity) {}
@@ -164,11 +209,12 @@ public:
         uint32_t local_path_id_;
         uint32_t global_path_id_;
         uint64_t file_size_;
+        int level_;
 
         SstFile(uint32_t cfd_id, uint32_t local_path_id,
-                uint32_t global_path_id, uint64_t file_size)
+                uint32_t global_path_id, uint64_t file_size, int level)
             : cfd_id_(cfd_id), local_path_id_(local_path_id), 
-              global_path_id_(global_path_id), file_size_(file_size) {}
+              global_path_id_(global_path_id), file_size_(file_size), level_(level) {}
     };
 
 private:

@@ -1573,7 +1573,7 @@ VersionStorageInfo::VersionStorageInfo(
     const InternalKeyComparator* internal_comparator,
     const Comparator* user_comparator, int levels,
     CompactionStyle compaction_style, VersionStorageInfo* ref_vstorage,
-    bool _force_consistency_checks, const std::vector<DbPath>* cf_paths)
+    bool _force_consistency_checks, ColumnFamilyData* cfd)
     : internal_comparator_(internal_comparator),
       user_comparator_(user_comparator),
       // cfd is nullptr if Version is dummy
@@ -1613,16 +1613,9 @@ VersionStorageInfo::VersionStorageInfo(
     current_num_samples_ = ref_vstorage->current_num_samples_;
     oldest_snapshot_seqnum_ = ref_vstorage->oldest_snapshot_seqnum_;
   }
-  // Initialize PathInfo::capacity_ with cf_paths
-  // It's ok that we only initialize capacity and leave other fields to zero.
-  if (cf_paths == nullptr || cf_paths->empty()) {
-    // According to DBImpl::ValidateOptions, More than four DB paths are not supported yet. 
-    // To make checker happy.
-    multi_path_info_.resize(4);
-  } else {
-    for (auto& cf_path : *cf_paths) {
-      multi_path_info_.push_back(VersionStorageInfo::PathInfo(cf_path.target_size));
-    }
+  if (cfd != nullptr) {
+    path_compaction_info_ = cfd->GetPathCompactionInfo();
+    local_path_size_capacity_ = cfd->GetLocalPathInfo();
   }
 }
 
@@ -1647,8 +1640,7 @@ Version::Version(ColumnFamilyData* column_family_data, VersionSet* vset,
           (cfd_ == nullptr || cfd_->current() == nullptr)
               ? nullptr
               : cfd_->current()->storage_info(),
-          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks,
-          cfd_ == nullptr ? nullptr : &(cfd_->ioptions()->cf_paths)),
+          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks, cfd_),
       vset_(vset),
       next_(this),
       prev_(this),
@@ -2012,13 +2004,6 @@ void Version::PrepareApply(
   storage_info_.GenerateLevelFilesBrief();
   storage_info_.GenerateLevel0NonOverlapping();
   storage_info_.GenerateBottommostFiles();
-  storage_info_.GeneratePathInfos();
-#ifndef NDEBUG
-  // CheckPathSize is designed for leveled compaction
-  if (cfd_->ioptions()->compaction_style == kCompactionStyleLevel) {
-    storage_info_.CheckPathSize();
-  }
-#endif
 }
 
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {
@@ -2386,25 +2371,6 @@ void VersionStorageInfo::ComputeCompactionScore(
   EstimateCompactionBytesNeeded(mutable_cf_options);
 }
 
-void VersionStorageInfo::ComputePathCompactionScore(const ImmutableCFOptions& immutable_cf_options) {
-  assert(path_compaction_scores_.empty());
-  for (int path_idx = 0; 
-    path_idx < static_cast<int>(immutable_cf_options.cf_paths.size()) - 1; 
-    path_idx++) {
-    path_compaction_scores_.push_back(
-      PathIdWithScore(
-        // Other compaction styles are not support currently. 
-        immutable_cf_options.compaction_style == kCompactionStyleLevel ?
-        multi_path_info_[path_idx].CalculateCompactionScore() : 0.0, path_idx));
-  }
-
-  std::sort(path_compaction_scores_.begin(), path_compaction_scores_.end(), 
-    [] (const PathIdWithScore& p1, const PathIdWithScore& p2) {
-      return p1.path_compaction_score_ > p2.path_compaction_score_;
-    }
-  );
-}
-
 void VersionStorageInfo::ComputeFilesMarkedForCompaction() {
   files_marked_for_compaction_.clear();
   int last_qualify_level = 0;
@@ -2648,14 +2614,6 @@ void SortFileByOverlappingRatio(
             });
 }
 }  // namespace
-
-void VersionStorageInfo::GeneratePathInfos() {
-  for (int level = 0; level < num_non_empty_levels_; level++) {
-    for (auto& file : files_[level]) {
-      AccumulatePathSize(level, file);
-    }
-  }
-}
 
 void VersionStorageInfo::UpdateFilesByCompactionPri(
     CompactionPri compaction_pri) {
@@ -3510,8 +3468,6 @@ void VersionSet::AppendVersion(ColumnFamilyData* column_family_data,
   v->storage_info()->ComputeCompactionScore(
       *column_family_data->ioptions(),
       *column_family_data->GetLatestMutableCFOptions());
-
-  v->storage_info()->ComputePathCompactionScore(*column_family_data->ioptions());
 
   // Mark v finalized
   v->storage_info_.SetFinalized();
