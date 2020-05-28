@@ -157,11 +157,7 @@ public:
         if (paths_iter == cfd_paths_.end())
             return result;
         std::vector<Path>& paths = paths_iter->second;
-        int* next_level_ptr = nullptr;
         for (int i = 0; i < static_cast<int>(paths.size()); i++) {
-            if (!paths[i].sst_levels_.empty() && next_level_ptr != nullptr) {
-                *next_level_ptr = *(paths[i].sst_levels_.begin());
-            }
             if (paths[i].sst_levels_.empty() || i == static_cast<int>(paths.size()) - 1) {
                 continue;
             } else {
@@ -169,7 +165,6 @@ public:
                 result.push_back(PathCompactionInfo {
                     paths[i].cfd_local_path_size_, paths[i].path_capacity_,
                     top_level, top_level + 1});
-                next_level_ptr = &(result.back().next_path_base_level_);
             }
         }
         std::sort(result.begin(), result.end(), 
