@@ -962,7 +962,7 @@ void ColumnFamilyData::MaybeDeconstructPathSizeWriteStopToken() {
     return;
   }
   if (is_path_size_stop_token_) {
-    const double capacity_danger_rate = 95.0 / 100;
+    const double capacity_danger_rate = mutable_cf_options_.capacity_danger_rate;
     auto global_path_info = GetGlobalPathInfo();
     for (auto& size_and_capacity : global_path_info) {
       double rate = static_cast<double>(size_and_capacity.first) / 

@@ -2312,7 +2312,6 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
       job_context->superversion_contexts;
   autovector<ColumnFamilyData*> column_families_not_to_flush;
   while (!flush_queue_.empty()) {
-    bool is_compaction_queue_empty = compaction_queue_.empty();
     bool run_out_of_capacity = false;
     FlushRequest front_req = flush_queue_.front();
     for (auto& iter : front_req) {
@@ -2324,7 +2323,7 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
         path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
       double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
       double warn_capacity_rate = cfd->GetCurrentMutableCFOptions()->capacity_warn_rate;
-      if (capacity_rate > warn_capacity_rate && !is_compaction_queue_empty) {
+      if (capacity_rate > warn_capacity_rate) {
         run_out_of_capacity = true;
         break;
       }
