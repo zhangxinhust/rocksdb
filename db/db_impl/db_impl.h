@@ -259,16 +259,6 @@ class DBImpl : public DB {
       const int output_path_id = -1,
       std::vector<std::string>* const output_file_names = nullptr,
       CompactionJobInfo* compaction_job_info = nullptr) override;
-  
-  Status ManualCompactionForPathSize(
-    ColumnFamilyHandle* column_family, const int input_path_id = -1,
-    const int output_path_id = -1);
-
-  Status ManualCompactionForPathSize(
-    const int input_path_id = -1,
-    const int output_path_id = -1) {
-    return ManualCompactionForPathSize(DefaultColumnFamily(), input_path_id, output_path_id);
-  }
 
   virtual Status PauseBackgroundWork() override;
   virtual Status ContinueBackgroundWork() override;
