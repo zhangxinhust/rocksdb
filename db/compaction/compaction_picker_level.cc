@@ -252,10 +252,12 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     for (int i = 0; i < static_cast<int>(path_compaction_info.size()); i++) {
       start_level_ = path_compaction_info[i].path_top_level_;
       output_level_ = path_compaction_info[i].next_path_base_level_;
-      assert(start_level_ >= 0 && output_level_ >= 0 &&
-             start_level_ < compaction_picker_->NumberLevels() &&
-             output_level_ < compaction_picker_->NumberLevels());
-      assert(start_level_ <= output_level_);
+      assert(start_level_ >= 0);
+      assert(start_level_ < compaction_picker_->NumberLevels());
+      assert(start_level_ + 1 == output_level_);
+      if (output_level_ >= compaction_picker_->NumberLevels()) {
+        continue;
+      }
       if (PickFileToCompact()) {
         if (start_level_ == 0) {
           compaction_reason_ = CompactionReason::kLevelL0FilesNum;

@@ -1310,17 +1310,19 @@ class DBImpl : public DB {
       std::vector<SequenceNumber>& snapshot_seqs,
       SequenceNumber earliest_write_conflict_snapshot,
       SnapshotChecker* snapshot_checker, LogBuffer* log_buffer,
-      Env::Priority thread_pri);
+      Env::Priority thread_pri, bool need_change_path);
 
   // Flush the memtables of (multiple) column families to multiple files on
   // persistent storage.
   Status FlushMemTablesToOutputFiles(
       const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri);
+      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
+      bool multi_path0_run_out_of_capacity);
 
   Status AtomicFlushMemTablesToOutputFiles(
       const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri);
+      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
+      bool multi_path0_run_out_of_capacity);
 
   // REQUIRES: log_numbers are sorted in ascending order
   Status RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
