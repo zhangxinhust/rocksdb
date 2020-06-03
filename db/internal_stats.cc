@@ -490,8 +490,8 @@ const std::unordered_map<std::string, DBPropertyInfo>
          {false, nullptr, nullptr, nullptr,
           &DBImpl::GetPropertyHandleOptionsStatistics}},
         {DB::Properties::kPathSizes,
-         {false, nullptr, nullptr, &InternalStats::HandleMapPathSize,
-          nullptr}},
+         {false, &InternalStats::HandlePathSizeStat, nullptr, 
+          &InternalStats::HandleMapPathSize, nullptr}},
 };
 
 const DBPropertyInfo* GetPropertyInfo(const Slice& property) {
@@ -970,6 +970,27 @@ bool InternalStats::HandleMapPathSize(std::map<std::string, std::string>* path_s
                             ToString(path_info[i].first)));
   }
   return true;
+}
+
+bool InternalStats::HandlePathSizeStat(std::string* value, Slice /*suffix*/) {
+  std::map<std::string, std::string> path_size_info;
+  if (HandleMapPathSize(&path_size_info)) {
+    char buf[2000];
+    snprintf(buf, sizeof(buf),
+            "\n** The Amount of Data for Each Path [%s] **\n",
+            cfd_->GetName().c_str());
+    value->append(buf);
+
+    for (size_t i = 0; i < path_size_info.size(); i++) {
+      char buf2[2000];
+      snprintf(buf2, sizeof(buf2),
+               "** Path %lu : %s B\n", i, path_size_info[ToString(i)].c_str());
+      value->append(buf2);
+    }
+    return true; 
+  } else {
+    return false;
+  }
 }
 
 void InternalStats::DumpDBStats(std::string* value) {
