@@ -424,8 +424,8 @@ class VersionStorageInfo {
     return path_compaction_info_;
   }
 
-  const std::vector<std::pair<uint64_t, uint64_t>>& GetLocalPathInfo() const {
-    return local_path_size_capacity_;
+  const std::vector<std::pair<uint64_t, uint64_t>>& GetGlobalPathInfo() const {
+    return path_size_capacity_;
   }
 
  private:
@@ -547,7 +547,7 @@ class VersionStorageInfo {
 
   std::vector<PathCompactionInfo> path_compaction_info_;
 
-  std::vector<std::pair<uint64_t, uint64_t>> local_path_size_capacity_;
+  std::vector<std::pair<uint64_t, uint64_t>> path_size_capacity_;
 
   friend class Version;
   friend class VersionSet;

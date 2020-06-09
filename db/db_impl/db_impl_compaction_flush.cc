@@ -2189,7 +2189,7 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
     FlushRequest front_req = flush_queue_.front();
     for (auto& iter : front_req) {
       ColumnFamilyData* cfd = iter.first;
-      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetLocalPathInfo();
+      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetGlobalPathInfo();
       assert(capactiy_info.size() >= 1);
       std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
       uint64_t estimate_size = 

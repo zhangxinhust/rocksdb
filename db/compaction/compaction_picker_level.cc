@@ -404,7 +404,7 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 }
 
 uint32_t LevelCompactionBuilder::AdjustPathId(uint32_t path_id, uint64_t total_input_size) const {
-  auto& path_info = vstorage_->GetLocalPathInfo();
+  auto& path_info = vstorage_->GetGlobalPathInfo();
   if (path_info.empty() || path_id >= path_info.size() - 1) {
     return path_id;
   }

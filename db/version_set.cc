@@ -1615,7 +1615,7 @@ VersionStorageInfo::VersionStorageInfo(
   }
   if (cfd != nullptr) {
     path_compaction_info_ = cfd->GetPathCompactionInfo();
-    local_path_size_capacity_ = cfd->GetLocalPathInfo();
+    path_size_capacity_ = cfd->GetGlobalPathInfo();
   }
 }
 
