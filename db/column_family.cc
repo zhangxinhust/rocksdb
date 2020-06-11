@@ -295,32 +295,6 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
                    result.level0_file_num_compaction_trigger);
   }
 
-  if (result.capacity_danger_rate <= 0.0 || 
-      result.capacity_danger_rate > 1.0) {
-    result.capacity_danger_rate = 95.0 / 100;
-  }
-
-  if (result.capacity_warn_rate <= 0.0 || 
-      result.capacity_warn_rate > 1.0) {
-    result.capacity_warn_rate = 90.0 / 100;
-  }
-
-  if (result.capacity_danger_rate < result.capacity_warn_rate) {
-    ROCKS_LOG_WARN(db_options.info_log.get(),
-                   "This condition must be satisfied: "
-                   "capacity_danger_rate(%lf) >= "
-                   "capacity_warn_rate(%lf)",
-                   result.capacity_danger_rate,
-                   result.capacity_warn_rate);
-    result.capacity_danger_rate = result.capacity_warn_rate;
-    ROCKS_LOG_WARN(db_options.info_log.get(),
-                   "Adjust the value to "
-                   "capacity_danger_rate(%lf) "
-                   "capacity_warn_rate(%lf)",
-                   result.capacity_danger_rate,
-                   result.capacity_warn_rate);
-  }
-
   if (result.soft_pending_compaction_bytes_limit == 0) {
     result.soft_pending_compaction_bytes_limit =
         result.hard_pending_compaction_bytes_limit;
@@ -458,7 +432,6 @@ ColumnFamilyData::ColumnFamilyData(
       log_number_(0),
       flush_reason_(FlushReason::kOthers),
       column_family_set_(column_family_set),
-      is_path_size_stop_token_(false),
       queued_for_flush_(false),
       queued_for_compaction_(false),
       prev_compaction_needed_bytes_(0),
@@ -715,28 +688,8 @@ std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
 ColumnFamilyData::GetWriteStallConditionAndCause(
     int num_unflushed_memtables, int num_l0_files,
     uint64_t num_compaction_needed_bytes,
-    const MutableCFOptions& mutable_cf_options,
-    const std::vector<std::pair<uint64_t, uint64_t>> global_path_info,
-    bool is_leveled_compaction) {
-  bool capacity_warn = false, capacity_danger = false;
-  if (is_leveled_compaction) {
-    const double capacity_warn_rate = mutable_cf_options.capacity_warn_rate;
-    const double capacity_danger_rate = mutable_cf_options.capacity_danger_rate;
-    for (auto& size_and_capacity : global_path_info) {
-      double rate = static_cast<double>(size_and_capacity.first) / 
-        size_and_capacity.second;
-      if (rate >= capacity_danger_rate) {
-        capacity_warn = capacity_danger = true;
-        break;
-      } else if (rate >= capacity_warn_rate) {
-        capacity_warn = true;
-      }
-    }
-  }
-
-  if (capacity_danger) {
-    return {WriteStallCondition::kStopped, WriteStallCause::kPathSizeLimit};
-  } else if (num_unflushed_memtables >= mutable_cf_options.max_write_buffer_number) {
+    const MutableCFOptions& mutable_cf_options) {
+  if (num_unflushed_memtables >= mutable_cf_options.max_write_buffer_number) {
     return {WriteStallCondition::kStopped, WriteStallCause::kMemtableLimit};
   } else if (!mutable_cf_options.disable_auto_compactions &&
              num_l0_files >= mutable_cf_options.level0_stop_writes_trigger) {
@@ -747,8 +700,6 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
                  mutable_cf_options.hard_pending_compaction_bytes_limit) {
     return {WriteStallCondition::kStopped,
             WriteStallCause::kPendingCompactionBytes};
-  } else if (capacity_warn) {
-    return {WriteStallCondition::kDelayed, WriteStallCause::kPathSizeLimit};
   } else if (mutable_cf_options.max_write_buffer_number > 3 &&
              num_unflushed_memtables >=
                  mutable_cf_options.max_write_buffer_number - 1) {
@@ -779,9 +730,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
 
     auto write_stall_condition_and_cause = GetWriteStallConditionAndCause(
         imm()->NumNotFlushed(), vstorage->l0_delay_trigger_count(),
-        vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
-        GetGlobalPathInfo(),
-        ioptions_.compaction_style == CompactionStyle::kCompactionStyleLevel);
+        vstorage->estimated_compaction_needed_bytes(), mutable_cf_options);
     write_stall_condition = write_stall_condition_and_cause.first;
     auto write_stall_cause = write_stall_condition_and_cause.second;
 
@@ -789,17 +738,6 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     bool needed_delay = write_controller->NeedsDelay();
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
-        write_stall_cause == WriteStallCause::kPathSizeLimit) {
-      write_controller_token_ = write_controller->GetStopToken();
-      is_path_size_stop_token_ = true;
-      internal_stats_->AddCFStats(InternalStats::PATH_SIZE_LIMIT_STOPS, 1);
-      ROCKS_LOG_WARN(
-          ioptions_.info_log,
-          "[%s] Stopping writes because the data size of a path "
-          "larger than %d%% of the target size.",
-          name_.c_str(), 
-          static_cast<int>(mutable_cf_options.capacity_danger_rate * 100));
-    } else if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
       write_controller_token_ = write_controller->GetStopToken();
       internal_stats_->AddCFStats(InternalStats::MEMTABLE_LIMIT_STOPS, 1);
@@ -830,21 +768,6 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           "[%s] Stopping writes because of estimated pending compaction "
           "bytes %" PRIu64,
           name_.c_str(), compaction_needed_bytes);
-    } else if (write_stall_condition == WriteStallCondition::kDelayed &&
-               write_stall_cause == WriteStallCause::kPathSizeLimit) {
-      write_controller_token_ =
-          SetupDelay(write_controller, compaction_needed_bytes,
-                     prev_compaction_needed_bytes_, was_stopped,
-                     mutable_cf_options.disable_auto_compactions);
-      internal_stats_->AddCFStats(InternalStats::PATH_SIZE_LIMIT_SLOWDOWNS, 1);
-      ROCKS_LOG_WARN(
-          ioptions_.info_log,
-          "[%s] Stalling writes because the data size of a path "
-          "larger than %d%% of the target size."
-          "rate %" PRIu64,
-          name_.c_str(),
-          static_cast<int>(mutable_cf_options.capacity_warn_rate * 100),
-          write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kMemtableLimit) {
       write_controller_token_ =
@@ -955,25 +878,6 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     prev_compaction_needed_bytes_ = compaction_needed_bytes;
   }
   return write_stall_condition;
-}
-
-void ColumnFamilyData::MaybeDeconstructPathSizeWriteStopToken() {
-  if (ioptions_.compaction_style != CompactionStyle::kCompactionStyleLevel) {
-    return;
-  }
-  if (is_path_size_stop_token_) {
-    const double capacity_danger_rate = mutable_cf_options_.capacity_danger_rate;
-    auto global_path_info = GetGlobalPathInfo();
-    for (auto& size_and_capacity : global_path_info) {
-      double rate = static_cast<double>(size_and_capacity.first) / 
-        size_and_capacity.second;
-      if (rate >= capacity_danger_rate) {
-        return;
-      }
-    }
-    is_path_size_stop_token_ = false;
-    write_controller_token_.reset();
-  }
 }
 
 const EnvOptions* ColumnFamilyData::soptions() const {
