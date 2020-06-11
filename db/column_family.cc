@@ -1479,6 +1479,7 @@ size_t ColumnFamilySet::NumberOfColumnFamilies() const {
 ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     const std::string& name, uint32_t id, Version* dummy_versions,
     const ColumnFamilyOptions& options) {
+  bool is_cf_paths_empty = options.cf_paths.empty();
   assert(column_families_.find(name) == column_families_.end());
   ColumnFamilyData* new_cfd = new ColumnFamilyData(
       id, name, dummy_versions, table_cache_, write_buffer_manager_, options,
@@ -1496,7 +1497,7 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     default_cfd_cache_ = new_cfd;
   }
 
-  psr_.AddCfPaths(new_cfd->GetID(), new_cfd->ioptions()->cf_paths);
+  psr_.AddCfPaths(new_cfd->GetID(), new_cfd->ioptions()->cf_paths, is_cf_paths_empty);
   return new_cfd;
 }
 

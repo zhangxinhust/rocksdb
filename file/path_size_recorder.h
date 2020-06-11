@@ -31,7 +31,7 @@ class PathSizeRecorder {
 public:
     PathSizeRecorder(Env* env) : env_(env) {}
 
-    void AddCfPaths(uint32_t cfd_id, const std::vector<DbPath>& cf_paths) {
+    void AddCfPaths(uint32_t cfd_id, const std::vector<DbPath>& cf_paths, bool use_db_path) {
         if (cf_paths.empty())
             return;
         MutexLock l(&mu_);
@@ -41,14 +41,14 @@ public:
             if (paths_global_id_.find(cf_path.path) == paths_global_id_.end()) {
                 // a new cf_path
                 uint32_t new_path_id = GetCurrentPathId();
-                paths.push_back(Path(new_path_id, cf_path.target_size));
+                paths.push_back(Path(new_path_id, cf_path.target_size, use_db_path));
                 paths_global_id_[cf_path.path] = new_path_id;
                 paths_size_.push_back(GlobalPath(0, cf_path.target_size));
             } else {
                 assert(paths_global_id_[cf_path.path] < paths_size_.size());
                 paths_size_[paths_global_id_[cf_path.path]].global_path_capacity_ 
                     += cf_path.target_size;
-                paths.push_back(Path(paths_global_id_[cf_path.path], cf_path.target_size));
+                paths.push_back(Path(paths_global_id_[cf_path.path], cf_path.target_size, use_db_path));
             }
         }
         cfd_paths_.insert(std::make_pair(cfd_id, std::move(paths)));
@@ -145,6 +145,7 @@ public:
             uint32_t global_path_id = path.global_path_id_;
             result.push_back(
                 std::make_pair(paths_size_[global_path_id].global_path_size_, 
+                               path.use_db_path_ ? path.path_capacity_ : 
                                paths_size_[global_path_id].global_path_capacity_));
         }
         return result;
@@ -182,10 +183,12 @@ public:
         uint32_t global_path_id_;
         uint64_t cfd_local_path_size_;
         uint64_t path_capacity_;
+        bool use_db_path_;
         std::multiset<int> sst_levels_;
 
-        Path(uint32_t path_id, uint64_t capacity)
-            : global_path_id_(path_id), cfd_local_path_size_(0), path_capacity_(capacity) {}
+        Path(uint32_t path_id, uint64_t capacity, bool use_db_path)
+            : global_path_id_(path_id), cfd_local_path_size_(0),
+              path_capacity_(capacity), use_db_path_(use_db_path) {}
     };
 
     struct GlobalPath {
