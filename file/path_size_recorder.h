@@ -91,20 +91,6 @@ public:
             }
             tracked_files_.insert(
                 std::make_pair(file_path, SstFile(cfd_id, path_id, global_path_id, file_size, level)));
-            // debug info
-            fprintf(stdout, "=========== Add File: %s(size: %ld) in [cfd: %d] [path id: %d] [level: %d] ========================\n",
-                    file_path.c_str(), file_size, cfd_id, path_id, level);
-            auto paths_debug = cfd_paths_.find(cfd_id);
-            assert(paths_debug != cfd_paths_.end());
-            int id = 0;
-            for (auto& path : paths_debug->second) {
-                uint32_t global_path_id_debug = path.global_path_id_;
-                fprintf(stdout, "path %d: [path_size: %ld  path_capacity: %ld]\n",
-                        id, paths_size_[global_path_id_debug].global_path_size_,
-                        path.use_db_path_ ? path.path_capacity_ : paths_size_[global_path_id_debug].global_path_capacity_);
-                id++;
-            }
-            fprintf(stdout, "===========================================================================================\n");
         }
     }
 
@@ -130,20 +116,6 @@ public:
         uint32_t global_path_id = (paths->second)[sstfile.local_path_id_].global_path_id_;
         paths_size_[global_path_id].global_path_size_ -= sstfile.file_size_;
         int cfd_id = static_cast<int>(sstfile.cfd_id_);
-        // debug info
-        fprintf(stdout, "=========== Delete File: %s(size: %ld) in [cfd: %d] [path id: %d] [level: %d] ========================\n",
-                file_path.c_str(), sstfile.file_size_, sstfile.cfd_id_, sstfile.local_path_id_, sstfile.level_);
-        auto paths_debug = cfd_paths_.find(sstfile.cfd_id_);
-        assert(paths_debug != cfd_paths_.end());
-        int id = 0;
-        for (auto& path : paths_debug->second) {
-            uint32_t global_path_id_debug = path.global_path_id_;
-            fprintf(stdout, "path %d: [path_size: %ld  path_capacity: %ld]\n",
-                    id, paths_size_[global_path_id_debug].global_path_size_,
-                    path.use_db_path_ ? path.path_capacity_ : paths_size_[global_path_id_debug].global_path_capacity_);
-            id++;
-        }
-        fprintf(stdout, "===========================================================================================\n");
         tracked_files_.erase(tracked_file);
         return cfd_id;
     }
