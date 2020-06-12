@@ -1175,12 +1175,14 @@ class DBImpl : public DB {
   // Argument required by background flush thread.
   struct BGFlushArg {
     BGFlushArg()
-        : cfd_(nullptr), max_memtable_id_(0), superversion_context_(nullptr) {}
+        : cfd_(nullptr), max_memtable_id_(0), superversion_context_(nullptr), run_out_of_capacity_(false) {}
     BGFlushArg(ColumnFamilyData* cfd, uint64_t max_memtable_id,
-               SuperVersionContext* superversion_context)
+               SuperVersionContext* superversion_context,
+               bool run_out_of_capacity = false)
         : cfd_(cfd),
           max_memtable_id_(max_memtable_id),
-          superversion_context_(superversion_context) {}
+          superversion_context_(superversion_context),
+          run_out_of_capacity_(run_out_of_capacity) {}
 
     // Column family to flush.
     ColumnFamilyData* cfd_;
@@ -1191,6 +1193,8 @@ class DBImpl : public DB {
     // installs a new superversion for the column family. This operation
     // requires a SuperVersionContext object (currently embedded in JobContext).
     SuperVersionContext* superversion_context_;
+
+    bool run_out_of_capacity_;
   };
 
   // Argument passed to flush thread.
@@ -1306,13 +1310,11 @@ class DBImpl : public DB {
   // persistent storage.
   Status FlushMemTablesToOutputFiles(
       const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
-      bool multi_path0_run_out_of_capacity);
+      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri);
 
   Status AtomicFlushMemTablesToOutputFiles(
       const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
-      bool multi_path0_run_out_of_capacity);
+      JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri);
 
   // REQUIRES: log_numbers are sorted in ascending order
   Status RecoverLogFiles(const std::vector<uint64_t>& log_numbers,

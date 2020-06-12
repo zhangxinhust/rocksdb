@@ -154,7 +154,7 @@ Status DBImpl::FlushMemTableToOutputFile(
       GetDataDir(cfd, path_id),
       GetCompressionFlush(*cfd->ioptions(), mutable_cf_options), stats_,
       &event_logger_, mutable_cf_options.report_bg_io_stats,
-      true /* sync_output_directory */, true /* write_manifest */, thread_pri);
+      true /* sync_output_directory */, true /* write_manifest */, thread_pri, path_id);
 
   FileMetaData file_meta;
 
@@ -243,12 +243,11 @@ Status DBImpl::FlushMemTableToOutputFile(
 
 Status DBImpl::FlushMemTablesToOutputFiles(
     const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-    JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
-    bool multi_path0_run_out_of_capacity) {
+    JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri) {
   if (immutable_db_options_.atomic_flush) {
     return AtomicFlushMemTablesToOutputFiles(
         bg_flush_args, made_progress, job_context, log_buffer, 
-        thread_pri, multi_path0_run_out_of_capacity);
+        thread_pri);
   }
   std::vector<SequenceNumber> snapshot_seqs;
   SequenceNumber earliest_write_conflict_snapshot;
@@ -266,7 +265,7 @@ Status DBImpl::FlushMemTablesToOutputFiles(
         snapshot_checker, log_buffer, thread_pri, 
         cfd->ioptions()->compaction_style == kCompactionStyleLevel &&
         cfd->ioptions()->cf_paths.size() > 1 &&
-        multi_path0_run_out_of_capacity);
+        arg.run_out_of_capacity_);
     if (!s.ok()) {
       status = s;
       if (!s.IsShutdownInProgress() && !s.IsColumnFamilyDropped()) {
@@ -290,8 +289,7 @@ Status DBImpl::FlushMemTablesToOutputFiles(
  */
 Status DBImpl::AtomicFlushMemTablesToOutputFiles(
     const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
-    JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri,
-    bool multi_path0_run_out_of_capacity) {
+    JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri) {
   mutex_.AssertHeld();
 
   autovector<ColumnFamilyData*> cfds;
@@ -323,7 +321,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
   for (int i = 0; i < num_cfs; ++i) {
     auto cfd = cfds[i];
     size_t path_id = (cfd->ioptions()->compaction_style == kCompactionStyleLevel &&
-                      cfd->ioptions()->cf_paths.size() > 1U && multi_path0_run_out_of_capacity) ?
+                      cfd->ioptions()->cf_paths.size() > 1U && bg_flush_args[i].run_out_of_capacity_) ?
                       (cfd->ioptions()->cf_paths.size() - 1U) : 0U;
     cfd_flush_path_ids.emplace_back(path_id);
     Directory* data_dir = GetDataDir(cfd, path_id);
@@ -355,7 +353,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
         data_dir, GetCompressionFlush(*cfd->ioptions(), mutable_cf_options),
         stats_, &event_logger_, mutable_cf_options.report_bg_io_stats,
         false /* sync_output_directory */, false /* write_manifest */,
-        thread_pri));
+        thread_pri, path_id));
     jobs.back()->PickMemTable();
   }
 
@@ -2182,22 +2180,7 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
   std::vector<SuperVersionContext>& superversion_contexts =
       job_context->superversion_contexts;
   autovector<ColumnFamilyData*> column_families_not_to_flush;
-  bool run_out_of_capacity = false;
   while (!flush_queue_.empty()) {
-    FlushRequest front_req = flush_queue_.front();
-    for (auto& iter : front_req) {
-      ColumnFamilyData* cfd = iter.first;
-      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetGlobalPathInfo();
-      assert(capactiy_info.size() >= 1);
-      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
-      uint64_t estimate_size = 
-        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
-      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
-      if (capacity_rate > 0.7) {
-        run_out_of_capacity = true;
-        break;
-      }
-    }
     // This cfd is already referenced
     const FlushRequest& flush_req = PopFirstFromFlushQueue();
     superversion_contexts.clear();
@@ -2205,15 +2188,20 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
 
     for (const auto& iter : flush_req) {
       ColumnFamilyData* cfd = iter.first;
+      std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetGlobalPathInfo();
+      assert(capactiy_info.size() >= 1);
+      std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
+      uint64_t estimate_size = 
+        path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
+      double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
       if (cfd->IsDropped() || !cfd->imm()->IsFlushPending()) {
         // can't flush this CF, try next one
         column_families_not_to_flush.push_back(cfd);
-        run_out_of_capacity = false;
         continue;
       }
       superversion_contexts.emplace_back(SuperVersionContext(true));
       bg_flush_args.emplace_back(cfd, iter.second,
-                                 &(superversion_contexts.back()));
+                                 &(superversion_contexts.back()), capacity_rate > 0.7);
     }
     if (!bg_flush_args.empty()) {
       break;
@@ -2235,7 +2223,7 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
           bg_compaction_scheduled_);
     }
     status = FlushMemTablesToOutputFiles(bg_flush_args, made_progress,
-                                         job_context, log_buffer, thread_pri, run_out_of_capacity);
+                                         job_context, log_buffer, thread_pri);
     TEST_SYNC_POINT("DBImpl::BackgroundFlush:BeforeFlush");
     // All the CFDs in the FlushReq must have the same flush reason, so just
     // grab the first one
