@@ -2188,17 +2188,17 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
 
     for (const auto& iter : flush_req) {
       ColumnFamilyData* cfd = iter.first;
+      if (cfd->IsDropped() || !cfd->imm()->IsFlushPending()) {
+        // can't flush this CF, try next one
+        column_families_not_to_flush.push_back(cfd);
+        continue;
+      }
       std::vector<std::pair<uint64_t, uint64_t>> capactiy_info = cfd->GetGlobalPathInfo();
       assert(capactiy_info.size() >= 1);
       std::pair<uint64_t, uint64_t> path0_capacity_info = capactiy_info[0];
       uint64_t estimate_size = 
         path0_capacity_info.first + static_cast<uint64_t>(cfd->imm()->ApproximateUnflushedMemTablesMemoryUsage());
       double capacity_rate = static_cast<double>(estimate_size) / path0_capacity_info.second;
-      if (cfd->IsDropped() || !cfd->imm()->IsFlushPending()) {
-        // can't flush this CF, try next one
-        column_families_not_to_flush.push_back(cfd);
-        continue;
-      }
       superversion_contexts.emplace_back(SuperVersionContext(true));
       bg_flush_args.emplace_back(cfd, iter.second,
                                  &(superversion_contexts.back()), capacity_rate > 0.7);
