@@ -36,11 +36,11 @@ bool LevelCompactionPicker::NeedsCompaction(
       return true;
     }
   }
-  auto& path_compaction_info = vstorage->GetPathCompactionInfo();
-  if (!path_compaction_info.empty()) {
-    return static_cast<double>(path_compaction_info[0].path_size_) /
-           path_compaction_info[0].path_capacity_ > 0.9;
-  }
+  // auto& path_compaction_info = vstorage->GetPathCompactionInfo();
+  // if (!path_compaction_info.empty()) {
+  //   return static_cast<double>(path_compaction_info[0].path_size_) /
+  //          path_compaction_info[0].path_capacity_ > 0.9;
+  // }
   return false;
 }
 
@@ -247,29 +247,29 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     }
   }
 
-  if (start_level_inputs_.empty()) {
-    auto& path_compaction_info = vstorage_->GetPathCompactionInfo();
-    for (int i = 0; i < static_cast<int>(path_compaction_info.size()); i++) {
-      start_level_ = path_compaction_info[i].path_top_level_;
-      output_level_ = path_compaction_info[i].next_path_base_level_;
-      assert(start_level_ >= 0);
-      assert(start_level_ < compaction_picker_->NumberLevels());
-      assert(start_level_ + 1 == output_level_);
-      if (output_level_ >= compaction_picker_->NumberLevels()) {
-        continue;
-      }
-      if (PickFileToCompact()) {
-        if (start_level_ == 0) {
-          compaction_reason_ = CompactionReason::kLevelL0FilesNum;
-        } else {
-          compaction_reason_ = CompactionReason::kLevelMaxLevelSize;
-        }
-        break;
-      } else {
-        start_level_inputs_.clear();
-      }
-    }
-  }
+  // if (start_level_inputs_.empty()) {
+  //   auto& path_compaction_info = vstorage_->GetPathCompactionInfo();
+  //   for (int i = 0; i < static_cast<int>(path_compaction_info.size()); i++) {
+  //     start_level_ = path_compaction_info[i].path_top_level_;
+  //     output_level_ = path_compaction_info[i].next_path_base_level_;
+  //     assert(start_level_ >= 0);
+  //     assert(start_level_ < compaction_picker_->NumberLevels());
+  //     assert(start_level_ + 1 == output_level_);
+  //     if (output_level_ >= compaction_picker_->NumberLevels()) {
+  //       continue;
+  //     }
+  //     if (PickFileToCompact()) {
+  //       if (start_level_ == 0) {
+  //         compaction_reason_ = CompactionReason::kLevelL0FilesNum;
+  //       } else {
+  //         compaction_reason_ = CompactionReason::kLevelMaxLevelSize;
+  //       }
+  //       break;
+  //     } else {
+  //       start_level_inputs_.clear();
+  //     }
+  //   }
+  // }
 
   // if we didn't find a compaction, check if there are any files marked for
   // compaction
@@ -405,7 +405,7 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
 uint32_t LevelCompactionBuilder::AdjustPathId(uint32_t path_id, uint64_t total_input_size) const {
   auto& path_info = vstorage_->GetGlobalPathInfo();
-  if (path_info.empty() || path_id >= path_info.size() - 1) {
+  if (path_info.empty() || path_id + 1 >= static_cast<uint32_t>(path_info.size())) {
     return path_id;
   }
   uint64_t path_size = path_info[path_id].first;

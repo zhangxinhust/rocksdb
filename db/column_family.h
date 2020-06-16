@@ -501,8 +501,6 @@ class ColumnFamilyData {
 
   void PathSizeRecorderOnAddFile(const std::string& file_path, uint32_t path_id, int level); 
 
-  void PathSizeRecorderOnDeleteFile(const std::string& file_path); 
-
   void PathSizeRecorderOnAddFileWhileDBOpen();
 
   std::vector<std::pair<uint64_t, uint64_t>> GetLocalPathInfo();

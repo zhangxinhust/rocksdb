@@ -543,8 +543,6 @@ class VersionStorageInfo {
   // is compiled in release mode
   bool force_consistency_checks_;
 
-  // autovector<PathInfo> multi_path_info_;
-
   std::vector<PathCompactionInfo> path_compaction_info_;
 
   std::vector<std::pair<uint64_t, uint64_t>> path_size_capacity_;

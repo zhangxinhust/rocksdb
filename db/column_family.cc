@@ -1268,11 +1268,6 @@ void ColumnFamilyData::PathSizeRecorderOnAddFile(const std::string& file_path,
   column_family_set_->psr_.OnAddFile(file_path, GetID(), path_id, level);
 }
 
-void ColumnFamilyData::PathSizeRecorderOnDeleteFile(const std::string& file_path) {
-  assert(column_family_set_ != nullptr);
-  column_family_set_->psr_.OnDeleteFile(file_path);
-}
-
 void ColumnFamilyData::PathSizeRecorderOnAddFileWhileDBOpen() {
   assert(column_family_set_ != nullptr && current_ != nullptr);
   const VersionStorageInfo* vstorage = current_->storage_info();

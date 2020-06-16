@@ -159,7 +159,7 @@ public:
             return result;
         std::vector<Path>& paths = paths_iter->second;
         for (int i = 0; i < static_cast<int>(paths.size()); i++) {
-            if (paths[i].sst_levels_.empty() || i == static_cast<int>(paths.size()) - 1) {
+            if (paths[i].sst_levels_.empty() || i + 1 == static_cast<int>(paths.size())) {
                 continue;
             } else {
                 int top_level = *(--(paths[i].sst_levels_.end()));
