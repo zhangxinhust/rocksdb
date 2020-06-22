@@ -24,7 +24,6 @@ struct PathCompactionInfo {
     uint64_t path_size_;
     uint64_t path_capacity_;
     int path_top_level_;
-    int next_path_base_level_;
 };
 
 class PathSizeRecorder {
@@ -165,7 +164,7 @@ public:
                 int top_level = *(--(paths[i].sst_levels_.end()));
                 result.push_back(PathCompactionInfo {
                     paths[i].cfd_local_path_size_, paths[i].path_capacity_,
-                    top_level, top_level + 1});
+                    top_level});
             }
         }
         std::sort(result.begin(), result.end(), 

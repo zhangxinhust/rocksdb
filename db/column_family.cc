@@ -295,6 +295,16 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
                    result.level0_file_num_compaction_trigger);
   }
 
+  if (result.flush_change_path_id_rate <= 0.0 || 
+      result.flush_change_path_id_rate > 1.0) {
+    result.flush_change_path_id_rate = 70.0 / 100;
+  }
+
+  if (result.compaction_change_path_id_rate <= 0.0 || 
+      result.compaction_change_path_id_rate > 1.0) {
+    result.compaction_change_path_id_rate = 70.0 / 100;
+  }
+
   if (result.soft_pending_compaction_bytes_limit == 0) {
     result.soft_pending_compaction_bytes_limit =
         result.hard_pending_compaction_bytes_limit;
