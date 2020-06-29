@@ -3788,7 +3788,8 @@ class Benchmark {
 
   void InitializeOptionsGeneral(Options* opts) {
     Options& options = *opts;
-
+    options.db_paths = { {"./path1", 1l * 1024 * 1024 * 1024}, 
+      {"./path2", 100l * 1024 * 1024 * 1024} };
     options.create_missing_column_families = FLAGS_num_column_families > 1;
     options.statistics = dbstats;
     options.wal_dir = FLAGS_wal_dir;
@@ -4809,6 +4810,7 @@ class Benchmark {
       read++;
       Status s;
       if (FLAGS_num_column_families > 1) {
+        pinnable_val.Reset();
         s = db_with_cfh->db->Get(options, db_with_cfh->GetCfh(key_rand), key,
                                  &pinnable_val);
       } else {
