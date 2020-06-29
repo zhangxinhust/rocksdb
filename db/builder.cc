@@ -50,7 +50,7 @@ TableBuilder* NewTableBuilder(
     uint64_t sample_for_compression, const CompressionOptions& compression_opts,
     int level, const bool skip_filters, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time) {
+    const uint64_t file_creation_time, WritableFileWriter* meta_file) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -61,7 +61,7 @@ TableBuilder* NewTableBuilder(
                           skip_filters, column_family_name, level,
                           creation_time, oldest_key_time, target_file_size,
                           file_creation_time),
-      column_family_id, file);
+      column_family_id, file, meta_file);
 }
 
 Status BuildTable(
@@ -82,7 +82,8 @@ Status BuildTable(
     TableFileCreationReason reason, EventLogger* event_logger, int job_id,
     const Env::IOPriority io_priority, TableProperties* table_properties,
     int level, const uint64_t creation_time, const uint64_t oldest_key_time,
-    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time) {
+    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time,
+    bool is_sst_meta_split) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -97,8 +98,17 @@ Status BuildTable(
     range_del_agg->AddTombstones(std::move(range_del_iter));
   }
 
-  std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
+  std::string fname;
+  std::string meta_fname;
+  if(is_sst_meta_split) {
+    fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
+                                    meta->fd.GetPathId() & 0xFFFF);
+    meta_fname = TableMetaFileName(ioptions.cf_paths, meta->fd.GetNumber(),
+                                    (meta->fd.GetPathId() >> 16) & 0xFFFF);
+  } else {
+    fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
+  }
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
       ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
@@ -108,6 +118,7 @@ Status BuildTable(
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
     TableBuilder* builder;
     std::unique_ptr<WritableFileWriter> file_writer;
+    std::unique_ptr<WritableFileWriter> meta_file_writer;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
     CompressionOptions compression_opts_for_flush(compression_opts);
@@ -115,6 +126,7 @@ Status BuildTable(
     compression_opts_for_flush.zstd_max_train_bytes = 0;
     {
       std::unique_ptr<WritableFile> file;
+      std::unique_ptr<WritableFile> meta_file;
 #ifndef NDEBUG
       bool use_direct_writes = env_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
@@ -126,19 +138,34 @@ Status BuildTable(
             job_id, meta->fd, tp, reason, s);
         return s;
       }
+      if(is_sst_meta_split) {
+        s = NewWritableFile(env, meta_fname, &file, env_options);
+        if (!s.ok()) {
+          EventHelpers::LogAndNotifyTableFileCreationFinished(
+              event_logger, ioptions.listeners, dbname, column_family_name, meta_fname,
+              job_id, meta->fd, tp, reason, s);
+          return s;
+        }
+        meta_file->SetIOPriority(io_priority);
+      }
       file->SetIOPriority(io_priority);
       file->SetWriteLifeTimeHint(write_hint);
 
       file_writer.reset(
           new WritableFileWriter(std::move(file), fname, env_options, env,
                                  ioptions.statistics, ioptions.listeners));
+      if(is_sst_meta_split) {
+        meta_file_writer.reset(
+          new WritableFileWriter(std::move(meta_file), meta_fname, env_options, env,
+                                 ioptions.statistics, ioptions.listeners));
+      }
       builder = NewTableBuilder(
           ioptions, mutable_cf_options, internal_comparator,
           int_tbl_prop_collector_factories, column_family_id,
           column_family_name, file_writer.get(), compression,
           sample_for_compression, compression_opts_for_flush, level,
           false /* skip_filters */, creation_time, oldest_key_time,
-          0 /*target_file_size*/, file_creation_time);
+          0 /*target_file_size*/, file_creation_time, meta_file_writer.get());
     }
 
     MergeHelper merge(env, internal_comparator.user_comparator(),

@@ -185,7 +185,8 @@ class TableCache {
                         std::unique_ptr<TableReader>* table_reader,
                         const SliceTransform* prefix_extractor = nullptr,
                         bool skip_filters = false, int level = -1,
-                        bool prefetch_index_and_filter_in_cache = true);
+                        bool prefetch_index_and_filter_in_cache = true,
+                        bool is_sst_meta_split = false);
 
   const ImmutableCFOptions& ioptions_;
   const EnvOptions& env_options_;

@@ -22,6 +22,7 @@
 namespace rocksdb {
 
 static const std::string kRocksDbTFileExt = "sst";
+static const std::string kRocksDbTMetaFileExt = "meta";
 static const std::string kLevelDbTFileExt = "ldb";
 static const std::string kRocksDBBlobFileExt = "blob";
 
@@ -95,6 +96,10 @@ std::string MakeTableFileName(const std::string& path, uint64_t number) {
   return MakeFileName(path, number, kRocksDbTFileExt.c_str());
 }
 
+std::string MakeTableMetaFileName(const std::string& path, uint64_t number) {
+  return MakeFileName(path, number, kRocksDbTMetaFileExt.c_str());
+}
+
 std::string Rocks2LevelTableFileName(const std::string& fullname) {
   assert(fullname.size() > kRocksDbTFileExt.size() + 1);
   if (fullname.size() <= kRocksDbTFileExt.size() + 1) {
@@ -125,6 +130,18 @@ std::string TableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
     path = db_paths[path_id].path;
   }
   return MakeTableFileName(path, number);
+}
+
+std::string TableMetaFileName(const std::vector<DbPath>& db_paths, uint64_t number,
+                          uint32_t path_id) {
+  assert(number > 0);
+  std::string path;
+  if (path_id >= db_paths.size()) {
+    path = db_paths.back().path;
+  } else {
+    path = db_paths[path_id].path;
+  }
+  return MakeTableMetaFileName(path, number);
 }
 
 void FormatFileNumber(uint64_t number, uint32_t path_id, char* out_buf,

@@ -1110,7 +1110,8 @@ Status BlockBasedTable::Open(
     const bool prefetch_index_and_filter_in_cache, const bool skip_filters,
     const int level, const bool immortal_table,
     const SequenceNumber largest_seqno, TailPrefetchStats* tail_prefetch_stats,
-    BlockCacheTracer* const block_cache_tracer) {
+    BlockCacheTracer* const block_cache_tracer,
+    std::unique_ptr<RandomAccessFileReader>&& meta_file) {
   table_reader->reset();
 
   Status s;
@@ -1121,7 +1122,7 @@ Status BlockBasedTable::Open(
   const bool prefetch_all = prefetch_index_and_filter_in_cache || level == 0;
   const bool preload_all = !table_options.cache_index_and_filter_blocks;
 
-  s = PrefetchTail(file.get(), file_size, tail_prefetch_stats, prefetch_all,
+  s = PrefetchTail(meta_file.get(), file_size, tail_prefetch_stats, prefetch_all,
                    preload_all, &prefetch_buffer);
 
   // Read in the following order:
@@ -1132,7 +1133,7 @@ Status BlockBasedTable::Open(
   //    5. [meta block: compression dictionary]
   //    6. [meta block: index]
   //    7. [meta block: filter]
-  s = ReadFooterFromFile(file.get(), prefetch_buffer.get(), file_size, &footer,
+  s = ReadFooterFromFile(meta_file.get(), prefetch_buffer.get(), file_size, &footer,
                          kBlockBasedTableMagicNumber);
   if (!s.ok()) {
     return s;
@@ -1152,6 +1153,7 @@ Status BlockBasedTable::Open(
                                       internal_comparator, skip_filters, level,
                                       immortal_table);
   rep->file = std::move(file);
+  rep->meta_file = std::move(meta_file);
   rep->footer = footer;
   rep->hash_index_allow_collision = table_options.hash_index_allow_collision;
   // We need to wrap data with internal_prefix_transform to make sure it can

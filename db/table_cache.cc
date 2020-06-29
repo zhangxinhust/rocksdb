@@ -95,12 +95,26 @@ Status TableCache::GetTableReader(
     bool sequential_mode, bool record_read_stats, HistogramImpl* file_read_hist,
     std::unique_ptr<TableReader>* table_reader,
     const SliceTransform* prefix_extractor, bool skip_filters, int level,
-    bool prefetch_index_and_filter_in_cache) {
-  std::string fname =
-      TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId());
+    bool prefetch_index_and_filter_in_cache,
+    bool is_sst_meta_split) {
+  std::string fname;
+  std::string meta_fname;
   std::unique_ptr<RandomAccessFile> file;
-  Status s = ioptions_.env->NewRandomAccessFile(fname, &file, env_options);
-
+  std::unique_ptr<RandomAccessFile> meta_file;
+  if(is_sst_meta_split) {
+    fname =
+      TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId() & 0xFFFF);
+    meta_fname =
+      TableMetaFileName(ioptions_.cf_paths, fd.GetNumber(), (fd.GetPathId() >> 16) & 0xFFFF);
+    
+    s = ioptions_.env->NewRandomAccessFile(fname, &file, env_options);
+    m_s = ioptions_.env->NewRandomAccessFile(meta_fname, &meta_file, env_options);
+  } else {
+    fname =
+      TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId());
+    s = ioptions_.env->NewRandomAccessFile(fname, &file, env_options);
+  }
+  
   RecordTick(ioptions_.statistics, NO_FILE_OPENS);
   if (s.ok()) {
     if (!sequential_mode && ioptions_.advise_random_on_open) {
@@ -112,12 +126,30 @@ Status TableCache::GetTableReader(
             std::move(file), fname, ioptions_.env,
             record_read_stats ? ioptions_.statistics : nullptr, SST_READ_MICROS,
             file_read_hist, ioptions_.rate_limiter, ioptions_.listeners));
-    s = ioptions_.table_factory->NewTableReader(
+    
+    std::unique_ptr<RandomAccessFileReader> meta_file_reader;
+    if(is_sst_meta_split) {
+      meta_file_reader = 
+          new RandomAccessFileReader(
+              std::move(meta_file), meta_fname, ioptions_.env,
+              record_read_stats ? ioptions_.statistics : nullptr, SST_READ_MICROS,
+              file_read_hist, ioptions_.rate_limiter, ioptions_.listeners);
+    }
+    if(is_sst_meta_split) {
+      s = ioptions_.table_factory->NewTableReader(
+        TableReaderOptions(ioptions_, prefix_extractor, env_options,
+                           internal_comparator, skip_filters, immortal_tables_,
+                           level, fd.largest_seqno, block_cache_tracer_),
+        std::move(file_reader), fd.GetFileSize(), table_reader,
+        prefetch_index_and_filter_in_cache, std::move(meta_file_reader));
+    } else {
+      s = ioptions_.table_factory->NewTableReader(
         TableReaderOptions(ioptions_, prefix_extractor, env_options,
                            internal_comparator, skip_filters, immortal_tables_,
                            level, fd.largest_seqno, block_cache_tracer_),
         std::move(file_reader), fd.GetFileSize(), table_reader,
         prefetch_index_and_filter_in_cache);
+    }
     TEST_SYNC_POINT("TableCache::GetTableReader:0");
   }
   return s;
@@ -154,7 +186,8 @@ Status TableCache::FindTable(const EnvOptions& env_options,
     s = GetTableReader(env_options, internal_comparator, fd,
                        false /* sequential mode */, record_read_stats,
                        file_read_hist, &table_reader, prefix_extractor,
-                       skip_filters, level, prefetch_index_and_filter_in_cache);
+                       skip_filters, level, prefetch_index_and_filter_in_cache,
+                       true/*is_sst_meta_split*/);
     if (!s.ok()) {
       assert(table_reader == nullptr);
       RecordTick(ioptions_.statistics, NO_FILE_ERRORS);

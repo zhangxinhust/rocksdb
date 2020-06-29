@@ -111,7 +111,8 @@ class BlockBasedTable : public TableReader {
                      const bool immortal_table = false,
                      const SequenceNumber largest_seqno = 0,
                      TailPrefetchStats* tail_prefetch_stats = nullptr,
-                     BlockCacheTracer* const block_cache_tracer = nullptr);
+                     BlockCacheTracer* const block_cache_tracer = nullptr,
+                     std::unique_ptr<RandomAccessFileReader>&& meta_file = nullptr);
 
   bool PrefixMayMatch(const Slice& internal_key,
                       const ReadOptions& read_options,
@@ -496,6 +497,7 @@ struct BlockBasedTable::Rep {
   const InternalKeyComparator& internal_comparator;
   Status status;
   std::unique_ptr<RandomAccessFileReader> file;
+  std::unique_ptr<RandomAccessFileReader> meta_file;
   char cache_key_prefix[kMaxCacheKeyPrefixSize];
   size_t cache_key_prefix_size = 0;
   char persistent_cache_key_prefix[kMaxCacheKeyPrefixSize];

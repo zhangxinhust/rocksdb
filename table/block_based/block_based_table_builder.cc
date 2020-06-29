@@ -281,7 +281,9 @@ struct BlockBasedTableBuilder::Rep {
   const BlockBasedTableOptions table_options;
   const InternalKeyComparator& internal_comparator;
   WritableFileWriter* file;
+  WritableFileWriter* meta_file;
   uint64_t offset = 0;
+  uint64_t meta_offset = 0;
   Status status;
   size_t alignment;
   BlockBuilder data_block;
@@ -365,12 +367,13 @@ struct BlockBasedTableBuilder::Rep {
       const CompressionOptions& _compression_opts, const bool skip_filters,
       const std::string& _column_family_name, const uint64_t _creation_time,
       const uint64_t _oldest_key_time, const uint64_t _target_file_size,
-      const uint64_t _file_creation_time)
+      const uint64_t _file_creation_time, WritableFileWriter* m_f)
       : ioptions(_ioptions),
         moptions(_moptions),
         table_options(table_opt),
         internal_comparator(icomparator),
         file(f),
+        meta_file(m_f),
         alignment(table_options.block_align
                       ? std::min(table_options.block_size, kDefaultPageSize)
                       : 0),
@@ -456,7 +459,7 @@ BlockBasedTableBuilder::BlockBasedTableBuilder(
     const CompressionOptions& compression_opts, const bool skip_filters,
     const std::string& column_family_name, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time) {
+    const uint64_t file_creation_time, WritableFileWriter* meta_file) {
   BlockBasedTableOptions sanitized_table_options(table_options);
   if (sanitized_table_options.format_version == 0 &&
       sanitized_table_options.checksum != kCRC32c) {
@@ -474,7 +477,7 @@ BlockBasedTableBuilder::BlockBasedTableBuilder(
               int_tbl_prop_collector_factories, column_family_id, file,
               compression_type, sample_for_compression, compression_opts,
               skip_filters, column_family_name, creation_time, oldest_key_time,
-              target_file_size, file_creation_time);
+              target_file_size, file_creation_time, meta_file);
 
   if (rep_->filter_builder != nullptr) {
     rep_->filter_builder->StartBlock(0);
@@ -583,14 +586,16 @@ void BlockBasedTableBuilder::Flush() {
 
 void BlockBasedTableBuilder::WriteBlock(BlockBuilder* block,
                                         BlockHandle* handle,
-                                        bool is_data_block) {
-  WriteBlock(block->Finish(), handle, is_data_block);
+                                        bool is_data_block,
+                                        bool is_meta_block) {
+  WriteBlock(block->Finish(), handle, is_data_block, is_meta_block);
   block->Reset();
 }
 
 void BlockBasedTableBuilder::WriteBlock(const Slice& raw_block_contents,
                                         BlockHandle* handle,
-                                        bool is_data_block) {
+                                        bool is_data_block,
+                                        bool is_meta_block) {
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
   //    type: uint8
@@ -697,7 +702,12 @@ void BlockBasedTableBuilder::WriteBlock(const Slice& raw_block_contents,
     RecordTick(r->ioptions.statistics, NUMBER_BLOCK_NOT_COMPRESSED);
   }
 
-  WriteRawBlock(block_contents, type, handle, is_data_block);
+  if(is_meta_block) {
+    WriteRawMetaBlock(block_contents, type, handle, is_data_block);
+  } else {
+    WriteRawBlock(block_contents, type, handle, is_data_block);
+  }
+  
   r->compressed_output.clear();
   if (is_data_block) {
     if (r->filter_builder != nullptr) {
@@ -779,6 +789,77 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
   }
 }
 
+void BlockBasedTableBuilder::WriteRawMetaBlock(const Slice& block_contents,
+                                           CompressionType type,
+                                           BlockHandle* handle,
+                                           bool is_data_block) {
+  Rep* r = rep_;
+  StopWatch sw(r->ioptions.env, r->ioptions.statistics, WRITE_RAW_BLOCK_MICROS);
+  handle->set_offset(r->meta_offset);
+  handle->set_size(block_contents.size());
+  assert(r->status.ok());
+  r->status = r->meta_file->Append(block_contents);
+  if (r->status.ok()) {
+    char trailer[kBlockTrailerSize];
+    trailer[0] = type;
+    char* trailer_without_type = trailer + 1;
+    switch (r->table_options.checksum) {
+      case kNoChecksum:
+        EncodeFixed32(trailer_without_type, 0);
+        break;
+      case kCRC32c: {
+        auto crc = crc32c::Value(block_contents.data(), block_contents.size());
+        crc = crc32c::Extend(crc, trailer, 1);  // Extend to cover block type
+        EncodeFixed32(trailer_without_type, crc32c::Mask(crc));
+        break;
+      }
+      case kxxHash: {
+        void* xxh = XXH32_init(0);
+        XXH32_update(xxh, block_contents.data(),
+                     static_cast<uint32_t>(block_contents.size()));
+        XXH32_update(xxh, trailer, 1);  // Extend  to cover block type
+        EncodeFixed32(trailer_without_type, XXH32_digest(xxh));
+        break;
+      }
+      case kxxHash64: {
+        XXH64_state_t* const state = XXH64_createState();
+        XXH64_reset(state, 0);
+        XXH64_update(state, block_contents.data(),
+                     static_cast<uint32_t>(block_contents.size()));
+        XXH64_update(state, trailer, 1);  // Extend  to cover block type
+        EncodeFixed32(
+            trailer_without_type,
+            static_cast<uint32_t>(XXH64_digest(state) &  // lower 32 bits
+                                  uint64_t{0xffffffff}));
+        XXH64_freeState(state);
+        break;
+      }
+    }
+
+    assert(r->status.ok());
+    TEST_SYNC_POINT_CALLBACK(
+        "BlockBasedTableBuilder::WriteRawBlock:TamperWithChecksum",
+        static_cast<char*>(trailer));
+    r->status = r->meta_file->Append(Slice(trailer, kBlockTrailerSize));
+    if (r->status.ok()) {
+      r->status = InsertBlockInCache(block_contents, type, handle);
+    }
+    if (r->status.ok()) {
+      r->meta_offset += block_contents.size() + kBlockTrailerSize;
+      if (r->table_options.block_align && is_data_block) {
+        size_t pad_bytes =
+            (r->alignment - ((block_contents.size() + kBlockTrailerSize) &
+                             (r->alignment - 1))) &
+            (r->alignment - 1);
+        r->status = r->meta_file->Pad(pad_bytes);
+        if (r->status.ok()) {
+          r->meta_offset += pad_bytes;
+        }
+      }
+    }
+  }
+}
+
 Status BlockBasedTableBuilder::status() const { return rep_->status; }
 
 static void DeleteCachedBlockContents(const Slice& /*key*/, void* value) {
@@ -840,7 +921,7 @@ void BlockBasedTableBuilder::WriteFilterBlock(
           rep_->filter_builder->Finish(filter_block_handle, &s);
       assert(s.ok() || s.IsIncomplete());
       rep_->props.filter_size += filter_content.size();
-      WriteRawBlock(filter_content, kNoCompression, &filter_block_handle);
+      WriteRawMetaBlock(filter_content, kNoCompression, &filter_block_handle);
     }
   }
   if (ok() && !empty_filter_block) {
@@ -874,7 +955,7 @@ void BlockBasedTableBuilder::WriteIndexBlock(
   if (ok()) {
     for (const auto& item : index_blocks.meta_blocks) {
       BlockHandle block_handle;
-      WriteBlock(item.second, &block_handle, false /* is_data_block */);
+      WriteBlock(item.second, &block_handle, false /* is_data_block */, true /*is_meta_block*/);
       if (!ok()) {
         break;
       }
@@ -883,9 +964,9 @@ void BlockBasedTableBuilder::WriteIndexBlock(
   }
   if (ok()) {
     if (rep_->table_options.enable_index_compression) {
-      WriteBlock(index_blocks.index_block_contents, index_block_handle, false);
+      WriteBlock(index_blocks.index_block_contents, index_block_handle, false, true);
     } else {
-      WriteRawBlock(index_blocks.index_block_contents, kNoCompression,
+      WriteRawMetaBlock(index_blocks.index_block_contents, kNoCompression,
                     index_block_handle);
     }
   }
@@ -898,9 +979,9 @@ void BlockBasedTableBuilder::WriteIndexBlock(
       return;
     }
     if (rep_->table_options.enable_index_compression) {
-      WriteBlock(index_blocks.index_block_contents, index_block_handle, false);
+      WriteBlock(index_blocks.index_block_contents, index_block_handle, false, true);
     } else {
-      WriteRawBlock(index_blocks.index_block_contents, kNoCompression,
+      WriteRawMetaBlock(index_blocks.index_block_contents, kNoCompression,
                     index_block_handle);
     }
     // The last index_block_handle will be for the partition index block
@@ -970,7 +1051,7 @@ void BlockBasedTableBuilder::WritePropertiesBlock(
                                          rep_->ioptions.info_log,
                                          &property_block_builder);
 
-    WriteRawBlock(property_block_builder.Finish(), kNoCompression,
+    WriteRawMetaBlock(property_block_builder.Finish(), kNoCompression,
                   &properties_block_handle);
   }
   if (ok()) {
@@ -996,7 +1077,7 @@ void BlockBasedTableBuilder::WriteCompressionDictBlock(
       rep_->compression_dict->GetRawDict().size()) {
     BlockHandle compression_dict_block_handle;
     if (ok()) {
-      WriteRawBlock(rep_->compression_dict->GetRawDict(), kNoCompression,
+      WriteRawMetaBlock(rep_->compression_dict->GetRawDict(), kNoCompression,
                     &compression_dict_block_handle);
 #ifndef NDEBUG
       Slice compression_dict = rep_->compression_dict->GetRawDict();
@@ -1016,7 +1097,7 @@ void BlockBasedTableBuilder::WriteRangeDelBlock(
     MetaIndexBuilder* meta_index_builder) {
   if (ok() && !rep_->range_del_block.empty()) {
     BlockHandle range_del_block_handle;
-    WriteRawBlock(rep_->range_del_block.Finish(), kNoCompression,
+    WriteRawMetaBlock(rep_->range_del_block.Finish(), kNoCompression,
                   &range_del_block_handle);
     meta_index_builder->Add(kRangeDelBlock, range_del_block_handle);
   }
@@ -1045,9 +1126,9 @@ void BlockBasedTableBuilder::WriteFooter(BlockHandle& metaindex_block_handle,
   std::string footer_encoding;
   footer.EncodeTo(&footer_encoding);
   assert(r->status.ok());
-  r->status = r->file->Append(footer_encoding);
+  r->status = r->meta_file->Append(footer_encoding);
   if (r->status.ok()) {
-    r->offset += footer_encoding.size();
+    r->meta_offset += footer_encoding.size();
   }
 }
 
@@ -1147,7 +1228,7 @@ Status BlockBasedTableBuilder::Finish() {
   WritePropertiesBlock(&meta_index_builder);
   if (ok()) {
     // flush the meta index block
-    WriteRawBlock(meta_index_builder.Finish(), kNoCompression,
+    WriteRawMetaBlock(meta_index_builder.Finish(), kNoCompression,
                   &metaindex_block_handle);
   }
   if (ok()) {

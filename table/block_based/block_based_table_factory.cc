@@ -196,7 +196,8 @@ Status BlockBasedTableFactory::NewTableReader(
     const TableReaderOptions& table_reader_options,
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table_reader,
-    bool prefetch_index_and_filter_in_cache) const {
+    bool prefetch_index_and_filter_in_cache,
+    std::unique_ptr<RandomAccessFileReader>&& meta_file) const {
   return BlockBasedTable::Open(
       table_reader_options.ioptions, table_reader_options.env_options,
       table_options_, table_reader_options.internal_comparator, std::move(file),
@@ -204,12 +205,12 @@ Status BlockBasedTableFactory::NewTableReader(
       prefetch_index_and_filter_in_cache, table_reader_options.skip_filters,
       table_reader_options.level, table_reader_options.immortal,
       table_reader_options.largest_seqno, &tail_prefetch_stats_,
-      table_reader_options.block_cache_tracer);
+      table_reader_options.block_cache_tracer, meta_file);
 }
 
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file) const {
+    WritableFileWriter* file, WritableFileWriter* meta_file) const {
   auto table_builder = new BlockBasedTableBuilder(
       table_builder_options.ioptions, table_builder_options.moptions,
       table_options_, table_builder_options.internal_comparator,
@@ -222,7 +223,8 @@ TableBuilder* BlockBasedTableFactory::NewTableBuilder(
       table_builder_options.creation_time,
       table_builder_options.oldest_key_time,
       table_builder_options.target_file_size,
-      table_builder_options.file_creation_time);
+      table_builder_options.file_creation_time,
+      meta_file);
 
   return table_builder;
 }

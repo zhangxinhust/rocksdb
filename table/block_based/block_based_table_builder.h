@@ -49,7 +49,8 @@ class BlockBasedTableBuilder : public TableBuilder {
       const CompressionOptions& compression_opts, const bool skip_filters,
       const std::string& column_family_name, const uint64_t creation_time = 0,
       const uint64_t oldest_key_time = 0, const uint64_t target_file_size = 0,
-      const uint64_t file_creation_time = 0);
+      const uint64_t file_creation_time = 0, 
+      WritableFileWriter* meta_file = nullptr);
 
   // REQUIRES: Either Finish() or Abandon() has been called.
   ~BlockBasedTableBuilder();
@@ -100,13 +101,16 @@ class BlockBasedTableBuilder : public TableBuilder {
 
   // Call block's Finish() method
   // and then write the compressed block contents to file.
-  void WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block);
+  void WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block,
+                  bool is_meta_block = false);
 
   // Compress and write block content to the file.
   void WriteBlock(const Slice& block_contents, BlockHandle* handle,
-                  bool is_data_block);
+                  bool is_data_block, bool is_meta_block = false);
   // Directly write data to the file.
   void WriteRawBlock(const Slice& data, CompressionType, BlockHandle* handle,
+                     bool is_data_block = false);
+  void WriteRawMetaBlock(const Slice& data, CompressionType, BlockHandle* handle,
                      bool is_data_block = false);
   Status InsertBlockInCache(const Slice& block_contents,
                             const CompressionType type,

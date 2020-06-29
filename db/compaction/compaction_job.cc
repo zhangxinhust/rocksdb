@@ -125,6 +125,7 @@ struct CompactionJob::SubcompactionState {
   // State kept for output being generated
   std::vector<Output> outputs;
   std::unique_ptr<WritableFileWriter> outfile;
+  std::unique_ptr<WritableFileWriter> meta_outfile;
   std::unique_ptr<TableBuilder> builder;
   Output* current_output() {
     if (outputs.empty()) {
@@ -161,6 +162,7 @@ struct CompactionJob::SubcompactionState {
         start(_start),
         end(_end),
         outfile(nullptr),
+        meta_outfile(nullptr),
         builder(nullptr),
         current_output_file_size(0),
         total_bytes(0),
@@ -1293,11 +1295,20 @@ Status CompactionJob::FinishCompactionOutputFile(
   if (s.ok()) {
     StopWatch sw(env_, stats_, COMPACTION_OUTFILE_SYNC_MICROS);
     s = sub_compact->outfile->Sync(db_options_.use_fsync);
+    if(sub_compact->meta_outfile) {
+      s = sub_compact->meta_outfile->Sync(db_options_.use_fsync);
+    }
   }
   if (s.ok()) {
     s = sub_compact->outfile->Close();
+    if(sub_compact->meta_outfile) {
+      s = sub_compact->meta_outfile->Close();
+    }
   }
   sub_compact->outfile.reset();
+  if(sub_compact->meta_outfile) {
+    sub_compact->meta_outfile->reset();
+  }
 
   TableProperties tp;
   if (s.ok()) {
@@ -1425,9 +1436,11 @@ Status CompactionJob::OpenCompactionOutputFile(
   assert(sub_compact->builder == nullptr);
   // no need to lock because VersionSet::next_file_number_ is atomic
   uint64_t file_number = versions_->NewFileNumber();
+  auto cf_paths = sub_compact->compaction->immutable_cf_options()->cf_paths;
   std::string fname =
-      TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
-                    file_number, sub_compact->compaction->output_path_id());
+      TableFileName(cf_paths, file_number, sub_compact->compaction->output_path_id());
+  std::string mfname =
+      TableMetaFileName(cf_paths, file_number, cf_paths->size()-1);
   // Fire events.
   ColumnFamilyData* cfd = sub_compact->compaction->column_family_data();
 #ifndef ROCKSDB_LITE
@@ -1437,13 +1450,15 @@ Status CompactionJob::OpenCompactionOutputFile(
 #endif  // !ROCKSDB_LITE
   // Make the output file
   std::unique_ptr<WritableFile> writable_file;
+  std::unique_ptr<WritableFile> meta_writable_file;
 #ifndef NDEBUG
   bool syncpoint_arg = env_options_.use_direct_writes;
   TEST_SYNC_POINT_CALLBACK("CompactionJob::OpenCompactionOutputFile",
                            &syncpoint_arg);
 #endif
   Status s = NewWritableFile(env_, fname, &writable_file, env_options_);
-  if (!s.ok()) {
+  Status m_s = NewWritableFile(env_, mfname, &meta_writable_file, env_options_);
+  if (!s.ok() || !m_s) {
     ROCKS_LOG_ERROR(
         db_options_.info_log,
         "[%s] [JOB %d] OpenCompactionOutputFiles for table #%" PRIu64
@@ -1460,7 +1475,8 @@ Status CompactionJob::OpenCompactionOutputFile(
 
   SubcompactionState::Output out;
   out.meta.fd =
-      FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0);
+      FileDescriptor(file_number, 
+        sub_compact->compaction->output_path_id() | (cf_paths.size()-1) << 16, 0);
   out.finished = false;
 
   sub_compact->outputs.push_back(out);
@@ -1473,7 +1489,9 @@ Status CompactionJob::OpenCompactionOutputFile(
   sub_compact->outfile.reset(
       new WritableFileWriter(std::move(writable_file), fname, env_options_,
                              env_, db_options_.statistics.get(), listeners));
-
+  sub_compact->meta_outfile.reset(
+      new WritableFileWriter(std::move(meta_writable_file), fname, env_options_,
+                             env_, db_options_.statistics.get(), listeners));
   // If the Column family flag is to only optimize filters for hits,
   // we can skip creating filters if this is the bottommost_level where
   // data is going to be found
@@ -1505,7 +1523,7 @@ Status CompactionJob::OpenCompactionOutputFile(
       sub_compact->compaction->output_compression_opts(),
       sub_compact->compaction->output_level(), skip_filters, latest_key_time,
       0 /* oldest_key_time */, sub_compact->compaction->max_output_file_size(),
-      current_time));
+      current_time), sub_compact->meta_outfile.get());
   LogFlush(db_options_.info_log);
   return s;
 }
