@@ -152,6 +152,7 @@ class TableBuilder {
   // Size of the file generated so far.  If invoked after a successful
   // Finish() call, returns the size of the final generated file.
   virtual uint64_t FileSize() const = 0;
+  virtual uint64_t MetaFileSize() const = 0;
 
   // If the user defined table properties collector suggest the file to
   // be further compacted.

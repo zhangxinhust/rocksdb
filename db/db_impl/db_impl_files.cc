@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "db/db_impl/db_impl.h"
 
+#include <iostream>
 #include <cinttypes>
 #include <set>
 #include <unordered_set>
@@ -284,6 +285,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                     file_deletion_status.ToString().c_str());
   }
   if (type == kTableFile) {
+    std::cout << "LogAndNotifyTableFileDeletion" << std::endl;
     EventHelpers::LogAndNotifyTableFileDeletion(
         &event_logger_, job_id, number, fname, file_deletion_status, GetName(),
         immutable_db_options_.listeners);
@@ -489,6 +491,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
+      std::cout << "PurgeObsoleteFiles LogAndNotifyTableFileDeletion" << std::endl;
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
   }

@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "db/table_cache.h"
+#include <iostream>
 
 #include "db/dbformat.h"
 #include "db/range_tombstone_fragmenter.h"
@@ -97,16 +98,16 @@ Status TableCache::GetTableReader(
     const SliceTransform* prefix_extractor, bool skip_filters, int level,
     bool prefetch_index_and_filter_in_cache,
     bool is_sst_meta_split) {
+  Status s, m_s;
   std::string fname;
   std::string meta_fname;
   std::unique_ptr<RandomAccessFile> file;
   std::unique_ptr<RandomAccessFile> meta_file;
   if(is_sst_meta_split) {
     fname =
-      TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId() & 0xFFFF);
+      TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId());
     meta_fname =
-      TableMetaFileName(ioptions_.cf_paths, fd.GetNumber(), (fd.GetPathId() >> 16) & 0xFFFF);
-    
+      TableMetaFileName(ioptions_.cf_paths, fd.GetNumber(), ioptions_.meta_file_path_id);
     s = ioptions_.env->NewRandomAccessFile(fname, &file, env_options);
     m_s = ioptions_.env->NewRandomAccessFile(meta_fname, &meta_file, env_options);
   } else {
@@ -116,7 +117,7 @@ Status TableCache::GetTableReader(
   }
   
   RecordTick(ioptions_.statistics, NO_FILE_OPENS);
-  if (s.ok()) {
+  if (s.ok() && m_s.ok()) {
     if (!sequential_mode && ioptions_.advise_random_on_open) {
       file->Hint(RandomAccessFile::RANDOM);
     }
@@ -129,18 +130,18 @@ Status TableCache::GetTableReader(
     
     std::unique_ptr<RandomAccessFileReader> meta_file_reader;
     if(is_sst_meta_split) {
-      meta_file_reader = 
+      meta_file_reader.reset( 
           new RandomAccessFileReader(
               std::move(meta_file), meta_fname, ioptions_.env,
               record_read_stats ? ioptions_.statistics : nullptr, SST_READ_MICROS,
-              file_read_hist, ioptions_.rate_limiter, ioptions_.listeners);
+              file_read_hist, ioptions_.rate_limiter, ioptions_.listeners));
     }
     if(is_sst_meta_split) {
       s = ioptions_.table_factory->NewTableReader(
         TableReaderOptions(ioptions_, prefix_extractor, env_options,
                            internal_comparator, skip_filters, immortal_tables_,
                            level, fd.largest_seqno, block_cache_tracer_),
-        std::move(file_reader), fd.GetFileSize(), table_reader,
+        std::move(file_reader), fd.GetMetaFileSize(), table_reader,
         prefetch_index_and_filter_in_cache, std::move(meta_file_reader));
     } else {
       s = ioptions_.table_factory->NewTableReader(
@@ -152,7 +153,7 @@ Status TableCache::GetTableReader(
     }
     TEST_SYNC_POINT("TableCache::GetTableReader:0");
   }
-  return s;
+  return s.ok() ? m_s : s;
 }
 
 void TableCache::EraseHandle(const FileDescriptor& fd, Cache::Handle* handle) {

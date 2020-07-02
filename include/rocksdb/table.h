@@ -522,7 +522,8 @@ class TableFactory {
       const TableReaderOptions& table_reader_options,
       std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
       std::unique_ptr<TableReader>* table_reader,
-      bool prefetch_index_and_filter_in_cache = true) const = 0;
+      bool prefetch_index_and_filter_in_cache = true,
+      std::unique_ptr<RandomAccessFileReader>&& meta_file = nullptr) const = 0;
 
   // Return a table builder to write to a file for this table type.
   //
@@ -544,7 +545,8 @@ class TableFactory {
   // to use in this table.
   virtual TableBuilder* NewTableBuilder(
       const TableBuilderOptions& table_builder_options,
-      uint32_t column_family_id, WritableFileWriter* file) const = 0;
+      uint32_t column_family_id, WritableFileWriter* file,
+      WritableFileWriter* meta_file = nullptr) const = 0;
 
   // Sanitizes the specified DB Options and ColumnFamilyOptions.
   //

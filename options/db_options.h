@@ -31,6 +31,7 @@ struct ImmutableDBOptions {
   std::shared_ptr<Statistics> statistics;
   bool use_fsync;
   std::vector<DbPath> db_paths;
+  uint32_t meta_file_path_id;
   std::string db_log_dir;
   std::string wal_dir;
   uint32_t max_subcompactions;

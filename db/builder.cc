@@ -9,6 +9,7 @@
 
 #include "db/builder.h"
 
+#include <iostream>
 #include <algorithm>
 #include <deque>
 #include <vector>
@@ -102,9 +103,9 @@ Status BuildTable(
   std::string meta_fname;
   if(is_sst_meta_split) {
     fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
-                                    meta->fd.GetPathId() & 0xFFFF);
+                                    meta->fd.GetPathId());
     meta_fname = TableMetaFileName(ioptions.cf_paths, meta->fd.GetNumber(),
-                                    (meta->fd.GetPathId() >> 16) & 0xFFFF);
+                                    ioptions.meta_file_path_id);
   } else {
     fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
@@ -139,7 +140,7 @@ Status BuildTable(
         return s;
       }
       if(is_sst_meta_split) {
-        s = NewWritableFile(env, meta_fname, &file, env_options);
+        s = NewWritableFile(env, meta_fname, &meta_file, env_options);
         if (!s.ok()) {
           EventHelpers::LogAndNotifyTableFileCreationFinished(
               event_logger, ioptions.listeners, dbname, column_family_name, meta_fname,
@@ -217,6 +218,7 @@ Status BuildTable(
     if (s.ok() && !empty) {
       uint64_t file_size = builder->FileSize();
       meta->fd.file_size = file_size;
+      meta->fd.meta_file_size = builder->MetaFileSize();
       meta->marked_for_compaction = builder->NeedCompact();
       assert(meta->fd.GetFileSize() > 0);
       tp = builder->GetTableProperties(); // refresh now that builder is finished
@@ -225,16 +227,20 @@ Status BuildTable(
       }
     }
     delete builder;
-
     // Finish and check for file errors
     if (s.ok() && !empty) {
       StopWatch sw(env, ioptions.statistics, TABLE_SYNC_MICROS);
       s = file_writer->Sync(ioptions.use_fsync);
+      if(is_sst_meta_split) {
+        s = meta_file_writer->Sync(ioptions.use_fsync);
+      }
     }
     if (s.ok() && !empty) {
       s = file_writer->Close();
+      if(is_sst_meta_split) {
+        s = meta_file_writer->Close();
+      }
     }
-
     if (s.ok() && !empty) {
       // Verify that the table is usable
       // We set for_compaction to false and don't OptimizeForCompactionTableRead
@@ -259,7 +265,6 @@ Status BuildTable(
       }
     }
   }
-
   // Check for input iterator errors
   if (!iter->status().ok()) {
     s = iter->status();
@@ -267,13 +272,13 @@ Status BuildTable(
 
   if (!s.ok() || meta->fd.GetFileSize() == 0) {
     env->DeleteFile(fname);
+    env->DeleteFile(meta_fname);
   }
 
   // Output to event logger and fire events.
   EventHelpers::LogAndNotifyTableFileCreationFinished(
       event_logger, ioptions.listeners, dbname, column_family_name, fname,
       job_id, meta->fd, tp, reason, s);
-
   return s;
 }
 

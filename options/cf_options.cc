@@ -43,6 +43,7 @@ ImmutableCFOptions::ImmutableCFOptions(const ImmutableDBOptions& db_options,
       allow_mmap_reads(db_options.allow_mmap_reads),
       allow_mmap_writes(db_options.allow_mmap_writes),
       db_paths(db_options.db_paths),
+      meta_file_path_id(db_options.meta_file_path_id),
       memtable_factory(cf_options.memtable_factory.get()),
       table_factory(cf_options.table_factory.get()),
       table_properties_collector_factories(

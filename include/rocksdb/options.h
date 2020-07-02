@@ -504,6 +504,8 @@ struct DBOptions {
   // Default: empty
   std::vector<DbPath> db_paths;
 
+  uint32_t meta_file_path_id = 0;
+
   // This specifies the info LOG dir.
   // If it is empty, the log files will be in the same dir as data.
   // If it is non empty, the log files will be in the specified dir,

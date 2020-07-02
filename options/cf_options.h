@@ -68,6 +68,8 @@ struct ImmutableCFOptions {
 
   std::vector<DbPath> db_paths;
 
+  uint32_t meta_file_path_id = 0;
+
   MemTableRepFactory* memtable_factory;
 
   TableFactory* table_factory;

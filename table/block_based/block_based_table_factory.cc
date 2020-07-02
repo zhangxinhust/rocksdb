@@ -205,7 +205,7 @@ Status BlockBasedTableFactory::NewTableReader(
       prefetch_index_and_filter_in_cache, table_reader_options.skip_filters,
       table_reader_options.level, table_reader_options.immortal,
       table_reader_options.largest_seqno, &tail_prefetch_stats_,
-      table_reader_options.block_cache_tracer, meta_file);
+      table_reader_options.block_cache_tracer, std::move(meta_file));
 }
 
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(

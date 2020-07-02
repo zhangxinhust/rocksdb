@@ -9,6 +9,7 @@
 #include "db/db_impl/db_impl.h"
 
 #include <cinttypes>
+#include <iostream>
 
 #include "db/builder.h"
 #include "db/error_handler.h"
@@ -156,7 +157,6 @@ Status DBImpl::FlushMemTableToOutputFile(
       true /* sync_output_directory */, true /* write_manifest */, thread_pri);
 
   FileMetaData file_meta;
-
   TEST_SYNC_POINT("DBImpl::FlushMemTableToOutputFile:BeforePickMemtables");
   flush_job.PickMemTable();
   TEST_SYNC_POINT("DBImpl::FlushMemTableToOutputFile:AfterPickMemtables");

@@ -145,6 +145,7 @@ class MockTableBuilder : public TableBuilder {
   uint64_t NumEntries() const override { return table_.size(); }
 
   uint64_t FileSize() const override { return table_.size(); }
+  uint64_t MetaFileSize() const override {return 0;}
 
   TableProperties GetTableProperties() const override {
     return TableProperties();

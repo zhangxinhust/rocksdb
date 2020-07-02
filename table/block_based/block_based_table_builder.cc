@@ -1248,6 +1248,7 @@ uint64_t BlockBasedTableBuilder::NumEntries() const {
 }
 
 uint64_t BlockBasedTableBuilder::FileSize() const { return rep_->offset; }
+uint64_t BlockBasedTableBuilder::MetaFileSize() const { return rep_->meta_offset; }
 
 bool BlockBasedTableBuilder::NeedCompact() const {
   for (const auto& collector : rep_->table_properties_collectors) {

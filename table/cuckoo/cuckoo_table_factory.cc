@@ -16,7 +16,8 @@ Status CuckooTableFactory::NewTableReader(
     const TableReaderOptions& table_reader_options,
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table,
-    bool /*prefetch_index_and_filter_in_cache*/) const {
+    bool /*prefetch_index_and_filter_in_cache*/,
+    std::unique_ptr<RandomAccessFileReader>&& /*meta_file*/) const {
   std::unique_ptr<CuckooTableReader> new_reader(new CuckooTableReader(
       table_reader_options.ioptions, std::move(file), file_size,
       table_reader_options.internal_comparator.user_comparator(), nullptr));
@@ -29,7 +30,7 @@ Status CuckooTableFactory::NewTableReader(
 
 TableBuilder* CuckooTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file) const {
+    WritableFileWriter* file, WritableFileWriter* /*meta_file*/) const {
   // Ignore the skipFIlters flag. Does not apply to this file format
   //
 

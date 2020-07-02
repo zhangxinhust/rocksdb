@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/block_based_table_reader.h"
 
+#include <iostream>
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -1113,7 +1114,7 @@ Status BlockBasedTable::Open(
     BlockCacheTracer* const block_cache_tracer,
     std::unique_ptr<RandomAccessFileReader>&& meta_file) {
   table_reader->reset();
-
+  
   Status s;
   Footer footer;
   std::unique_ptr<FilePrefetchBuffer> prefetch_buffer;
@@ -1124,7 +1125,6 @@ Status BlockBasedTable::Open(
 
   s = PrefetchTail(meta_file.get(), file_size, tail_prefetch_stats, prefetch_all,
                    preload_all, &prefetch_buffer);
-
   // Read in the following order:
   //    1. Footer
   //    2. [metaindex block]
@@ -1336,7 +1336,7 @@ Status BlockBasedTable::ReadPropertiesBlock(
     TableProperties* table_properties = nullptr;
     if (s.ok()) {
       s = ReadProperties(
-          meta_iter->value(), rep_->file.get(), prefetch_buffer, rep_->footer,
+          meta_iter->value(), rep_->meta_file.get(), prefetch_buffer, rep_->footer,
           rep_->ioptions, &table_properties, true /* verify_checksum */,
           nullptr /* ret_block_handle */, nullptr /* ret_block_contents */,
           false /* compression_type_missing */, nullptr /* memory_allocator */);
@@ -1619,7 +1619,7 @@ Status BlockBasedTable::ReadMetaBlock(FilePrefetchBuffer* prefetch_buffer,
   // it is an empty block.
   std::unique_ptr<Block> meta;
   Status s = ReadBlockFromFile(
-      rep_->file.get(), prefetch_buffer, rep_->footer, ReadOptions(),
+      rep_->meta_file.get(), prefetch_buffer, rep_->footer, ReadOptions(),
       rep_->footer.metaindex_handle(), &meta, rep_->ioptions,
       true /* decompress */, true /*maybe_compressed*/, BlockType::kMetaIndex,
       UncompressionDict::GetEmptyDict(), rep_->persistent_cache_options,
@@ -2166,15 +2166,28 @@ Status BlockBasedTable::MaybeReadBlockAndLoadToCache(
       BlockContents raw_block_contents;
       if (!contents) {
         StopWatch sw(rep_->ioptions.env, statistics, READ_BLOCK_GET_MICROS);
-        BlockFetcher block_fetcher(
+      //meta block read from meta file
+        if(block_type == BlockType::kData) {
+          BlockFetcher block_fetcher(
             rep_->file.get(), prefetch_buffer, rep_->footer, ro, handle,
             &raw_block_contents, rep_->ioptions, do_uncompress,
             maybe_compressed, block_type, uncompression_dict,
             rep_->persistent_cache_options,
             GetMemoryAllocator(rep_->table_options),
             GetMemoryAllocatorForCompressedBlock(rep_->table_options));
-        s = block_fetcher.ReadBlockContents();
-        raw_block_comp_type = block_fetcher.get_compression_type();
+            s = block_fetcher.ReadBlockContents();
+            raw_block_comp_type = block_fetcher.get_compression_type();
+        } else {
+          BlockFetcher block_fetcher(
+            rep_->meta_file.get(), prefetch_buffer, rep_->footer, ro, handle,
+            &raw_block_contents, rep_->ioptions, do_uncompress,
+            maybe_compressed, block_type, uncompression_dict,
+            rep_->persistent_cache_options,
+            GetMemoryAllocator(rep_->table_options),
+            GetMemoryAllocatorForCompressedBlock(rep_->table_options));
+            s = block_fetcher.ReadBlockContents();
+            raw_block_comp_type = block_fetcher.get_compression_type();
+        }  
         contents = &raw_block_contents;
       } else {
         raw_block_comp_type = contents->get_compression_type();
@@ -2467,7 +2480,9 @@ Status BlockBasedTable::RetrieveBlock(
   {
     StopWatch sw(rep_->ioptions.env, rep_->ioptions.statistics,
                  READ_BLOCK_GET_MICROS);
-    s = ReadBlockFromFile(
+    //meta block read from meta file
+    if(block_type == BlockType::kData) {
+      s = ReadBlockFromFile(
         rep_->file.get(), prefetch_buffer, rep_->footer, ro, handle, &block,
         rep_->ioptions, do_uncompress, maybe_compressed, block_type,
         uncompression_dict, rep_->persistent_cache_options,
@@ -2477,6 +2492,18 @@ Status BlockBasedTable::RetrieveBlock(
             : 0,
         GetMemoryAllocator(rep_->table_options), for_compaction,
         rep_->blocks_definitely_zstd_compressed);
+    } else {
+      s = ReadBlockFromFile(
+        rep_->meta_file.get(), prefetch_buffer, rep_->footer, ro, handle, &block,
+        rep_->ioptions, do_uncompress, maybe_compressed, block_type,
+        uncompression_dict, rep_->persistent_cache_options,
+        rep_->get_global_seqno(block_type),
+        block_type == BlockType::kData
+            ? rep_->table_options.read_amp_bytes_per_bit
+            : 0,
+        GetMemoryAllocator(rep_->table_options), for_compaction,
+        rep_->blocks_definitely_zstd_compressed);
+    }
   }
 
   if (!s.ok()) {

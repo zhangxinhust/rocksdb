@@ -85,6 +85,7 @@ class BlockBasedTableBuilder : public TableBuilder {
   // Size of the file generated so far.  If invoked after a successful
   // Finish() call, returns the size of the final generated file.
   uint64_t FileSize() const override;
+  uint64_t MetaFileSize() const override;
 
   bool NeedCompact() const override;
 

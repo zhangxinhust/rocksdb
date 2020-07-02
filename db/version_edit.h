@@ -36,19 +36,23 @@ struct FileDescriptor {
   TableReader* table_reader;
   uint64_t packed_number_and_path_id;
   uint64_t file_size;  // File size in bytes
+  uint64_t meta_file_size;  // File size in bytes
   SequenceNumber smallest_seqno;  // The smallest seqno in this file
   SequenceNumber largest_seqno;   // The largest seqno in this file
 
-  FileDescriptor() : FileDescriptor(0, 0, 0) {}
+  FileDescriptor() : FileDescriptor(0, 0, 0, 0) {}
 
-  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size)
-      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0) {}
+  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, 
+                      uint64_t _meta_file_size = 0)
+      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0, _meta_file_size) {}
 
   FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size,
-                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno)
+                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno,
+                 uint64_t _meta_file_size = 0)
       : table_reader(nullptr),
         packed_number_and_path_id(PackFileNumberAndPathId(number, path_id)),
         file_size(_file_size),
+        meta_file_size(_meta_file_size),
         smallest_seqno(_smallest_seqno),
         largest_seqno(_largest_seqno) {}
 
@@ -58,6 +62,7 @@ struct FileDescriptor {
     table_reader = fd.table_reader;
     packed_number_and_path_id = fd.packed_number_and_path_id;
     file_size = fd.file_size;
+    meta_file_size = fd.meta_file_size;
     smallest_seqno = fd.smallest_seqno;
     largest_seqno = fd.largest_seqno;
     return *this;
@@ -71,6 +76,7 @@ struct FileDescriptor {
         packed_number_and_path_id / (kFileNumberMask + 1));
   }
   uint64_t GetFileSize() const { return file_size; }
+  uint64_t GetMetaFileSize() const { return meta_file_size; }
 };
 
 struct FileSampledStats {
@@ -242,11 +248,11 @@ class VersionEdit {
                uint64_t file_size, const InternalKey& smallest,
                const InternalKey& largest, const SequenceNumber& smallest_seqno,
                const SequenceNumber& largest_seqno,
-               bool marked_for_compaction) {
+               bool marked_for_compaction, uint64_t meta_file_size = 0) {
     assert(smallest_seqno <= largest_seqno);
     FileMetaData f;
     f.fd = FileDescriptor(file, file_path_id, file_size, smallest_seqno,
-                          largest_seqno);
+                          largest_seqno, meta_file_size);
     f.smallest = smallest;
     f.largest = largest;
     f.fd.smallest_seqno = smallest_seqno;

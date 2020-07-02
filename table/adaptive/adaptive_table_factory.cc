@@ -45,7 +45,8 @@ Status AdaptiveTableFactory::NewTableReader(
     const TableReaderOptions& table_reader_options,
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table,
-    bool /*prefetch_index_and_filter_in_cache*/) const {
+    bool /*prefetch_index_and_filter_in_cache*/,
+    std::unique_ptr<RandomAccessFileReader>&& /*meta_file*/) const {
   Footer footer;
   auto s = ReadFooterFromFile(file.get(), nullptr /* prefetch_buffer */,
                               file_size, &footer);
@@ -70,9 +71,9 @@ Status AdaptiveTableFactory::NewTableReader(
 
 TableBuilder* AdaptiveTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file) const {
+    WritableFileWriter* file, WritableFileWriter* meta_file) const {
   return table_factory_to_write_->NewTableBuilder(table_builder_options,
-                                                  column_family_id, file);
+                                                  column_family_id, file, meta_file);
 }
 
 std::string AdaptiveTableFactory::GetPrintableTableOptions() const {
