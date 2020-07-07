@@ -420,7 +420,6 @@ Status DBImpl::Recover(
     max_total_in_memory_state_ += mutable_cf_options->write_buffer_size *
                                   mutable_cf_options->max_write_buffer_number;
   }
-
   if (s.ok()) {
     SequenceNumber next_sequence(kMaxSequenceNumber);
     default_cf_handle_ = new ColumnFamilyHandleImpl(
@@ -446,7 +445,7 @@ Status DBImpl::Recover(
     } else if (!s.ok()) {
       return s;
     }
-
+   
     std::vector<uint64_t> logs;
     for (size_t i = 0; i < filenames.size(); i++) {
       uint64_t number;
@@ -497,7 +496,7 @@ Status DBImpl::Recover(
       }
     }
   }
-
+  
   if (read_only) {
     // If we are opening as read-only, we need to update options_file_number_
     // to reflect the most recent OPTIONS file. It does not matter for regular
@@ -873,6 +872,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         continue;
       }
 
+      if(log_number == 19) {
+      }
       if (has_valid_writes && !read_only) {
         // we can do this because this is called before client has access to the
         // DB and there is only a single thread operating on DB
@@ -886,7 +887,12 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
+          if(log_number == 19) {
+          }
+
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
+          if(log_number == 19) {
+          }
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
             // file-systems cause the DB::Open() to fail.
@@ -894,10 +900,17 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           }
           flushed = true;
 
+          if(log_number == 19) {
+          }
           cfd->CreateNewMemtable(*cfd->GetLatestMutableCFOptions(),
                                  *next_sequence);
+          if(log_number == 19) {
+          }
         }
       }
+      if(log_number == 19) {
+      }
+
     }
 
     if (!status.ok()) {
@@ -1146,7 +1159,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
           cfd->ioptions()->compression_opts, paranoid_file_checks,
           cfd->internal_stats(), TableFileCreationReason::kRecovery,
           &event_logger_, job_id, Env::IO_HIGH, nullptr /* table_properties */,
-          -1 /* level */, current_time, write_hint);
+          -1 /* level */, current_time, 0, write_hint, 0, true);
       LogFlush(immutable_db_options_.info_log);
       ROCKS_LOG_DEBUG(immutable_db_options_.info_log,
                       "[%s] [WriteLevel0TableForRecovery]"

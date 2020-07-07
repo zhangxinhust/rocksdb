@@ -32,6 +32,7 @@ enum FileType {
   kLogFile,
   kDBLockFile,
   kTableFile,
+  kTableMetaFile,
   kDescriptorFile,
   kCurrentFile,
   kTempFile,
@@ -62,6 +63,7 @@ extern std::string ArchivedLogFileName(const std::string& dbname,
                                        uint64_t num);
 
 extern std::string MakeTableFileName(const std::string& name, uint64_t number);
+extern std::string MakeTableMetaFileName(const std::string& name, uint64_t number);
 
 // Return the name of sstable with LevelDB suffix
 // created from RocksDB sstable suffixed name

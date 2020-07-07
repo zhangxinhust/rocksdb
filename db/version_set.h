@@ -724,10 +724,12 @@ class Version {
 struct ObsoleteFileInfo {
   FileMetaData* metadata;
   std::string   path;
+  std::string   meta_path;
 
   ObsoleteFileInfo() noexcept : metadata(nullptr) {}
-  ObsoleteFileInfo(FileMetaData* f, const std::string& file_path)
-      : metadata(f), path(file_path) {}
+  ObsoleteFileInfo(FileMetaData* f, const std::string& file_path,
+                      const std::string& meta_file_path = "")
+      : metadata(f), path(file_path), meta_path(meta_file_path) {}
 
   ObsoleteFileInfo(const ObsoleteFileInfo&) = delete;
   ObsoleteFileInfo& operator=(const ObsoleteFileInfo&) = delete;
@@ -739,6 +741,7 @@ struct ObsoleteFileInfo {
 
   ObsoleteFileInfo& operator=(ObsoleteFileInfo&& rhs) noexcept {
     path = std::move(rhs.path);
+    meta_path= std::move(rhs.meta_path);
     metadata = rhs.metadata;
     rhs.metadata = nullptr;
 

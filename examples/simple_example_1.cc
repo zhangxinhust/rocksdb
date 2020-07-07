@@ -4,9 +4,12 @@
 //  (found in the LICENSE.Apache file in the root directory).
 
 #include <iostream>
+#include <random>
 #include <cstdio>
 #include <string>
 #include <unistd.h>
+#include <fstream>
+
 
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
@@ -20,7 +23,23 @@ std::string kMetaPath = "/tmp/rocksdb_simple_example/meta";
 int main() {
   DB* db;
   Options options;
-  int i = 0;
+  std::random_device rd;
+
+  std::ifstream writefile(kDBPath +"/keyvalue.txt");
+
+  std::string temp, key, value;
+  if (!writefile.is_open()) {
+    std::cout << "open file fail, retry!" << std::endl;
+    std::ofstream outfile(kDBPath +"/keyvalue.txt");
+    for(int i = 0; i < 10000000; i++) {
+      outfile << std::to_string(rd())+std::string("key")+std::to_string(i);
+      outfile << " " << std::string("value")+std::to_string(i)+std::string("xxxxxxxxxxxxxx");
+      outfile << std::endl;
+    }
+    outfile.close();
+    return 0;
+  }
+
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options.IncreaseParallelism();
   options.OptimizeLevelStyleCompaction();
@@ -33,21 +52,40 @@ int main() {
   // open DB
   Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
-  for(i = 0; i < 100000000; i++) {
-    s = db->Put(WriteOptions(), std::string("key")+std::to_string(i), std::string("value")+std::to_string(i)+std::string("xxxxxxxxxxxxxx"));
+  
+  std::cout << "put starting..." << std::endl;
+  while(getline(writefile, temp)) {
+    int idx = temp.find(" ");
+    key = temp.substr(0, idx);
+    value = temp.substr(idx+1);
+    //std::cout << key << " " << value << std::endl;
+    s = db->Put(WriteOptions(), key, value);
     assert(s.ok());
   }
-  std::cout << "write finish" << std::endl;
-  sleep(10);
-  std::string value;
-  for(i = 0; i < 1000000; i++) {
-    // get value
-    s = db->Get(ReadOptions(), std::string("key")+std::to_string(i), &value);
+  writefile.close();
+  std::cout << "put end" << std::endl;
+
+  std::string value_read;
+  std::ifstream readfile(kDBPath+"/keyvalue.txt");
+  if (!readfile.is_open()) {
+    std::cout << "open file fail!" << std::endl;
+    return 0;
+  }
+  std::cout << "get starting..." << std::endl;
+  while(getline(readfile, temp)) {
+    int idx = temp.find(" ");
+    key = temp.substr(0, idx);
+    value = temp.substr(idx+1);
+    //std::cout << key << " " << value << std::endl;
+    s = db->Get(ReadOptions(), key, &value_read);
     assert(s.ok());
-    if(value != std::string("value")+std::to_string(i)+std::string("xxxxxxxxxxxxxx")) {
-        printf("k:%s\n", std::string("key")+std::to_string(i));
+    if(value != value_read) {
+        printf("k:%s\n", key.c_str());
     }
   }
+  readfile.close();
+  std::cout << "get end" << std::endl;
+
   delete db;
 
   return 0;

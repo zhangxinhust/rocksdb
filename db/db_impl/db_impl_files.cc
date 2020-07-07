@@ -8,7 +8,6 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "db/db_impl/db_impl.h"
 
-#include <iostream>
 #include <cinttypes>
 #include <set>
 #include <unordered_set>
@@ -257,7 +256,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                                     const std::string& path_to_sync,
                                     FileType type, uint64_t number) {
   Status file_deletion_status;
-  if (type == kTableFile || type == kLogFile) {
+  if (type == kTableFile || type == kLogFile || kTableMetaFile) {
     file_deletion_status =
         DeleteDBFile(&immutable_db_options_, fname, path_to_sync,
                      /*force_bg=*/false, /*force_fg=*/!wal_in_db_path_);
@@ -284,8 +283,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                     job_id, fname.c_str(), type, number,
                     file_deletion_status.ToString().c_str());
   }
-  if (type == kTableFile) {
-    std::cout << "LogAndNotifyTableFileDeletion" << std::endl;
+  if (type == kTableFile || type == kTableMetaFile) {
     EventHelpers::LogAndNotifyTableFileDeletion(
         &event_logger_, job_id, number, fname, file_deletion_status, GetName(),
         immutable_db_options_.listeners);
@@ -323,6 +321,11 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     candidate_files.emplace_back(
         MakeTableFileName(kDumbDbName, file.metadata->fd.GetNumber()),
         file.path);
+    if(file.meta_path != "") {
+      candidate_files.emplace_back(
+        MakeTableMetaFileName(kDumbDbName, file.metadata->fd.GetNumber()),
+        file.meta_path);
+    }
     if (file.metadata->table_reader_handle) {
       table_cache_->Release(file.metadata->table_reader_handle);
     }
@@ -405,6 +408,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
         // (can happen during manifest roll)
         keep = (number >= state.manifest_file_number);
         break;
+      case kTableMetaFile:
       case kTableFile:
         // If the second condition is not there, this makes
         // DontDeletePendingOutputs fail
@@ -462,6 +466,9 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       TableCache::Evict(table_cache_.get(), number);
       fname = MakeTableFileName(candidate_file.file_path, number);
       dir_to_sync = candidate_file.file_path;
+    } else if (type == kTableMetaFile) {
+      fname = MakeTableMetaFileName(candidate_file.file_path, number);
+      dir_to_sync = candidate_file.file_path;
     } else {
       dir_to_sync =
           (type == kLogFile) ? immutable_db_options_.wal_dir : dbname_;
@@ -491,7 +498,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
-      std::cout << "PurgeObsoleteFiles LogAndNotifyTableFileDeletion" << std::endl;
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
   }

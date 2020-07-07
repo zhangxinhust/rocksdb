@@ -140,6 +140,7 @@ bool VersionEdit::EncodeTo(std::string* dst) const {
       PutVarint32(dst, f.fd.GetPathId());
     }
     PutVarint64(dst, f.fd.GetFileSize());
+    PutVarint64(dst, f.fd.GetMetaFileSize());
     PutLengthPrefixedSlice(dst, f.smallest.Encode());
     PutLengthPrefixedSlice(dst, f.largest.Encode());
     PutVarint64Varint64(dst, f.fd.smallest_seqno, f.fd.largest_seqno);
@@ -245,13 +246,15 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
   uint64_t number;
   uint32_t path_id = 0;
   uint64_t file_size;
+  uint64_t meta_file_size;
   SequenceNumber smallest_seqno;
   SequenceNumber largest_seqno;
   // Since this is the only forward-compatible part of the code, we hack new
   // extension into this record. When we do, we set this boolean to distinguish
   // the record from the normal NewFile records.
   if (GetLevel(input, &level, &msg) && GetVarint64(input, &number) &&
-      GetVarint64(input, &file_size) && GetInternalKey(input, &f.smallest) &&
+      GetVarint64(input, &file_size) && GetVarint64(input, &meta_file_size) &&
+      GetInternalKey(input, &f.smallest) &&
       GetInternalKey(input, &f.largest) &&
       GetVarint64(input, &smallest_seqno) &&
       GetVarint64(input, &largest_seqno)) {
@@ -304,7 +307,8 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
     return "new-file4 entry";
   }
   f.fd =
-      FileDescriptor(number, path_id, file_size, smallest_seqno, largest_seqno);
+      FileDescriptor(number, path_id, file_size, smallest_seqno,
+                       largest_seqno, meta_file_size);
   new_files_.push_back(std::make_pair(level, f));
   return nullptr;
 }
@@ -408,11 +412,13 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
       case kNewFile: {
         uint64_t number;
         uint64_t file_size;
+        uint64_t meta_file_size;
         if (GetLevel(&input, &level, &msg) && GetVarint64(&input, &number) &&
             GetVarint64(&input, &file_size) &&
+            GetVarint64(&input, &meta_file_size) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest)) {
-          f.fd = FileDescriptor(number, 0, file_size);
+          f.fd = FileDescriptor(number, 0, file_size, meta_file_size);
           new_files_.push_back(std::make_pair(level, f));
         } else {
           if (!msg) {
@@ -424,16 +430,18 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
       case kNewFile2: {
         uint64_t number;
         uint64_t file_size;
+        uint64_t meta_file_size;
         SequenceNumber smallest_seqno;
         SequenceNumber largest_seqno;
         if (GetLevel(&input, &level, &msg) && GetVarint64(&input, &number) &&
             GetVarint64(&input, &file_size) &&
+            GetVarint64(&input, &meta_file_size) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest) &&
             GetVarint64(&input, &smallest_seqno) &&
             GetVarint64(&input, &largest_seqno)) {
           f.fd = FileDescriptor(number, 0, file_size, smallest_seqno,
-                                largest_seqno);
+                                largest_seqno, meta_file_size);
           new_files_.push_back(std::make_pair(level, f));
         } else {
           if (!msg) {
@@ -447,16 +455,18 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
         uint64_t number;
         uint32_t path_id;
         uint64_t file_size;
+        uint64_t meta_file_size;
         SequenceNumber smallest_seqno;
         SequenceNumber largest_seqno;
         if (GetLevel(&input, &level, &msg) && GetVarint64(&input, &number) &&
             GetVarint32(&input, &path_id) && GetVarint64(&input, &file_size) &&
+            GetVarint64(&input, &meta_file_size) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest) &&
             GetVarint64(&input, &smallest_seqno) &&
             GetVarint64(&input, &largest_seqno)) {
           f.fd = FileDescriptor(number, path_id, file_size, smallest_seqno,
-                                largest_seqno);
+                                largest_seqno, meta_file_size);
           new_files_.push_back(std::make_pair(level, f));
         } else {
           if (!msg) {

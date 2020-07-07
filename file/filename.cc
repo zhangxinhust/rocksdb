@@ -361,6 +361,8 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
     } else if (suffix == Slice(kRocksDbTFileExt) ||
                suffix == Slice(kLevelDbTFileExt)) {
       *type = kTableFile;
+    } else if (suffix == Slice(kRocksDbTMetaFileExt)) {
+      *type = kTableMetaFile;
     } else if (suffix == Slice(kRocksDBBlobFileExt)) {
       *type = kBlobFile;
     } else if (suffix == Slice(kTempFileNameSuffix)) {
