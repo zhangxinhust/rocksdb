@@ -7,6 +7,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <iostream>
+#include <sys/time.h>
+
 #include <cinttypes>
 #include <algorithm>
 #include <functional>
@@ -742,14 +745,47 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     bytes_written_per_sec =
         stats.bytes_written / static_cast<double>(stats.micros);
   }
+  
+  //-----------------------------------------------------------
+	uint32_t read_path_id, read_level_id;
+	bool read_two_level_flag = false;
+	
+	const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
+	FileMetaData* meta = input_files[0].files[0];
+	read_level_id = input_files[0].level;
+	read_path_id = meta->fd.GetPathId();
+	if(input_files.size() > 1) {
+	  read_two_level_flag = true;
+	}
+  //--------------------------------------------------------------------
 
   ROCKS_LOG_BUFFER(
       log_buffer_,
+
+	  "\nzhangxin: begin\n"
+	  "current_time: %lu.\nmicros: %lu.\n"
+	  "read_level_id: %u, read_path_id: %u.\n"
+	  "read_two_level_flag: %d\n"
+	  "write_level_id: %u, write_path_id: %u.\n"
+	  "read_bytes: %lu.\n"
+	  "write_bytes: %lu\n"
+	  
+	  "zhangxin: end\n\n\n"
+
+
       "[%s] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "
       "files in(%d, %d) out(%d) "
       "MB in(%.1f, %.1f) out(%.1f), read-write-amplify(%.1f) "
       "write-amplify(%.1f) %s, records in: %" PRIu64
       ", records dropped: %" PRIu64 " output_compression: %s\n",
+
+      env_->NowMicros(), compaction_stats_.micros,
+      read_level_id, read_path_id,
+      read_two_level_flag,
+      compact_->compaction->output_level(), compact_->compaction->output_path_id(),
+      compaction_stats_.bytes_read_non_output_levels + compaction_stats_.bytes_read_output_level,
+      compaction_stats_.bytes_written,
+
       cfd->GetName().c_str(), vstorage->LevelSummary(&tmp), bytes_read_per_sec,
       bytes_written_per_sec, compact_->compaction->output_level(),
       stats.num_input_files_in_non_output_levels,
