@@ -128,6 +128,11 @@ class TableBuilder {
   // REQUIRES: Either Finish() or Abandon() has been called.
   virtual ~TableBuilder() {}
 
+  // zhangxin
+  virtual uint64_t index_elapse_micro_total() = 0;
+  virtual uint64_t index_elapse_micro_total_short() = 0;
+  virtual uint64_t filter_elapse_micro_total() = 0;
+
   // Add key,value to the table being constructed.
   // REQUIRES: key is after any previously added key according to comparator.
   // REQUIRES: Finish(), Abandon() have not been called

@@ -499,6 +499,11 @@ BlockBasedTableBuilder::~BlockBasedTableBuilder() {
   delete rep_;
 }
 
+// zhangxin
+uint64_t BlockBasedTableBuilder::index_elapse_micro_total() { return rep_->index_elapse_micro_total; }
+uint64_t BlockBasedTableBuilder::index_elapse_micro_total_short() { return rep_->index_elapse_micro_total_short; }
+uint64_t BlockBasedTableBuilder::filter_elapse_micro_total() { return rep_->filter_elapse_micro_total; }
+
 void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(rep_->state != Rep::State::kClosed);
