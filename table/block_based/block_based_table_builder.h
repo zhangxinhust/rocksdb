@@ -58,6 +58,11 @@ class BlockBasedTableBuilder : public TableBuilder {
   BlockBasedTableBuilder(const BlockBasedTableBuilder&) = delete;
   BlockBasedTableBuilder& operator=(const BlockBasedTableBuilder&) = delete;
 
+  // zhangxin
+  uint64_t index_elapse_micro_total() { return rep_->index_elapse_micro_total };
+  uint64_t index_elapse_micro_total_short() { return rep_->index_elapse_micro_total_short };
+  uint64_t filter_elapse_micro_total() { return rep_->filter_elapse_micro_total };
+
   // Add key,value to the table being constructed.
   // REQUIRES: key is after any previously added key according to comparator.
   // REQUIRES: Finish(), Abandon() have not been called

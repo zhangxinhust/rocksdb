@@ -82,7 +82,7 @@ Status BuildTable(
     TableFileCreationReason reason, EventLogger* event_logger, int job_id,
     const Env::IOPriority io_priority, TableProperties* table_properties,
     int level, const uint64_t creation_time, const uint64_t oldest_key_time,
-    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time) {
+    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time, LogBuffer* log_buffer_) { // zhangxin
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -153,6 +153,10 @@ Status BuildTable(
         ShouldReportDetailedTime(env, ioptions.statistics),
         true /* internal key corruption is not ok */, range_del_agg.get());
     c_iter.SeekToFirst();
+
+	// zhangxin
+    uint64_t sst_elapse_micro_begin = env->NowMicros();
+	
     for (; c_iter.Valid(); c_iter.Next()) {
       const Slice& key = c_iter.key();
       const Slice& value = c_iter.value();
@@ -197,6 +201,20 @@ Status BuildTable(
         *table_properties = tp;
       }
     }
+
+	// zhangxin
+    ROCKS_LOG_BUFFER(
+      log_buffer_, 
+      "\n\nsst_print_begin:\n"
+      "index_total_micro: %lu.\n"
+      "index_total_micro_short: %lu.\n"
+      "filter_total_micro: %lu.\n"
+      "sst_print_end\n",
+      builder->index_elapse_micro_total(),
+      builder->index_elapse_micro_total_short(),
+      builder->index_elapse_micro_total(),
+      env->NowMicros() - sst_elapse_micro_begin
+    )
     delete builder;
 
     // Finish and check for file errors
