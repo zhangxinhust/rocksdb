@@ -82,6 +82,6 @@ extern Status BuildTable(
     TableProperties* table_properties = nullptr, int level = -1,
     const uint64_t creation_time = 0, const uint64_t oldest_key_time = 0,
     Env::WriteLifeTimeHint write_hint = Env::WLTH_NOT_SET,
-    const uint64_t file_creation_time = 0);
+    const uint64_t file_creation_time = 0, LogBuffer* log_buffer_); // zhangxin
 
 }  // namespace rocksdb

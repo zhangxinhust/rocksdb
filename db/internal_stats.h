@@ -88,6 +88,9 @@ struct LevelStat {
 
 class InternalStats {
  public:
+  // zhangxin
+  void PrintLevelAndWalBytes(LogBuffer* log_buffer);
+  
   static const std::map<LevelStatType, LevelStat> compaction_level_stats;
 
   enum InternalCFStatsType {

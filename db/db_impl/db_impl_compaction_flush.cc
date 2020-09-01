@@ -1991,10 +1991,12 @@ DBImpl::BGJobLimits DBImpl::GetBGJobLimits(int max_background_flushes,
   return res;
 }
 
+// zhangxin
 void DBImpl::AddToCompactionQueue(ColumnFamilyData* cfd) {
   assert(!cfd->queued_for_compaction());
   cfd->Ref();
   compaction_queue_.push_back(cfd);
+  element_insert_time_.push_back(env_->NowMicros());
   cfd->set_queued_for_compaction(true);
 }
 
@@ -2017,22 +2019,29 @@ DBImpl::FlushRequest DBImpl::PopFirstFromFlushQueue() {
   return flush_req;
 }
 
+// zhangxin
 ColumnFamilyData* DBImpl::PickCompactionFromQueue(
-    std::unique_ptr<TaskLimiterToken>* token, LogBuffer* log_buffer) {
+    std::unique_ptr<TaskLimiterToken>* token, LogBuffer* log_buffer, uint64_t *cfd_start_wait_time) {
   assert(!compaction_queue_.empty());
+  assert(!element_insert_time_.empty());
   assert(*token == nullptr);
   autovector<ColumnFamilyData*> throttled_candidates;
+  autovector<uint64_t> throttled_candidates_time;
   ColumnFamilyData* cfd = nullptr;
   while (!compaction_queue_.empty()) {
     auto first_cfd = *compaction_queue_.begin();
+	auto first_time = *element_insert_time_.begin();
     compaction_queue_.pop_front();
+	element_insert_time_.pop_front();
     assert(first_cfd->queued_for_compaction());
     if (!RequestCompactionToken(first_cfd, false, token, log_buffer)) {
       throttled_candidates.push_back(first_cfd);
+	  throttled_candidates_time.push_back(first_time);
       continue;
     }
     cfd = first_cfd;
     cfd->set_queued_for_compaction(false);
+	*cfd_start_wait_time = first_time;
     break;
   }
   // Add throttled compaction candidates back to queue in the original order.
@@ -2040,6 +2049,11 @@ ColumnFamilyData* DBImpl::PickCompactionFromQueue(
        iter != throttled_candidates.rend(); ++iter) {
     compaction_queue_.push_front(*iter);
   }
+  for (auto iter = throttled_candidates_time.rbegin();
+       iter != throttled_candidates_time.rend(); ++iter) {
+    element_insert_time_.push_front(*iter);
+  }
+
   return cfd;
 }
 
@@ -2512,7 +2526,10 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       return Status::OK();
     }
 
-    auto cfd = PickCompactionFromQueue(&task_token, log_buffer);
+	// zhangxin
+	uint64_t cfd_start_wait_time  = 0;
+    auto cfd = PickCompactionFromQueue(&task_token, log_buffer, &cfd_start_wait_time);
+
     if (cfd == nullptr) {
       // Can't find any executable task from the compaction queue.
       // All tasks have been throttled by compaction thread limiter.
@@ -2546,7 +2563,19 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       c.reset(cfd->PickCompaction(*mutable_cf_options, log_buffer));
       TEST_SYNC_POINT("DBImpl::BackgroundCompaction():AfterPickCompaction");
 
+		//zhangxin
       if (c != nullptr) {
+        ROCKS_LOG_BUFFER(
+          log_buffer,
+          "\ncompaction_wait_time start:\n"
+          "wait_start: %lu.\n"
+          "wait_end: %lu.\n"
+          "compaction_start_level: %d.\n"
+          "compaction_wait_time end.\n\n",
+          cfd_start_wait_time,
+          env_->NowMicros(),
+          c->start_level()
+		);
         bool enough_room = EnoughRoomForCompaction(
             cfd, *(c->inputs()), &sfm_reserved_compact_space, log_buffer);
 

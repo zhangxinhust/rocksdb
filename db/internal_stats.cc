@@ -8,6 +8,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+// zhangxin
+#include <string>
+#include <iostream>
+
 #include "db/internal_stats.h"
 
 #include <cinttypes>
@@ -954,6 +958,47 @@ bool InternalStats::HandleBlockCachePinnedUsage(uint64_t* value, DBImpl* /*db*/,
   }
   *value = static_cast<uint64_t>(block_cache->GetPinnedUsage());
   return true;
+}
+
+// zhangxin
+void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
+  char buf[200];
+  std::string str_to_log;
+
+  uint64_t wal_bytes = GetDBStats(InternalStats::kIntStatsWalFileBytes);
+  snprintf(buf, sizeof(buf), 
+    "\nPrintLevelAndWalBytes:\n"
+    "wal_bytes: %lu.\n",
+    wal_bytes
+  );
+  str_to_log.append(buf);
+
+  std::map<int, std::map<LevelStatType, double>> levels_stats;
+  CompactionStats compaction_stats_sum;
+  DumpCFMapStats(&levels_stats, &compaction_stats_sum);
+  for (int l = 0; l < number_levels_; ++l) {
+    if (levels_stats.find(l) != levels_stats.end()) {
+      snprintf(buf, sizeof(buf), 
+	  	"num_levels: %d.\n"
+	  	"level %d write: %f MB.\n"
+	  	"level_new %d new_write: %f MB.\n",
+	  	number_levels_,
+	  	l,
+	  	1024 * levels_stats[l].at(LevelStatType::WRITE_GB),
+	  	l,
+	  	1024 * levels_stats[l].at(LevelStatType::W_NEW_GB)
+	  );
+      str_to_log.append(buf);
+    }
+  }
+  //std::cout << "str_to_log begin: \n" << str_to_log << "\nstr_to_log end.\n";
+  ROCKS_LOG_BUFFER(
+	log_buffer_,
+	"\nlog_start.\n"
+	"%s"
+	"\nlog_end.\n",
+	str_to_log.c_str()
+  );
 }
 
 void InternalStats::DumpDBStats(std::string* value) {

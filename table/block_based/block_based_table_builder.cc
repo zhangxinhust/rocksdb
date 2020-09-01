@@ -276,6 +276,12 @@ class BlockBasedTableBuilder::BlockBasedTablePropertiesCollector
 };
 
 struct BlockBasedTableBuilder::Rep {
+  // zhangxin
+  uint64_t index_elapse_micro_total = 0;
+  uint64_t index_elapse_micro_total_short = 0;
+  uint64_t filter_elapse_micro_total = 0;
+  //uint64_t sst_elapse_micro_total = 0;
+  
   const ImmutableCFOptions ioptions;
   const MutableCFOptions moptions;
   const BlockBasedTableOptions table_options;
@@ -524,7 +530,12 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
       // entries in the first block and < all entries in subsequent
       // blocks.
       if (ok() && r->state == Rep::State::kUnbuffered) {
+	  	// zhangxin
+        uint64_t index_begin_time = r->file->env_->NowMicros();
         r->index_builder->AddIndexEntry(&r->last_key, &key, r->pending_handle);
+        uint64_t index_elapse_time = r->file->env_->NowMicros() - index_begin_time;
+        r->index_elapse_micro_total += index_elapse_time;
+        r->index_elapse_micro_total_short += index_elapse_time;
       }
     }
 
@@ -532,7 +543,11 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
     // builder after being added to index builder.
     if (r->state == Rep::State::kUnbuffered && r->filter_builder != nullptr) {
       size_t ts_sz = r->internal_comparator.user_comparator()->timestamp_size();
+	  // zhangxin
+      uint64_t filter_begin_time = r->file->env_->NowMicros();
       r->filter_builder->Add(ExtractUserKeyAndStripTimestamp(key, ts_sz));
+      uint64_t filter_elapse_time = r->file->env_->NowMicros() - filter_begin_time;
+      r->filter_elapse_micro_total += filter_elapse_time;
     }
 
     r->last_key.assign(key.data(), key.size());
@@ -545,7 +560,11 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
       }
       r->data_block_and_keys_buffers.back().second.emplace_back(key.ToString());
     } else {
+      // zhangxin
+      uint64_t index_begin_time = r->file->env_->NowMicros();
       r->index_builder->OnKeyAdded(key);
+      uint64_t index_elapse_time = r->file->env_->NowMicros() - index_begin_time;
+	  r->index_elapse_micro_total += index_elapse_time;
     }
     NotifyCollectTableCollectorsOnAdd(key, value, r->offset,
                                       r->table_properties_collectors,

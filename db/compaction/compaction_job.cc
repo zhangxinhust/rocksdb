@@ -744,6 +744,65 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
         stats.bytes_written / static_cast<double>(stats.micros);
   }
 
+  // zhangxin
+  //InternalStats* inter_stats = new InternalStats(cfd->ioptions()->num_levels, env_, cfd);
+  cfd->internal_stats()->PrintLevelAndWalBytes(log_buffer_);
+
+  uint32_t read_path_id, read_level_id;
+  bool read_two_level_flag = false;
+
+  const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
+  FileMetaData* meta = input_files[0].files[0];
+  read_level_id = input_files[0].level;
+  read_path_id = meta->fd.GetPathId();
+  if(input_files.size() > 1) {
+    read_two_level_flag = true;
+  }
+
+  std::string str_sst_num;
+  char buf[200];
+  for(int l = 0; l < vstorage->num_levels(); l++) {
+    snprintf(buf, sizeof(buf), "sst_num: level %d: %d\n", l, vstorage->NumLevelFiles(l));
+    str_sst_num.append(buf);
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_,
+    "\nzhangxin: start\n"
+    "current_time: %lu.\nmicros: %lu.\n"
+    "read_level_id: %u, read_path_id: %u.\n"
+    "read_two_level_flag: %d\n"
+    "write_level_id: %u, write_path_id: %u.\n"
+    "read_bytes: %lu.\n"
+    "read_bytes_input: %lu.\n"
+    "read_bytes_output: %lu.\n"
+    "write_bytes: %lu\n"
+    "read_files_num_input: %d\n"
+    "read_files_num_output: %d\n"
+    "write_files_num: %d\n",
+    //"wal_info: \n%s.\n"
+
+    env_->NowMicros(), compaction_stats_.micros,
+    read_level_id, read_path_id,
+    read_two_level_flag,
+    compact_->compaction->output_level(), compact_->compaction->output_path_id(),
+    compaction_stats_.bytes_read_non_output_levels + compaction_stats_.bytes_read_output_level,
+    compaction_stats_.bytes_read_non_output_levels,
+    compaction_stats_.bytes_read_output_level,
+    compaction_stats_.bytes_written,
+    compaction_stats_.num_input_files_in_non_output_levels,
+    compaction_stats_.num_input_files_in_output_level,
+    compaction_stats_.num_output_files
+    //str_to_log.c_str()
+  );
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_,
+    "\nsst_files_num: \n%s\n"
+    "zhangxin: end\n\n\n",
+    str_sst_num.c_str()
+  );
+
   ROCKS_LOG_BUFFER(
       log_buffer_,
       "[%s] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "

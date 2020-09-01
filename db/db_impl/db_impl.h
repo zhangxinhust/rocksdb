@@ -1520,8 +1520,8 @@ class DBImpl : public DB {
   FlushRequest PopFirstFromFlushQueue();
 
   // Pick the first unthrottled compaction with task token from queue.
-  ColumnFamilyData* PickCompactionFromQueue(
-      std::unique_ptr<TaskLimiterToken>* token, LogBuffer* log_buffer);
+  ColumnFamilyData* PickCompactionFromQueue( // zhangxin
+      std::unique_ptr<TaskLimiterToken>* token, LogBuffer* log_buffer, uint64_t *cft_start_wait_time);
 
   // helper function to call after some of the logs_ were synced
   void MarkLogsSynced(uint64_t up_to, bool synced_dir, const Status& status);
@@ -1751,6 +1751,8 @@ class DBImpl : public DB {
   // invariant(column family present in compaction_queue_ <==>
   // ColumnFamilyData::pending_compaction_ == true)
   std::deque<ColumnFamilyData*> compaction_queue_;
+  // zhangxin
+  std::deque<uint64_t> element_insert_time_;
 
   // A map to store file numbers and filenames of the files to be purged
   std::unordered_map<uint64_t, PurgeFileInfo> purge_files_;
