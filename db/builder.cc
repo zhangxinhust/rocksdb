@@ -209,12 +209,13 @@ Status BuildTable(
       "index_total_micro: %lu.\n"
       "index_total_micro_short: %lu.\n"
       "filter_total_micro: %lu.\n"
+      "sst_total_micro: %lu\n"
       "sst_print_end\n",
       builder->index_elapse_micro_total(),
       builder->index_elapse_micro_total_short(),
-      builder->index_elapse_micro_total(),
+      builder->filter_elapse_micro_total(),
       env->NowMicros() - sst_elapse_micro_begin
-    )
+    );
     delete builder;
 
     // Finish and check for file errors
