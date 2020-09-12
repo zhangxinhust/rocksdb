@@ -986,7 +986,7 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
 	  	number_levels_,
 	  	l, 1024 * levels_stats[l].at(LevelStatType::WRITE_GB),
 	  	l, 1024 * levels_stats[l].at(LevelStatType::W_NEW_GB),
-	  	l, levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0
+	  	l, levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0
 	  );
       str_to_log.append(buf);
     }
