@@ -761,7 +761,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   if(input_files.size() > 1) {
     read_two_level_flag = true;
   }
-
+  /*
   for(uint32_t i = 0; i < input_files.size(); i++) {
     fprintf(stdout, "\nlevel %d.\n", i);
     for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
@@ -769,9 +769,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
         input_files[i].files[j]->smallest.rep()->c_str(),
         input_files[i].files[j]->largest.rep()->c_str());
     }
-    
   }
-
+  */
   std::string str_sst_num;
   char buf[200];
   for(int l = 0; l < vstorage->num_levels(); l++) {
@@ -794,9 +793,9 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     "read_files_num_output: %d\n"
     "write_files_num: %d\n"
     "smallest_user_key_: %s.\n"
-    "largest_user_key_: %s.\n"
-    "SmallestUserKey: %s.\n"
-    "LargestUserKey: %s.\n",
+    "largest_user_key_:  %s.\n",
+    //"SmallestUserKey: %s.\n"
+    //"LargestUserKey: %s.\n",
     //"wal_info: \n%s.\n"
 
     env_->NowMicros(), compaction_stats_.micros,
@@ -810,10 +809,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     compaction_stats_.num_input_files_in_non_output_levels,
     compaction_stats_.num_input_files_in_output_level,
     compaction_stats_.num_output_files,
-    std::string(compact_->compaction->GetSmallestUserKey().data()).c_str(),
-    std::string(compact_->compaction->GetLargestUserKey().data()).c_str(),
-    std::string(compact_->SmallestUserKey().data()).c_str(),
-    std::string(compact_->LargestUserKey().data()).c_str()
+    compact_->compaction->GetSmallestUserKey().ToString(false).c_str(),
+    compact_->compaction->GetLargestUserKey().ToString(false).c_str()
+    //compact_->SmallestUserKey().ToString(false).c_str(),
+    //compact_->LargestUserKey().ToString(false).c_str()
     //str_to_log.c_str()
   );
 
