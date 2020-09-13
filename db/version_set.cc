@@ -1650,7 +1650,7 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
                   MergeContext* merge_context,
                   SequenceNumber* max_covering_tombstone_seq, bool* value_found,
                   bool* key_exists, SequenceNumber* seq, ReadCallback* callback,
-                  bool* is_blob) {
+                  bool* is_blob, int* hit_level) {
   Slice ikey = k.internal_key();
   Slice user_key = k.user_key();
 
@@ -1729,6 +1729,9 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
         // TODO: update per-level perfcontext user_key_return_count for kMerge
         break;
       case GetContext::kFound:
+        //zhangxin
+        *hit_level = int(fp.GetHitFileLevel());
+
         if (fp.GetHitFileLevel() == 0) {
           RecordTick(db_statistics_, GET_HIT_L0);
         } else if (fp.GetHitFileLevel() == 1) {

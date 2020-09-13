@@ -1468,6 +1468,10 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
                        ColumnFamilyHandle* column_family, const Slice& key,
                        PinnableSlice* pinnable_val, bool* value_found,
                        ReadCallback* callback, bool* is_blob_index) {
+  // zhangxin
+  uint64_t micro_start = env_->NowMicros();
+  int hit_level = -1;
+  
   assert(pinnable_val != nullptr);
   PERF_CPU_TIMER_GUARD(get_cpu_nanos, env_);
   StopWatch sw(env_, stats_, DB_GET);
@@ -1569,7 +1573,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
     PERF_TIMER_GUARD(get_from_output_files_time);
     sv->current->Get(read_options, lkey, pinnable_val, &s, &merge_context,
                      &max_covering_tombstone_seq, value_found, nullptr, nullptr,
-                     callback, is_blob_index);
+                     callback, is_blob_index, &hit_level); // zhangxin
     RecordTick(stats_, MEMTABLE_MISS);
   }
 
@@ -1587,6 +1591,18 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
     }
     RecordInHistogram(stats_, BYTES_PER_READ, size);
   }
+
+  //zhangxin
+  LogBuffer* log_buffer = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+  ROCKS_LOG_BUFFER(
+    log_buffer, 
+    "\n\nread_latency_begin:\n"
+    "latency: %lu.\n"
+    "hit_level: %d.\n"
+    "read_latency_end.\n",
+    env_->NowMicros() - micro_start,
+    hit_level
+  );
   return s;
 }
 
