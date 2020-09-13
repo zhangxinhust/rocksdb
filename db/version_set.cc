@@ -1730,7 +1730,9 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
         break;
       case GetContext::kFound:
         //zhangxin
-        *hit_level = int(fp.GetHitFileLevel());
+        if(hit_level != nullptr) {
+          *hit_level = int(fp.GetHitFileLevel());
+        }
 
         if (fp.GetHitFileLevel() == 0) {
           RecordTick(db_statistics_, GET_HIT_L0);
