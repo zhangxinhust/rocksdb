@@ -225,8 +225,8 @@ Status BuildTable(
 
       env->NowMicros(),
       fname.c_str(),
-      meta.fd.GetPathId(),
-      meta.fd.GetNumber()
+      meta->fd.GetPathId(),
+      meta->fd.GetNumber()
     );
     delete builder;
 

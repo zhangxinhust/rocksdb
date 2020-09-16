@@ -579,7 +579,7 @@ Status CompactionJob::Run() {
 
   // zhangxin
   const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
-  string str_sst;
+  std::string str_sst;
   char buf[500];
   for(uint32_t i = 0; i < input_files.size(); i++) {
     fprintf(stdout, "\nlevel %d.\n", input_files[i].level);
