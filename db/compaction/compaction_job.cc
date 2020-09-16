@@ -596,7 +596,7 @@ Status CompactionJob::Run() {
 
   ROCKS_LOG_BUFFER(
     log_buffer_,
-    "sst_compact_time_begin:\n"
+    "\n\nsst_compact_time_begin:\n"
     "sst_compact_time: %lu.\n"
     "id and path info:\n%s\n"
     "sst_compact_time_end\n",
