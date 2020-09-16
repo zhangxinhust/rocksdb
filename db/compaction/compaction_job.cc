@@ -580,11 +580,11 @@ Status CompactionJob::Run() {
   // zhangxin
   const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
   std::string str_sst;
-  char buf[500];
+  char buf[1000];
   for(uint32_t i = 0; i < input_files.size(); i++) {
-    fprintf(stdout, "\nlevel %d.\n", input_files[i].level);
+    //fprintf(stdout, "\nlevel %d.\n", input_files[i].level);
     for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
-      sprintf(buf, "No. %d sst: level %d, path %u, id: %lu.\n", 
+      sprintf(buf, "No. %u sst: level %d, path %u, id: %lu.\n", 
                    j, 
                    input_files[i].level,
                    input_files[i].files[j]->fd.GetPathId(),
@@ -597,7 +597,8 @@ Status CompactionJob::Run() {
   ROCKS_LOG_BUFFER(
     log_buffer_,
     "sst_compact_time_begin:\n"
-    "sst_compact_time:\n%s\n"
+    "sst_compact_time: %lu.\n"
+    "id and path info:\n%s\n"
     "sst_compact_time_end\n",
 
     env_->NowMicros(),
