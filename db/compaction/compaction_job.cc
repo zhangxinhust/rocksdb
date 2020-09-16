@@ -577,6 +577,33 @@ Status CompactionJob::Run() {
   log_buffer_->FlushBufferToLog();
   LogCompaction();
 
+  // zhangxin
+  const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
+  string str_sst;
+  char buf[500];
+  for(uint32_t i = 0; i < input_files.size(); i++) {
+    fprintf(stdout, "\nlevel %d.\n", input_files[i].level);
+    for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
+      sprintf(buf, "No. %d sst: level %d, path %u, id: %lu.\n", 
+                   j, 
+                   input_files[i].level,
+                   input_files[i].files[j]->fd.GetPathId(),
+                   input_files[i].files[j]->fd.GetNumber()
+      );
+      str_sst.append(buf);
+    }
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_,
+    "sst_compact_time_begin:\n"
+    "sst_compact_time:\n%s\n"
+    "sst_compact_time_end\n",
+
+    env_->NowMicros(),
+    str_sst.c_str()
+  );
+
   const size_t num_threads = compact_->sub_compact_states.size();
   assert(num_threads > 0);
   const uint64_t start_micros = env_->NowMicros();
@@ -793,10 +820,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     "read_files_num_output: %d\n"
     "write_files_num: %d\n"
     "smallest_user_key_: %s.\n"
-    "largest_user_key_:  %s.\n",
+    "largest_user_key_:  %s.\n"
     //"SmallestUserKey: %s.\n"
-    //"LargestUserKey: %s.\n",
+    //"LargestUserKey: %s.\n"
     //"wal_info: \n%s.\n"
+    
+    "\nsst_files_num: \n%s\n"
+    "zhangxin: end\n\n\n",
 
     env_->NowMicros(), compaction_stats_.micros,
     read_level_id, read_path_id,
@@ -810,16 +840,11 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     compaction_stats_.num_input_files_in_output_level,
     compaction_stats_.num_output_files,
     compact_->compaction->GetSmallestUserKey().ToString(false).c_str(),
-    compact_->compaction->GetLargestUserKey().ToString(false).c_str()
+    compact_->compaction->GetLargestUserKey().ToString(false).c_str(),
     //compact_->SmallestUserKey().ToString(false).c_str(),
     //compact_->LargestUserKey().ToString(false).c_str()
     //str_to_log.c_str()
-  );
 
-  ROCKS_LOG_BUFFER(
-    log_buffer_,
-    "\nsst_files_num: \n%s\n"
-    "zhangxin: end\n\n\n",
     str_sst_num.c_str()
   );
 
@@ -1383,6 +1408,20 @@ Status CompactionJob::FinishCompactionOutputFile(
   }
   sub_compact->current_output()->finished = true;
   sub_compact->total_bytes += current_bytes;
+
+  // zhangxin
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n\nsst_write_time_begin:\n"
+    "sst_write_time: %lu.\n"
+    "sst_file_path_id: %u.\n"
+    "sst_file_number: %lu.\n"
+    "sst_wirte_time_end\n",
+  
+    env_->NowMicros(),
+    sub_compact->current_output()->meta.fd.GetPathId(),
+    sub_compact->current_output()->meta.fd.GetNumber()
+  );
 
   // Finish and check for file errors
   if (s.ok()) {

@@ -210,11 +210,23 @@ Status BuildTable(
       "index_total_micro_short: %lu.\n"
       "filter_total_micro: %lu.\n"
       "sst_total_micro: %lu\n"
-      "sst_print_end\n",
+      "sst_print_end\n"
+      
+      "sst_write_time_begin:\n"
+      "sst_write_time: %lu.\n"
+      "sst_file_name: %s.\n"
+      "sst_file_path_id: %u.\n"
+      "sst_file_number: %lu.\n"
+      "sst_wirte_time_end\n",
       builder->index_elapse_micro_total(),
       builder->index_elapse_micro_total_short(),
       builder->filter_elapse_micro_total(),
-      env->NowMicros() - sst_elapse_micro_begin
+      env->NowMicros() - sst_elapse_micro_begin,
+
+      env->NowMicros(),
+      fname.c_str(),
+      meta.fd.GetPathId(),
+      meta.fd.GetNumber()
     );
     delete builder;
 
