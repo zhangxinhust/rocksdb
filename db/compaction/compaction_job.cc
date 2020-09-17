@@ -610,7 +610,7 @@ Status CompactionJob::Run() {
     "id and path info:\n",
     env_->NowMicros()
   );
-  for(int i = 0; i < strv.size(); i++) {
+  for(uint32_t i = 0; i < strv.size(); i++) {
     ROCKS_LOG_BUFFER(
       log_buffer_,
       "%s",
