@@ -579,30 +579,47 @@ Status CompactionJob::Run() {
 
   // zhangxin
   const std::vector<CompactionInputFiles> input_files = *(compact_->compaction->inputs());
-  std::string str_sst;
+  std::vector<std::string> strv;
+  std::string str_tmp;
   char buf[1000];
   for(uint32_t i = 0; i < input_files.size(); i++) {
-    //fprintf(stdout, "\nlevel %d.\n", input_files[i].level);
     for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
-      sprintf(buf, "No. %u sst: level %d, path %u, id: %lu.\n", 
-                   j, 
-                   input_files[i].level,
+      /*sprintf(buf, "No. %u sst: level %d, path %u, id: %lu.\n", 
+                   j, input_files[i].level,
                    input_files[i].files[j]->fd.GetPathId(),
                    input_files[i].files[j]->fd.GetNumber()
+      );*/
+      sprintf(buf, "sst: level %d, id: %lu.\n", 
+                   input_files[i].level, input_files[i].files[j]->fd.GetNumber()
       );
-      str_sst.append(buf);
+      str_tmp.append(buf);
+      if(str_tmp.length() >= 200) {
+        strv.push_back(str_tmp);
+        str_tmp = "";
+      }
     }
+  }
+  if(str_tmp.length()) {
+    strv.push_back(str_tmp);
   }
 
   ROCKS_LOG_BUFFER(
     log_buffer_,
     "\n\nsst_compact_time_begin:\n"
     "sst_compact_time: %lu.\n"
-    "id and path info:\n%s\n"
-    "sst_compact_time_end\n",
-
-    env_->NowMicros(),
-    str_sst.c_str()
+    "id and path info:\n",
+    env_->NowMicros()
+  );
+  for(int i = 0; i < strv.size(); i++) {
+    ROCKS_LOG_BUFFER(
+      log_buffer_,
+      "%s",
+      strv[i].c_str()
+    );
+  }
+  ROCKS_LOG_BUFFER(
+    log_buffer_,
+    "sst_compact_time_end\n"
   );
 
   const size_t num_threads = compact_->sub_compact_states.size();
@@ -799,12 +816,14 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     }
   }
   */
+  /*
   std::string str_sst_num;
   char buf[200];
   for(int l = 0; l < vstorage->num_levels(); l++) {
     snprintf(buf, sizeof(buf), "sst_num: level %d: %d\n", l, vstorage->NumLevelFiles(l));
     str_sst_num.append(buf);
   }
+  */
 
   ROCKS_LOG_BUFFER(
     log_buffer_,
@@ -826,7 +845,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     //"LargestUserKey: %s.\n"
     //"wal_info: \n%s.\n"
     
-    "\nsst_files_num: \n%s\n"
+    //"\nsst_files_num: \n%s\n"
     "zhangxin: end\n\n\n",
 
     env_->NowMicros(), compaction_stats_.micros,
@@ -841,12 +860,12 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     compaction_stats_.num_input_files_in_output_level,
     compaction_stats_.num_output_files,
     compact_->compaction->GetSmallestUserKey().ToString(false).c_str(),
-    compact_->compaction->GetLargestUserKey().ToString(false).c_str(),
+    compact_->compaction->GetLargestUserKey().ToString(false).c_str()
     //compact_->SmallestUserKey().ToString(false).c_str(),
     //compact_->LargestUserKey().ToString(false).c_str()
     //str_to_log.c_str()
 
-    str_sst_num.c_str()
+    //str_sst_num.c_str()
   );
 
   ROCKS_LOG_BUFFER(
