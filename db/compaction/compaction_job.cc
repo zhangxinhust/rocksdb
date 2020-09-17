@@ -613,13 +613,13 @@ Status CompactionJob::Run() {
   for(uint32_t i = 0; i < strv.size(); i++) {
     ROCKS_LOG_BUFFER(
       log_buffer_,
-      "%s",
+      "\n\n%s",
       strv[i].c_str()
     );
   }
   ROCKS_LOG_BUFFER(
     log_buffer_,
-    "sst_compact_time_end\n"
+    "\n\nsst_compact_time_end\n"
   );
 
   const size_t num_threads = compact_->sub_compact_states.size();
@@ -827,7 +827,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 
   ROCKS_LOG_BUFFER(
     log_buffer_,
-    "\nzhangxin: start\n"
+    "\n\nzhangxin: start\n"
     "current_time: %lu.\nmicros: %lu.\n"
     "read_level_id: %u, read_path_id: %u.\n"
     "read_two_level_flag: %d\n"
@@ -844,7 +844,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     //"SmallestUserKey: %s.\n"
     //"LargestUserKey: %s.\n"
     //"wal_info: \n%s.\n"
-    
     //"\nsst_files_num: \n%s\n"
     "zhangxin: end\n\n\n",
 
@@ -864,7 +863,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     //compact_->SmallestUserKey().ToString(false).c_str(),
     //compact_->LargestUserKey().ToString(false).c_str()
     //str_to_log.c_str()
-
     //str_sst_num.c_str()
   );
 
