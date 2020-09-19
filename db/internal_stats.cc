@@ -979,25 +979,24 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
   for (int l = 0; l < number_levels_; ++l) {
     if (levels_stats.find(l) != levels_stats.end()) {
       snprintf(buf, sizeof(buf), 
-	  	"num_levels: %d.\n"
-	  	"level %d write: %f MB.\n"
-	  	"level_new %d new_write: %f MB.\n"
-	  	"level_size No.%d: %f MB.\n",
-	  	number_levels_,
-	  	l, 1024 * levels_stats[l].at(LevelStatType::WRITE_GB),
-	  	l, 1024 * levels_stats[l].at(LevelStatType::W_NEW_GB),
-	  	l, levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0
-	  );
+        "num_levels: %d.\n"
+        "level %d write: %f MB.\n"
+        //"level_new %d new_write: %f MB.\n"
+        "level_size No.%d: %f MB.\n",
+        number_levels_,
+        l, 1024 * levels_stats[l].at(LevelStatType::WRITE_GB),
+        //l, 1024 * levels_stats[l].at(LevelStatType::W_NEW_GB),
+        l, levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0
+      );
       str_to_log.append(buf);
     }
   }
-  //std::cout << "str_to_log begin: \n" << str_to_log << "\nstr_to_log end.\n";
   ROCKS_LOG_BUFFER(
-	log_buffer_,
-	"\nlog_start.\n"
-	"%s"
-	"\nlog_end.\n",
-	str_to_log.c_str()
+    log_buffer_,
+    "\nlog_start.\n"
+    "%s"
+    "\nlog_end.\n",
+    str_to_log.c_str()
   );
 }
 
