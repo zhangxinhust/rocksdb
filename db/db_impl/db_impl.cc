@@ -1593,9 +1593,9 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
   }
 
   //zhangxin
-  LogBuffer* log_buffer = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+  LogBuffer log_buffer(InfoLogLevel::DEBUG_LEVEL, immutable_db_options_.info_log.get());
   ROCKS_LOG_BUFFER(
-    log_buffer, 
+    &log_buffer, 
     "\n\nread_latency_begin:\n"
     "latency: %lu.\n"
     "hit_level: %d.\n"
