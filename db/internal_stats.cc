@@ -979,11 +979,11 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
   for (int l = 0; l < number_levels_; ++l) {
     if (levels_stats.find(l) != levels_stats.end()) {
       snprintf(buf, sizeof(buf), 
-        "num_levels: %d.\n"
+        //"num_levels: %d.\n"
         "level %d write: %f MB.\n"
         //"level_new %d new_write: %f MB.\n"
         "level_size No.%d: %f MB.\n",
-        number_levels_,
+        //number_levels_,
         l, 1024 * levels_stats[l].at(LevelStatType::WRITE_GB),
         //l, 1024 * levels_stats[l].at(LevelStatType::W_NEW_GB),
         l, levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0
