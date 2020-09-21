@@ -967,7 +967,6 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
 
   uint64_t wal_bytes = GetDBStats(InternalStats::kIntStatsWalFileBytes);
   snprintf(buf, sizeof(buf), 
-    "\nPrintLevelAndWalBytes:\n"
     "wal_bytes: %lu.\n",
     wal_bytes
   );

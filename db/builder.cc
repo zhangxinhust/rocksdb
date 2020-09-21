@@ -202,7 +202,7 @@ Status BuildTable(
       }
     }
 
-	// zhangxin
+    // zhangxin
     ROCKS_LOG_BUFFER(
       log_buffer_, 
       "\n\nsst_print_begin:\n"
@@ -217,7 +217,7 @@ Status BuildTable(
       "sst_file_name: %s.\n"
       "sst_file_path_id: %u.\n"
       "sst_file_number: %lu.\n"
-      "sst_wirte_time_end\n",
+      "sst_write_time_end\n",
       builder->index_elapse_micro_total(),
       builder->index_elapse_micro_total_short(),
       builder->filter_elapse_micro_total(),

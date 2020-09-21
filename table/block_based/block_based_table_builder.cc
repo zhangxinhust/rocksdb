@@ -538,7 +538,7 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
       // entries in the first block and < all entries in subsequent
       // blocks.
       if (ok() && r->state == Rep::State::kUnbuffered) {
-	  	// zhangxin
+        // zhangxin
         uint64_t index_begin_time = env_->NowMicros();
         r->index_builder->AddIndexEntry(&r->last_key, &key, r->pending_handle);
         uint64_t index_elapse_time = env_->NowMicros() - index_begin_time;
@@ -551,7 +551,7 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
     // builder after being added to index builder.
     if (r->state == Rep::State::kUnbuffered && r->filter_builder != nullptr) {
       size_t ts_sz = r->internal_comparator.user_comparator()->timestamp_size();
-	  // zhangxin
+      // zhangxin
       uint64_t filter_begin_time = env_->NowMicros();
       r->filter_builder->Add(ExtractUserKeyAndStripTimestamp(key, ts_sz));
       uint64_t filter_elapse_time = env_->NowMicros() - filter_begin_time;
@@ -572,7 +572,7 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
       uint64_t index_begin_time = env_->NowMicros();
       r->index_builder->OnKeyAdded(key);
       uint64_t index_elapse_time = env_->NowMicros() - index_begin_time;
-	  r->index_elapse_micro_total += index_elapse_time;
+      r->index_elapse_micro_total += index_elapse_time;
     }
     NotifyCollectTableCollectorsOnAdd(key, value, r->offset,
                                       r->table_properties_collectors,

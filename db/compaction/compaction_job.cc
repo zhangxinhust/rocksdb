@@ -1434,7 +1434,7 @@ Status CompactionJob::FinishCompactionOutputFile(
     "sst_write_time: %lu.\n"
     "sst_file_path_id: %u.\n"
     "sst_file_number: %lu.\n"
-    "sst_wirte_time_end\n",
+    "sst_write_time_end\n",
   
     env_->NowMicros(),
     sub_compact->current_output()->meta.fd.GetPathId(),

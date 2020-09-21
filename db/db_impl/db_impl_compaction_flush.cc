@@ -2526,8 +2526,8 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       return Status::OK();
     }
 
-	// zhangxin
-	uint64_t cfd_start_wait_time  = 0;
+    // zhangxin
+    uint64_t cfd_start_wait_time  = 0;
     auto cfd = PickCompactionFromQueue(&task_token, log_buffer, &cfd_start_wait_time);
 
     if (cfd == nullptr) {
@@ -2563,7 +2563,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       c.reset(cfd->PickCompaction(*mutable_cf_options, log_buffer));
       TEST_SYNC_POINT("DBImpl::BackgroundCompaction():AfterPickCompaction");
 
-		//zhangxin
+      //zhangxin
       if (c != nullptr) {
         ROCKS_LOG_BUFFER(
           log_buffer,
@@ -2575,7 +2575,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
           cfd_start_wait_time,
           env_->NowMicros(),
           c->start_level()
-		);
+        );
         bool enough_room = EnoughRoomForCompaction(
             cfd, *(c->inputs()), &sfm_reserved_compact_space, log_buffer);
 
