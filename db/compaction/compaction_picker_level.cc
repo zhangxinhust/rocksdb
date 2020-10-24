@@ -397,10 +397,12 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
     log_buffer_, 
     "\n\nzhangxin output_file_num_begin.\n"
     "current_micros: %lu.\n"
+    "start_level: %d.\n"
     "max_output_files_num: %u.\n"
     "average_output_files_num: %f.\n"
     "zhangxin output_file_num_end.\n",
     env_->NowMicros(),
+    start_level_,
     max_output_files_num,
     sum_output_files_num / 1.0 / output_files_per_input_file.size()
   );
