@@ -402,7 +402,7 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
     env_->NowMicros(),
     max_output_files_num,
     sum_output_files_num / 1.0 / output_files_per_input_file.size()
-  )
+  );
 
   log_buffer_.FlushBufferToLog();
 
