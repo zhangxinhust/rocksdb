@@ -388,7 +388,7 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
     uint32_t output_files_num = uint32_t(output_level_inputs.files.size());
     output_files_per_input_file.push_back(output_files_num);
-    max_output_files_num = max(max_output_files_num, output_files_num);
+    max_output_files_num = std::max(max_output_files_num, output_files_num);
     sum_output_files_num += output_files_num;
   }
 
