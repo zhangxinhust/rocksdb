@@ -370,6 +370,42 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
 
+  // zhangxin
+  std::vector<uint32_t> output_files_per_input_file;
+  uint32_t max_output_files_num = 0, sum_output_files_num = 0;
+  for(uint32_t i = 0; i < start_level_inputs_.size(); i++) {
+    CompactionInputFiles single_input_file = start_level_inputs_;
+    FileMetaData *file = single_input_file.files[i];
+    single_input_file.files.clear();
+    single_input_file.files.push_back(file);
+    InternalKey smallest, largest;
+    compaction_picker_->GetRange(single_input_file, &smallest, &largest);
+
+    CompactionInputFiles output_level_inputs;
+    vstorage_->GetOverlappingInputs(output_level_, &smallest, &largest,
+                                    &output_level_inputs.files);
+
+    uint32_t output_files_num = uint32_t(output_level_inputs.files.size());
+    output_files_per_input_file.push_back(output_files_num);
+    max_output_files_num = max(max_output_files_num, output_files_num);
+    sum_output_files_num += output_files_num;
+  }
+
+  Env *env_ = Env::Default();
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n\nzhangxin output_file_num_begin.\n"
+    "current_micros: %lu.\n"
+    "max_output_files_num: %u.\n"
+    "average_output_files_num: %f.\n"
+    "zhangxin output_file_num_end.\n",
+    env_->NowMicros(),
+    max_output_files_num,
+    sum_output_files_num / 1.0 / output_files_per_input_file.size()
+  )
+
+  log_buffer_.FlushBufferToLog();
+
   return c;
 }
 
