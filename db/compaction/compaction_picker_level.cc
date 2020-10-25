@@ -402,13 +402,15 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
     "start_level: %d.\n"
     "max_output_files_num: %u.\n"
     "average_output_files_num: %lf.\n"
-    "input_files_num: %d / %d."
+    "input_files_num: %d / %d.\n"
+    "output_level_inputs_num: %u.\n"
     "zhangxin output_file_num_end.\n",
     env_->NowMicros(),
     start_level_,
     max_output_files_num,
     double(sum_output_files_num) / output_files_per_input_file.size(),
-    start_level_inputs_.size(), output_files_per_input_file.size()
+    start_level_inputs_.size(), output_files_per_input_file.size(),
+    output_level_inputs_.size()
   );
 
   log_buffer_->FlushBufferToLog();
