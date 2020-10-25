@@ -374,11 +374,13 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
   // zhangxin
   std::vector<uint32_t> output_files_per_input_file;
   uint32_t max_output_files_num = 0, sum_output_files_num = 0;
+
   for(uint32_t i = 0; i < start_level_inputs_.size(); i++) {
     CompactionInputFiles single_input_file = start_level_inputs_;
     FileMetaData *file = single_input_file.files[i];
     single_input_file.files.clear();
     single_input_file.files.push_back(file);
+
     InternalKey smallest, largest;
     compaction_picker_->GetRange(single_input_file, &smallest, &largest);
 
@@ -399,12 +401,14 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
     "current_micros: %lu.\n"
     "start_level: %d.\n"
     "max_output_files_num: %u.\n"
-    "average_output_files_num: %f.\n"
+    "average_output_files_num: %lf.\n"
+    "input_files_num: %d / %d."
     "zhangxin output_file_num_end.\n",
     env_->NowMicros(),
     start_level_,
     max_output_files_num,
-    sum_output_files_num / 1.0 / output_files_per_input_file.size()
+    double(sum_output_files_num) / output_files_per_input_file.size(),
+    start_level_inputs_.size(), output_files_per_input_file.size()
   );
 
   log_buffer_->FlushBufferToLog();
