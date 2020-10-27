@@ -2408,14 +2408,44 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   }
   const uint64_t current_time = static_cast<uint64_t>(_current_time);
 
-  for (int level = 0; level < num_levels() - 1; level++) {
-    for (auto f : files_[level]) {
+  // hust-cloud
+  if (compaction_style_ == kCompactionStyleLevel) {
+    for (auto f : files_[1]) { // L1 only
       if (!f->being_compacted && f->fd.table_reader != nullptr &&
           f->fd.table_reader->GetTableProperties() != nullptr) {
         auto creation_time =
             f->fd.table_reader->GetTableProperties()->creation_time;
         if (creation_time > 0 && creation_time < (current_time - ttl)) {
-          expired_ttl_files_.emplace_back(level, f);
+          expired_ttl_files_.emplace_back(1, f);
+        }
+      }
+    }
+
+    // sort all the files based on their live time. Older files get listed
+    // first. Use bubble sort because the number of entries are small.
+    for (int i = 0; i < expired_ttl_files_.size() - 1; i++) {
+      for (int j = i + 1; j < expired_ttl_files_.size(); j++) {
+        auto &p1 = expired_ttl_files_[i];
+        auto &p2 = expired_ttl_files_[j];
+        
+        if (p1.second->fd.table_reader->GetTableProperties()->creation_time > 
+            p2.second->fd.table_reader->GetTableProperties()->creation_time) {
+          auto tmp = expired_ttl_files_[i];
+          expired_ttl_files_[i] = expired_ttl_files_[j];
+          expired_ttl_files_[j] = tmp;
+        }
+      }
+    }
+  } else {
+    for (int level = 0; level < num_levels() - 1; level++) {
+      for (auto f : files_[level]) {
+        if (!f->being_compacted && f->fd.table_reader != nullptr &&
+            f->fd.table_reader->GetTableProperties() != nullptr) {
+          auto creation_time =
+              f->fd.table_reader->GetTableProperties()->creation_time;
+          if (creation_time > 0 && creation_time < (current_time - ttl)) {
+            expired_ttl_files_.emplace_back(level, f);
+          }
         }
       }
     }
