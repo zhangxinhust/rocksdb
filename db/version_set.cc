@@ -2423,8 +2423,8 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
 
     // sort all the files based on their live time. Older files get listed
     // first. Use bubble sort because the number of entries are small.
-    for (int i = 0; i < expired_ttl_files_.size() - 1; i++) {
-      for (int j = i + 1; j < expired_ttl_files_.size(); j++) {
+    for (uint32_t i = 0; i < expired_ttl_files_.size() - 1; i++) {
+      for (uint32_t j = i + 1; j < expired_ttl_files_.size(); j++) {
         auto &p1 = expired_ttl_files_[i];
         auto &p2 = expired_ttl_files_[j];
         
