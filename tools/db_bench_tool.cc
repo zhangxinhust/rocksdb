@@ -3790,6 +3790,7 @@ class Benchmark {
     Options& options = *opts;
 
     //zhangxin
+    // options.ttl = 20;
     options.db_paths = std::vector<rocksdb::DbPath>();
     /*
     options.db_paths.push_back(rocksdb::DbPath("./path0", 256l * 1024 * 1024));
@@ -3797,10 +3798,16 @@ class Benchmark {
     options.db_paths.push_back(rocksdb::DbPath("./path2", 2560l * 1024 * 1024));
     options.db_paths.push_back(rocksdb::DbPath("./path3", 25600l * 1024 * 1024));
     */
+    /*
     options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path0", 256l * 1024 * 1024));
     options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path1", 256l * 1024 * 1024));
     options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path2", 2560l * 1024 * 1024));
     options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path3", 25600l * 1024 * 1024));
+    */
+    options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path0", 256l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path1", 256l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path2", 2560l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path3", 25600l * 1024 * 1024));
 
     /*
     options.db_paths.push_back(rocksdb::DbPath("/mnt/zhangxin/ssd/rocksdb/path0", 256l * 1024 * 1024));
