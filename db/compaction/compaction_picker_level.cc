@@ -201,7 +201,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
-      return; // TODO: return no or pick other files blow?
+      return; // TODO: return now or pick other files blow?
     }
   }
 
