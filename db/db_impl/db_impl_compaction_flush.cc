@@ -2326,6 +2326,15 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     env_->NowMicros()
   );
   */
+  ROCKS_LOG_BUFFER(
+    &log_buffer,
+    "\n\ntotal_log_size_begin.\n"
+    "total_log_size: %lu.\n"
+    "curr_time: %lu.\n"
+    "total_log_size_end.\n",
+    total_log_size_,
+    env_->NowMicros()
+  );
 
   {
     InstrumentedMutexLock l(&mutex_);
