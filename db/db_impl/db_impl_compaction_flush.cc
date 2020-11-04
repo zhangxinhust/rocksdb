@@ -2314,16 +2314,18 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
                        immutable_db_options_.info_log.get());
 
   // zhangxin
+  /*
   uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
   ROCKS_LOG_BUFFER(
     &log_buffer,
     "\n\nwal_file_bytes_begin.\n"
-    "wal_files_bytes: %lu.\n"
-    "currtime_time: %lu.\n"
+    "wal_file_bytes: %lu.\n"
+    "curr_time: %lu.\n"
     "wal_file_bytes_end.\n",
     wal_file_bytes,
     env_->NowMicros()
   );
+  */
 
   {
     InstrumentedMutexLock l(&mutex_);

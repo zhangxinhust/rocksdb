@@ -154,9 +154,9 @@ Status BuildTable(
         true /* internal key corruption is not ok */, range_del_agg.get());
     c_iter.SeekToFirst();
 
-	// zhangxin
+    // zhangxin
     uint64_t sst_elapse_micro_begin = env->NowMicros();
-	
+
     for (; c_iter.Valid(); c_iter.Next()) {
       const Slice& key = c_iter.key();
       const Slice& value = c_iter.value();
