@@ -2307,6 +2307,20 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
 
 void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
                                       Env::Priority bg_thread_pri) {
+  // zhangxin
+  uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  LogBuffer log_buffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+  ROCKS_LOG_BUFFER(
+    &log_buffer,
+    "\n\nwal_file_bytes_begin.\n"
+    "wal_files_bytes: %lu.\n"
+    "currtime_time: %lu.\n"
+    "wal_file_bytes_end.\n",
+    wal_file_bytes,
+    env_->NowMicros()
+  );
+  log_buffer.FlushBufferToLog();
+
   bool made_progress = false;
   JobContext job_context(next_job_id_.fetch_add(1), true);
   TEST_SYNC_POINT("BackgroundCallCompaction:0");
