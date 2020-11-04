@@ -358,6 +358,8 @@ TEST_F(OptionsSettableTest, ColumnFamilyOptionsAllFieldsSettable) {
        sizeof(std::vector<DbPath>)},
       {offset_of(&ColumnFamilyOptions::compaction_thread_limiter),
        sizeof(std::shared_ptr<ConcurrentTaskLimiter>)},
+      {offset_of(&ColumnFamilyOptions::sst_partitioner_factory),
+       sizeof(std::shared_ptr<SstPartitionerFactory>)},
   };
 
   char* options_ptr = new char[sizeof(ColumnFamilyOptions)];
@@ -399,6 +401,7 @@ TEST_F(OptionsSettableTest, ColumnFamilyOptionsAllFieldsSettable) {
   options->compaction_filter = nullptr;
   options->flush_change_path_id_rate = 0.95;
   options->compaction_change_path_id_rate = 0.9;
+  options->sst_partitioner_factory = nullptr;
 
   char* new_options_ptr = new char[sizeof(ColumnFamilyOptions)];
   ColumnFamilyOptions* new_options =

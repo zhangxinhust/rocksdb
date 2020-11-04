@@ -586,17 +586,21 @@ extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_deletev(
 extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_deletev_cf(
     rocksdb_writebatch_wi_t* b, rocksdb_column_family_handle_t* column_family,
     int num_keys, const char* const* keys_list, const size_t* keys_list_sizes);
+// DO NOT USE - rocksdb_writebatch_wi_delete_range is not yet supported
 extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_delete_range(
     rocksdb_writebatch_wi_t* b, const char* start_key, size_t start_key_len,
     const char* end_key, size_t end_key_len);
+// DO NOT USE - rocksdb_writebatch_wi_delete_range_cf is not yet supported
 extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_delete_range_cf(
     rocksdb_writebatch_wi_t* b, rocksdb_column_family_handle_t* column_family,
     const char* start_key, size_t start_key_len, const char* end_key,
     size_t end_key_len);
+// DO NOT USE - rocksdb_writebatch_wi_delete_rangev is not yet supported
 extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_delete_rangev(
     rocksdb_writebatch_wi_t* b, int num_keys, const char* const* start_keys_list,
     const size_t* start_keys_list_sizes, const char* const* end_keys_list,
     const size_t* end_keys_list_sizes);
+// DO NOT USE - rocksdb_writebatch_wi_delete_rangev_cf is not yet supported
 extern ROCKSDB_LIBRARY_API void rocksdb_writebatch_wi_delete_rangev_cf(
     rocksdb_writebatch_wi_t* b, rocksdb_column_family_handle_t* column_family,
     int num_keys, const char* const* start_keys_list,
@@ -1027,6 +1031,10 @@ extern ROCKSDB_LIBRARY_API void rocksdb_options_set_ratelimiter(
 /* RateLimiter */
 extern ROCKSDB_LIBRARY_API rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(
     int64_t rate_bytes_per_sec, int64_t refill_period_us, int32_t fairness);
+extern ROCKSDB_LIBRARY_API rocksdb_ratelimiter_t*
+rocksdb_writeampbasedratelimiter_create(int64_t rate_bytes_per_sec,
+                                        int64_t refill_period_us,
+                                        int32_t fairness);
 extern ROCKSDB_LIBRARY_API void rocksdb_ratelimiter_destroy(rocksdb_ratelimiter_t*);
 
 /* PerfContext */
