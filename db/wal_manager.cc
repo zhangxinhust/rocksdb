@@ -134,7 +134,7 @@ Status WalManager::GetUpdatesSince(
 //    b. get sorted non-empty archived logs
 //    c. delete what should be deleted
 void WalManager::PurgeObsoleteWALFiles(
-  std::unordered_set<uint64_t>&log_numbers, 
+  std::unordered_set<uint64_t> *log_numbers, 
   std::atomic<uint64_t> *real_total_log_size) { // zhangxin
   bool const ttl_enabled = db_options_.wal_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.wal_size_limit_mb > 0;
@@ -200,8 +200,8 @@ void WalManager::PurgeObsoleteWALFiles(
             MutexLock l(&read_first_record_cache_mutex_);
             read_first_record_cache_.erase(number);
             // zhangxin
-            if (log_numbers.count(number)) {
-              log_numbers.erase(number);
+            if (log_numbers->count(number)) {
+              log_numbers->erase(number);
             }
 
             s = env_->GetFileSize(file_path, &size_bytes);
@@ -246,8 +246,8 @@ void WalManager::PurgeObsoleteWALFiles(
               MutexLock l(&read_first_record_cache_mutex_);
               read_first_record_cache_.erase(number);
               // zhangxin
-              if (log_numbers.count(number)) {
-                log_numbers.erase(number);
+              if (log_numbers->count(number)) {
+                log_number->erase(number);
               }
 
 
@@ -297,8 +297,8 @@ void WalManager::PurgeObsoleteWALFiles(
       MutexLock l(&read_first_record_cache_mutex_);
       read_first_record_cache_.erase(archived_logs[i]->LogNumber());
       // zhangxin
-      if (log_numbers.count(number)) {
-        log_numbers.erase(number);
+      if (log_numbers->count(number)) {
+        log_numbers->erase(number);
       }
 
 
