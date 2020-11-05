@@ -480,14 +480,10 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       continue;
     } else if (type == kLogFile) { // zhangxin
       uint64_t file_size = 0;
-      fprintf(stdout, "before GetFileSize.\n");
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
-        fprintf(stdout, "GetFileSize ok.\n");
         real_total_log_size_ -= file_size;
-        fprintf(stdout, "after minus real_total_log_size.\n");
       } else {
-        fprintf(stdout, "GetFileSize error.\n");
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
                         "Unable to get file size: %s: %s", fname.c_str(),
                         s.ToString().c_str());

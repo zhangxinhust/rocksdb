@@ -2316,7 +2316,12 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
 
   // zhangxin
   fprintf(stdout, "before getTickerCount.\n");
-  uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  uint64_t wal_file_bytes = 0;
+  if (stats_) {
+    wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  } else {
+    fprintf(stdout, "DBImpl::stats_ is null.\n");
+  }
   fprintf(stdout, "before total_log_size print.\n");
   ROCKS_LOG_BUFFER(
     &log_buffer,
