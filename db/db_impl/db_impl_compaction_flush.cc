@@ -2316,8 +2316,17 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
 
   // zhangxin
   uint64_t wal_file_bytes = 0;
+  uint64_t global_wal_size = 0;
   if (stats_) {
     wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  }
+  for(auto log_number : log_numbers_) {
+    std::string log_name = LogFileName(immutable_db_options_.wal_dir, log_number);
+    uint64_t tmp_size = 0;
+    Status s = env_->GetFileSize(log_name, &tmp_size);
+    if (s.ok()) {
+      global_wal_size += tmp_size;
+    }
   }
   ROCKS_LOG_BUFFER(
     &log_buffer,
@@ -2325,11 +2334,13 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     "wal_file_bytes: %lu.\n"
     "total_log_size: %lu.\n"
     "real_total_log_size: %lu.\n"
+    "global_wal_size: %lu.\n"
     "curr_time: %lu.\n"
     "total_log_size_end.\n",
     wal_file_bytes,
     uint64_t(total_log_size_),
     uint64_t(real_total_log_size_),
+    global_wal_size,
     env_->NowMicros()
   );
 

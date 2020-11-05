@@ -1681,6 +1681,8 @@ class DBImpl : public DB {
   std::atomic<uint64_t> total_log_size_;
   std::atomic<uint64_t> real_total_log_size_; // zhangxin
 
+  std::unordered_set<uint64_t> log_numbers_; // zhangxin
+
   // If this is non-empty, we need to delete these log files in background
   // threads. Protected by db mutex.
   autovector<log::Writer*> logs_to_free_;

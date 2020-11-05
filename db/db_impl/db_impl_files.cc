@@ -202,9 +202,9 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       job_context->size_log_to_delete += earliest.size;
       total_log_size_ -= earliest.size;
       // zhangxin
-      fprintf(stdout, "------------------------minus No.%lu log: %lu, log_size: %lu, real_log_size: %lu.\n",
-              earliest.number, earliest.size, uint64_t(total_log_size_), 
-              uint64_t(real_total_log_size_));
+      //fprintf(stdout, "------------------------minus No.%lu log: %lu, log_size: %lu, real_log_size: %lu.\n",
+        //      earliest.number, earliest.size, uint64_t(total_log_size_), 
+          //    uint64_t(real_total_log_size_));
 
       if (two_write_queues_) {
         log_write_mutex_.Lock();
@@ -484,13 +484,15 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       wal_manager_.ArchiveWALFile(fname, number);
       continue;
     } else if (type == kLogFile) { // zhangxin
+      log_numbers_.erase(number);
+
       uint64_t file_size = 0;
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
         real_total_log_size_ -= file_size;
-        fprintf(stdout, "------------------------purge wal: %s, size: %lu, total_size: %lu. real_size: %lu.\n", 
-                fname.c_str(), file_size, uint64_t(total_log_size_),
-                uint64_t(real_total_log_size_));
+        //fprintf(stdout, "------------------------purge wal: %s, size: %lu, total_size: %lu. real_size: %lu.\n", 
+          //      fname.c_str(), file_size, uint64_t(total_log_size_),
+            //    uint64_t(real_total_log_size_));
       } else {
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
                         "Unable to get file size: %s: %s", fname.c_str(),
@@ -564,7 +566,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     }
   }
 #ifndef ROCKSDB_LITE
-  wal_manager_.PurgeObsoleteWALFiles(&real_total_log_size_); // zhangxin
+  wal_manager_.PurgeObsoleteWALFiles(log_numbers, &real_total_log_size_); // zhangxin
 #endif  // ROCKSDB_LITE
   LogFlush(immutable_db_options_.info_log);
   InstrumentedMutexLock l(&mutex_);

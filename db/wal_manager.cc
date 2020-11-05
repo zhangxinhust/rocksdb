@@ -133,7 +133,9 @@ Status WalManager::GetUpdatesSince(
 //    a. compute how many files should be deleted
 //    b. get sorted non-empty archived logs
 //    c. delete what should be deleted
-void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_size) { // zhangxin
+void WalManager::PurgeObsoleteWALFiles(
+  std::unordered_set<uint64_t>&log_numbers, 
+  std::atomic<uint64_t> *real_total_log_size) { // zhangxin
   bool const ttl_enabled = db_options_.wal_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.wal_size_limit_mb > 0;
   if (!ttl_enabled && !size_limit_enabled) {
@@ -198,12 +200,16 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
             MutexLock l(&read_first_record_cache_mutex_);
             read_first_record_cache_.erase(number);
             // zhangxin
+            if (log_numbers.count(number)) {
+              log_numbers.erase(number);
+            }
+
             s = env_->GetFileSize(file_path, &size_bytes);
             if (s.ok()) {
               if (real_total_log_size) {
                 *real_total_log_size -= size_bytes;
-                fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
-                        size_bytes, uint64_t(real_total_log_size));
+                //fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
+                  //      size_bytes, uint64_t(real_total_log_size));
               }
             } else {
               ROCKS_LOG_ERROR(db_options_.info_log,
@@ -240,10 +246,15 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
               MutexLock l(&read_first_record_cache_mutex_);
               read_first_record_cache_.erase(number);
               // zhangxin
+              if (log_numbers.count(number)) {
+                log_numbers.erase(number);
+              }
+
+
               if (real_total_log_size) {
                 *real_total_log_size -= file_size;
-                fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
-                        file_size, uint64_t(real_total_log_size));
+                //fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
+                  //      file_size, uint64_t(real_total_log_size));
               }
             }
           }
@@ -286,12 +297,17 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
       MutexLock l(&read_first_record_cache_mutex_);
       read_first_record_cache_.erase(archived_logs[i]->LogNumber());
       // zhangxin
+      if (log_numbers.count(number)) {
+        log_numbers.erase(number);
+      }
+
+
       s = env_->GetFileSize(file_path, &size_bytes);
       if (s.ok()) {
         if (real_total_log_size) {
           *real_total_log_size -= size_bytes;
-          fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
-                  size_bytes, uint64_t(real_total_log_size));
+          //fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",
+            //      size_bytes, uint64_t(real_total_log_size));
         }
       } else {
         ROCKS_LOG_ERROR(db_options_.info_log,

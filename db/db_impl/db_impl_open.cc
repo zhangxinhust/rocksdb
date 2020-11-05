@@ -1067,7 +1067,11 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
       break;
     }
     total_log_size_ += log.size;
-    real_total_log_size_ += log.size; // zhangxin
+
+    // zhangxin
+    real_total_log_size_ += log.size;
+    log_numbers_.insert(log_number);
+
     alive_log_files_.push_back(log);
     // We preallocate space for logs, but then after a crash and restart, those
     // preallocated space are not needed anymore. It is likely only the last
@@ -1246,10 +1250,12 @@ Status DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
                    recycle_log_number);
     std::string old_log_fname =
         LogFileName(immutable_db_options_.wal_dir, recycle_log_number);
+    log_numbers_.insert(recycle_log_number); // zhangxin
     s = env_->ReuseWritableFile(log_fname, old_log_fname, &lfile,
                                 opt_env_options);
   } else {
     s = NewWritableFile(env_, log_fname, &lfile, opt_env_options);
+    log_numbers_.insert(log_file_num); // zhangxin
   }
 
   if (s.ok()) {
