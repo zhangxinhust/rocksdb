@@ -566,7 +566,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     }
   }
 #ifndef ROCKSDB_LITE
-  wal_manager_.PurgeObsoleteWALFiles(&log_numbers, &real_total_log_size_); // zhangxin
+  wal_manager_.PurgeObsoleteWALFiles(&log_numbers_, &real_total_log_size_); // zhangxin
 #endif  // ROCKSDB_LITE
   LogFlush(immutable_db_options_.info_log);
   InstrumentedMutexLock l(&mutex_);
