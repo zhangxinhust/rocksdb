@@ -3800,10 +3800,10 @@ class Benchmark {
     options.db_paths.push_back(rocksdb::DbPath("./path3", 25600l * 1024 * 1024));
     */
     
-    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path0", 256l * 1024 * 1024));
-    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path1", 256l * 1024 * 1024));
-    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path2", 2560l * 1024 * 1024));
-    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path3", 25600l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path0", 512l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path1", 512l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path2", 5120l * 1024 * 1024));
+    options.db_paths.push_back(rocksdb::DbPath("/nvme1n1/zhangxin/ssd/path3", 51200l * 1024 * 1024));
     /*
     options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path0", 256l * 1024 * 1024));
     options.db_paths.push_back(rocksdb::DbPath("/data4/zhangxin/ssd/path1", 256l * 1024 * 1024));
