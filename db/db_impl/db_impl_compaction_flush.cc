@@ -2344,7 +2344,7 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
       global_wal_size += tmp_size;
       //fprintf(stdout, "file %s size: %lu.\n", log_name.c_str(), tmp_size);
     } else {
-      s = env_->GetFileSize(log_name, &tmp_size)
+      s = env_->GetFileSize(log_name, &tmp_size);
       if (s.ok()) {
         global_wal_size += tmp_size;
       }
