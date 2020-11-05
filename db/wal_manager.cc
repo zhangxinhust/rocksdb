@@ -200,7 +200,9 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
             // zhangxin
             s = env_->GetFileSize(file_path, &size_bytes);
             if (s.ok()) {
-              *real_total_log_size -= size_bytes;
+              if (real_total_log_size) {
+                *real_total_log_size -= size_bytes;
+              }
             } else {
               ROCKS_LOG_ERROR(db_options_.info_log,
                               "Unable to get file size: %s: %s", file_path.c_str(),
@@ -236,7 +238,9 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
               MutexLock l(&read_first_record_cache_mutex_);
               read_first_record_cache_.erase(number);
               // zhangxin
-              *real_total_log_size -= file_size;
+              if (real_total_log_size) {
+                *real_total_log_size -= file_size;
+              }
             }
           }
         }
@@ -280,7 +284,9 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
       // zhangxin
       s = env_->GetFileSize(file_path, &size_bytes);
       if (s.ok()) {
-        *real_total_log_size -= size_bytes;
+        if (real_total_log_size) {
+          *real_total_log_size -= size_bytes;
+        }
       } else {
         ROCKS_LOG_ERROR(db_options_.info_log,
                         "Unable to get file size: %s: %s", file_path.c_str(),
