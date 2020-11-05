@@ -202,6 +202,8 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
             if (s.ok()) {
               if (real_total_log_size) {
                 *real_total_log_size -= size_bytes;
+                fprintf(stdout, "------------------------------------------------minus: %lu, real_log_size: %lu.\n",
+                        size_bytes, uint64_t(real_total_log_size));
               }
             } else {
               ROCKS_LOG_ERROR(db_options_.info_log,
@@ -240,6 +242,8 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
               // zhangxin
               if (real_total_log_size) {
                 *real_total_log_size -= file_size;
+                fprintf(stdout, "------------------------------------------------minus: %lu, real_log_size: %lu.\n",
+                        file_size, uint64_t(real_total_log_size));
               }
             }
           }
@@ -286,6 +290,8 @@ void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_siz
       if (s.ok()) {
         if (real_total_log_size) {
           *real_total_log_size -= size_bytes;
+          fprintf(stdout, "------------------------------------------------minus: %lu, real_log_size: %lu.\n",
+                  size_bytes, uint64_t(real_total_log_size));
         }
       } else {
         ROCKS_LOG_ERROR(db_options_.info_log,
