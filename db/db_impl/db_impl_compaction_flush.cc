@@ -2325,9 +2325,13 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     std::string archived_dir = ArchivalDirectory(immutable_db_options_.wal_dir);
     FileType type;
     WalFileType wal_type;
-    ParseFileName(log_name, log_number, &type, &wal_type);
-    if (wal_type == kArchivedLogFile) {
-      log_name = LogFileName(archived_dir, log_number);
+    uint64_t tmp_number;
+    if (ParseFileName(log_name, &tmp_number, &type, &wal_type)) {
+      if (wal_type == kArchivedLogFile) {
+        log_name = LogFileName(archived_dir, log_number);
+      }
+    } else {
+      continue;
     }
 
     uint64_t tmp_size = 0;
