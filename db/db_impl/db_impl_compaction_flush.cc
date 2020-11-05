@@ -2031,18 +2031,18 @@ ColumnFamilyData* DBImpl::PickCompactionFromQueue(
   ColumnFamilyData* cfd = nullptr;
   while (!compaction_queue_.empty()) {
     auto first_cfd = *compaction_queue_.begin();
-	auto first_time = *element_insert_time_.begin();
+    auto first_time = *element_insert_time_.begin();
     compaction_queue_.pop_front();
-	element_insert_time_.pop_front();
+    element_insert_time_.pop_front();
     assert(first_cfd->queued_for_compaction());
     if (!RequestCompactionToken(first_cfd, false, token, log_buffer)) {
       throttled_candidates.push_back(first_cfd);
-	  throttled_candidates_time.push_back(first_time);
+      throttled_candidates_time.push_back(first_time);
       continue;
     }
     cfd = first_cfd;
     cfd->set_queued_for_compaction(false);
-	*cfd_start_wait_time = first_time;
+    *cfd_start_wait_time = first_time;
     break;
   }
   // Add throttled compaction candidates back to queue in the original order.
@@ -2322,6 +2322,14 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
   }
   for(auto log_number : log_numbers_) {
     std::string log_name = LogFileName(immutable_db_options_.wal_dir, log_number);
+    std::string archived_dir = ArchivalDirectory(immutable_db_options_.wal_dir);
+    FileType type;
+    WalFileType wal_type;
+    ParseFileName(log_name, log_number, &type, &wal_type);
+    if (wal_type == kArchivedLogFile) {
+      log_name = LogFileName(archived_dir, log_number);
+    }
+
     uint64_t tmp_size = 0;
     Status s = env_->GetFileSize(log_name, &tmp_size);
     if (s.ok()) {

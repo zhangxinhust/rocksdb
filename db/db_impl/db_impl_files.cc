@@ -508,7 +508,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     // zhangxin
     if (log_numbers_.count(number)) {
       log_numbers_.erase(number);
-      fprintf(stdout, "delete %lu, size: %lu.\n", number, log_numbers_.size());
+      //fprintf(stdout, "delete %lu, size: %lu.\n", number, log_numbers_.size());
     }
 
     Status file_deletion_status;

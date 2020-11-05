@@ -1251,13 +1251,13 @@ Status DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
     std::string old_log_fname =
         LogFileName(immutable_db_options_.wal_dir, recycle_log_number);
     log_numbers_.insert(recycle_log_number); // zhangxin
-    fprintf(stdout, "insert %lu, size: %lu.\n", recycle_log_number, log_numbers_.size());
+    //fprintf(stdout, "insert %lu, size: %lu.\n", recycle_log_number, log_numbers_.size());
     s = env_->ReuseWritableFile(log_fname, old_log_fname, &lfile,
                                 opt_env_options);
   } else {
     s = NewWritableFile(env_, log_fname, &lfile, opt_env_options);
     log_numbers_.insert(log_file_num); // zhangxin
-    fprintf(stdout, "insert %lu, size: %lu.\n", log_file_num, log_numbers_.size());
+    //fprintf(stdout, "insert %lu, size: %lu.\n", log_file_num, log_numbers_.size());
   }
 
   if (s.ok()) {
