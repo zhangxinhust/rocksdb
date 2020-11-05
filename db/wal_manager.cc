@@ -247,7 +247,7 @@ void WalManager::PurgeObsoleteWALFiles(
               read_first_record_cache_.erase(number);
               // zhangxin
               if (log_numbers->count(number)) {
-                log_number->erase(number);
+                log_numbers->erase(number);
               }
 
 
