@@ -2339,7 +2339,7 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     if (s.ok()) {
       global_wal_size += tmp_size;
     } else {
-      fprintf(stdout, "fail to get size: %s.\n", log_name.c_str())
+      fprintf(stdout, "fail to get size: %s.\n", log_name.c_str());
     }
   }
   ROCKS_LOG_BUFFER(
