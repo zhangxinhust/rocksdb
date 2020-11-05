@@ -2323,25 +2323,32 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
   for(auto log_number : log_numbers_) {
     std::string log_name = LogFileName(immutable_db_options_.wal_dir, log_number);
     std::string archived_dir = ArchivalDirectory(immutable_db_options_.wal_dir);
+    std::string log_name_archived = LogFileName(archived_dir, log_number);
     FileType type;
     WalFileType wal_type;
     uint64_t tmp_number;
-    fprintf(stdout, "log_name: %s, archived_dir: %s.\n", log_name.c_str(), archived_dir.c_str());
+    //fprintf(stdout, "log_name: %s, archived_dir: %s.\n", log_name.c_str(), archived_dir.c_str());
+    /*
     if (ParseFileName(log_name, &tmp_number, &type, &wal_type)) {
       if (wal_type == kArchivedLogFile) {
         log_name = LogFileName(archived_dir, log_number);
       }
     } else {
-      //continue;
+      continue;
     }
+    */
 
     uint64_t tmp_size = 0;
-    Status s = env_->GetFileSize(log_name, &tmp_size);
+    Status s = env_->GetFileSize(log_name_archived, &tmp_size);
     if (s.ok()) {
       global_wal_size += tmp_size;
-      fprintf(stdout, "file %s size: %lu.\n", log_name.c_str(), tmp_size);
+      //fprintf(stdout, "file %s size: %lu.\n", log_name.c_str(), tmp_size);
     } else {
-      fprintf(stdout, "fail to get size: %s.\n", log_name.c_str());
+      s = env_->GetFileSize(log_name, &tmp_size)
+      if (s.ok()) {
+        global_wal_size += tmp_size;
+      }
+      //fprintf(stdout, "fail to get size: %s.\n", log_name.c_str());
     }
   }
   ROCKS_LOG_BUFFER(
