@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "db/db_impl/db_impl.h"
 
+#include <stdio.h> // zhangxin
 #include <cinttypes>
 
 #include "db/builder.h"
@@ -2315,6 +2316,7 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
 
   // zhangxin
   uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  fprintf(stdout, "before total_log_size print.\n");
   ROCKS_LOG_BUFFER(
     &log_buffer,
     "\n\ntotal_log_size_begin.\n"
@@ -2328,6 +2330,7 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     uint64_t(real_total_log_size_),
     env_->NowMicros()
   );
+  fprintf(stdout, "after total_log_size print.\n");
 
   {
     InstrumentedMutexLock l(&mutex_);
