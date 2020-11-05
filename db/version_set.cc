@@ -2420,22 +2420,6 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
         }
       }
     }
-
-    // sort all the files based on their live time. Older files get listed
-    // first. Use bubble sort because the number of entries are small.
-    for (uint32_t i = 0; i + 1 < expired_ttl_files_.size(); i++) {
-      for (uint32_t j = i + 1; j < expired_ttl_files_.size(); j++) {
-        auto &p1 = expired_ttl_files_[i];
-        auto &p2 = expired_ttl_files_[j];
-        
-        if (p1.second->fd.table_reader->GetTableProperties()->creation_time > 
-            p2.second->fd.table_reader->GetTableProperties()->creation_time) {
-          auto tmp = expired_ttl_files_[i];
-          expired_ttl_files_[i] = expired_ttl_files_[j];
-          expired_ttl_files_[j] = tmp;
-        }
-      }
-    }
   } else {
     for (int level = 0; level < num_levels() - 1; level++) {
       for (auto f : files_[level]) {
