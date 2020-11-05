@@ -3791,6 +3791,7 @@ class Benchmark {
 
     //zhangxin
     // options.ttl = 20;
+    // options.WAL_ttl_seconds = 20;
     options.db_paths = std::vector<rocksdb::DbPath>();
     /*
     options.db_paths.push_back(rocksdb::DbPath("./path0", 256l * 1024 * 1024));
