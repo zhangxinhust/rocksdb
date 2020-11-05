@@ -133,7 +133,7 @@ Status WalManager::GetUpdatesSince(
 //    a. compute how many files should be deleted
 //    b. get sorted non-empty archived logs
 //    c. delete what should be deleted
-void WalManager::PurgeObsoleteWALFiles() {
+void WalManager::PurgeObsoleteWALFiles(std::atomic<uint64_t> *real_total_log_size) { // zhangxin
   bool const ttl_enabled = db_options_.wal_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.wal_size_limit_mb > 0;
   if (!ttl_enabled && !size_limit_enabled) {
@@ -171,6 +171,7 @@ void WalManager::PurgeObsoleteWALFiles() {
 
   size_t log_files_num = 0;
   uint64_t log_file_size = 0;
+  uint64_t size_bytes = 0; // zhangxin
 
   for (auto& f : files) {
     uint64_t number;
@@ -196,6 +197,16 @@ void WalManager::PurgeObsoleteWALFiles() {
           } else {
             MutexLock l(&read_first_record_cache_mutex_);
             read_first_record_cache_.erase(number);
+            // zhangxin
+            s = env_->GetFileSize(file_path, &size_bytes);
+            if (s.ok()) {
+              *real_total_log_size -= size_bytes;
+            } else {
+              ROCKS_LOG_ERROR(db_options_.info_log,
+                              "Unable to get file size: %s: %s", file_path.c_str(),
+                              s.ToString().c_str());
+              return;
+            }
           }
           continue;
         }
@@ -224,6 +235,8 @@ void WalManager::PurgeObsoleteWALFiles() {
             } else {
               MutexLock l(&read_first_record_cache_mutex_);
               read_first_record_cache_.erase(number);
+              // zhangxin
+              *real_total_log_size -= file_size;
             }
           }
         }
@@ -264,6 +277,16 @@ void WalManager::PurgeObsoleteWALFiles() {
     } else {
       MutexLock l(&read_first_record_cache_mutex_);
       read_first_record_cache_.erase(archived_logs[i]->LogNumber());
+      // zhangxin
+      s = env_->GetFileSize(file_path, &size_bytes);
+      if (s.ok()) {
+        *real_total_log_size -= size_bytes;
+      } else {
+        ROCKS_LOG_ERROR(db_options_.info_log,
+                        "Unable to get file size: %s: %s", file_path.c_str(),
+                        s.ToString().c_str());
+        return;
+      }
     }
   }
 }

@@ -2330,9 +2330,11 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     &log_buffer,
     "\n\ntotal_log_size_begin.\n"
     "total_log_size: %lu.\n"
+    "real_total_log_size: %lu.\n"
     "curr_time: %lu.\n"
     "total_log_size_end.\n",
     uint64_t(total_log_size_),
+    uint64_t(real_total_log_size_),
     env_->NowMicros()
   );
 

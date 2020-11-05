@@ -170,6 +170,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       persist_stats_cf_handle_(nullptr),
       log_sync_cv_(&mutex_),
       total_log_size_(0),
+      real_total_log_size_(0), // zhangxin
       is_snapshot_supported_(true),
       write_buffer_manager_(immutable_db_options_.write_buffer_manager.get()),
       write_thread_(immutable_db_options_),

@@ -1679,6 +1679,7 @@ class DBImpl : public DB {
   WriteBatch cached_recoverable_state_;
   std::atomic<bool> cached_recoverable_state_empty_ = {true};
   std::atomic<uint64_t> total_log_size_;
+  std::atomic<uint64_t> real_total_log_size_; // zhangxin
 
   // If this is non-empty, we need to delete these log files in background
   // threads. Protected by db mutex.
