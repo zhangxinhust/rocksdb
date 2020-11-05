@@ -1157,6 +1157,7 @@ Status DBImpl::WriteToWAL(const WriteBatch& merged_batch,
     *log_used = logfile_number_;
   }
   total_log_size_ += log_entry.size();
+  real_total_log_size_ += log_entry.size(); // zhangxin
   // TODO(myabandeh): it might be unsafe to access alive_log_files_.back() here
   // since alive_log_files_ might be modified concurrently
   alive_log_files_.back().AddSize(log_entry.size());

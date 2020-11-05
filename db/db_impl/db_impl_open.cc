@@ -1056,6 +1056,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
   // Mark these as alive so they'll be considered for deletion later by
   // FindObsoleteFiles()
   total_log_size_ = 0;
+  real_total_log_size_ = 0; // zhangxin
   log_empty_ = false;
   for (auto log_number : log_numbers) {
     LogFileNumberSize log(log_number);
@@ -1066,6 +1067,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
       break;
     }
     total_log_size_ += log.size;
+    real_total_log_size_ += log.size; // zhangxin
     alive_log_files_.push_back(log);
     // We preallocate space for logs, but then after a crash and restart, those
     // preallocated space are not needed anymore. It is likely only the last

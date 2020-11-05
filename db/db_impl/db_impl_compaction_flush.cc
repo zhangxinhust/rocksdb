@@ -2312,6 +2312,32 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
   TEST_SYNC_POINT("BackgroundCallCompaction:0");
   LogBuffer log_buffer(InfoLogLevel::INFO_LEVEL,
                        immutable_db_options_.info_log.get());
+
+  // zhangxin
+  /*
+  uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
+  ROCKS_LOG_BUFFER(
+    &log_buffer,
+    "\n\nwal_file_bytes_begin.\n"
+    "wal_file_bytes: %lu.\n"
+    "curr_time: %lu.\n"
+    "wal_file_bytes_end.\n",
+    wal_file_bytes,
+    env_->NowMicros()
+  );
+  */
+  ROCKS_LOG_BUFFER(
+    &log_buffer,
+    "\n\ntotal_log_size_begin.\n"
+    "total_log_size: %lu.\n"
+    "real_total_log_size: %lu.\n"
+    "curr_time: %lu.\n"
+    "total_log_size_end.\n",
+    uint64_t(total_log_size_),
+    uint64_t(real_total_log_size_),
+    env_->NowMicros()
+  );
+
   {
     InstrumentedMutexLock l(&mutex_);
 
