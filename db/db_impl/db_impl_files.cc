@@ -479,7 +479,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       continue;
     } else if (type == kLogFile) { // zhangxin
       uint64_t file_size = 0;
-      Status s = env_->GetFileSize(fname, &file_size)
+      Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
         real_total_log_size_ -= file_size;
       } else {
