@@ -134,9 +134,9 @@ Status WalManager::GetUpdatesSince(
 //    b. get sorted non-empty archived logs
 //    c. delete what should be deleted
 void WalManager::PurgeObsoleteWALFiles(
-  fprintf(stdout, "PurgeObsoleteWALFiles begin.\n");
   std::unordered_set<uint64_t> *log_numbers, 
   std::atomic<uint64_t> *real_total_log_size) { // zhangxin
+  fprintf(stdout, "PurgeObsoleteWALFiles begin.\n");
   bool const ttl_enabled = db_options_.wal_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.wal_size_limit_mb > 0;
   if (!ttl_enabled && !size_limit_enabled) {
