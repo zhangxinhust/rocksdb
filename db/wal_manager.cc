@@ -296,11 +296,10 @@ void WalManager::PurgeObsoleteWALFiles(
     } else {
       MutexLock l(&read_first_record_cache_mutex_);
       read_first_record_cache_.erase(archived_logs[i]->LogNumber());
-      // zhangxin
-      if (log_numbers->count(number)) {
-        log_numbers->erase(number);
-      }
-
+      // zhangxin 暂时不跟踪wal_size_limit_mb
+      //if (log_numbers->count(number)) {
+      //  log_numbers->erase(number);
+      //}
 
       s = env_->GetFileSize(file_path, &size_bytes);
       if (s.ok()) {
