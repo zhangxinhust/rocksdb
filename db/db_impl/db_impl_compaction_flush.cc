@@ -2326,12 +2326,13 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     FileType type;
     WalFileType wal_type;
     uint64_t tmp_number;
+    fprintf(stdout, "log_name: %s, archived_dir: %s.\n", log_name.c_str(), archived_dir.c_str());
     if (ParseFileName(log_name, &tmp_number, &type, &wal_type)) {
       if (wal_type == kArchivedLogFile) {
         log_name = LogFileName(archived_dir, log_number);
       }
     } else {
-      continue;
+      //continue;
     }
 
     uint64_t tmp_size = 0;
