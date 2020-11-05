@@ -2315,6 +2315,7 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
                        immutable_db_options_.info_log.get());
 
   // zhangxin
+  fprintf(stdout, "before getTickerCount.\n");
   uint64_t wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
   fprintf(stdout, "before total_log_size print.\n");
   ROCKS_LOG_BUFFER(
