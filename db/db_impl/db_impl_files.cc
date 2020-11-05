@@ -477,6 +477,17 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                              immutable_db_options_.wal_size_limit_mb > 0)) {
       wal_manager_.ArchiveWALFile(fname, number);
       continue;
+    } else if (type == kLogFile) { // zhangxin
+      uint64_t file_size = 0;
+      Status s = env_->GetFileSize(fname, &file_size)
+      if (s.ok()) {
+        real_total_log_size_ -= file_size;
+      } else {
+        ROCKS_LOG_ERROR(immutable_db_options_.info_log,
+                        "Unable to get file size: %s: %s", fname.c_str(),
+                        s.ToString().c_str());
+        return;
+      }
     }
 #endif  // !ROCKSDB_LITE
 
