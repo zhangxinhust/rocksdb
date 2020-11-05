@@ -2334,12 +2334,14 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
     "wal_file_bytes: %lu.\n"
     "total_log_size: %lu.\n"
     "real_total_log_size: %lu.\n"
+    "wal_counts: %lu.\n"
     "global_wal_size: %lu.\n"
     "curr_time: %lu.\n"
     "total_log_size_end.\n",
     wal_file_bytes,
     uint64_t(total_log_size_),
     uint64_t(real_total_log_size_),
+    log_numbers_.size(),
     global_wal_size,
     env_->NowMicros()
   );

@@ -250,7 +250,6 @@ void WalManager::PurgeObsoleteWALFiles(
                 log_numbers->erase(number);
               }
 
-
               if (real_total_log_size) {
                 *real_total_log_size -= file_size;
                 //fprintf(stdout, "------------------------------------------------real minus: %lu, real_log_size: %lu.\n",

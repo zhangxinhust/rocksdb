@@ -484,8 +484,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       wal_manager_.ArchiveWALFile(fname, number);
       continue;
     } else if (type == kLogFile) { // zhangxin
-      log_numbers_.erase(number);
-
       uint64_t file_size = 0;
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
@@ -505,6 +503,12 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     for (const auto w : state.logs_to_free) {
       // TODO: maybe check the return value of Close.
       w->Close();
+    }
+
+    // zhangxin
+    if (log_numbers_.count(number)) {
+      log_numbers_.erase(number);
+      fprintf(stdout, "delete %lu, size: %lu.\n", number, log_numbers_.size());
     }
 
     Status file_deletion_status;
