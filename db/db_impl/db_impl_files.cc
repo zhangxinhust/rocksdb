@@ -483,6 +483,8 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
         real_total_log_size_ -= file_size;
+        fprintf(stdout, "purge wal name: %s, size: %lu, total_size: %lu.\n", 
+                fname.c_str(), file_size, uint64_t(real_total_log_size_));
       } else {
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
                         "Unable to get file size: %s: %s", fname.c_str(),
