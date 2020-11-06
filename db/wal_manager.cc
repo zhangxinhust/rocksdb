@@ -136,7 +136,7 @@ Status WalManager::GetUpdatesSince(
 void WalManager::PurgeObsoleteWALFiles(
   std::unordered_set<uint64_t> *log_numbers, 
   std::atomic<uint64_t> *real_total_log_size) { // zhangxin
-  fprintf(stdout, "PurgeObsoleteWALFiles begin.\n");
+  //fprintf(stdout, "PurgeObsoleteWALFiles begin.\n");
   bool const ttl_enabled = db_options_.wal_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.wal_size_limit_mb > 0;
   if (!ttl_enabled && !size_limit_enabled) {
@@ -179,6 +179,7 @@ void WalManager::PurgeObsoleteWALFiles(
   for (auto& f : files) {
     uint64_t number;
     FileType type;
+    //fprintf(stdout, )
     if (ParseFileName(f, &number, &type) && type == kLogFile) {
       std::string const file_path = archival_dir + "/" + f;
       if (ttl_enabled) {
@@ -191,7 +192,7 @@ void WalManager::PurgeObsoleteWALFiles(
           continue;
         }
         if (now_seconds - file_m_time > db_options_.wal_ttl_seconds) {
-          fprintf(stdout, "before delete %s.\n", f.c_str());
+          //fprintf(stdout, "before delete %s.\n", f.c_str());
           s = DeleteDBFile(&db_options_, file_path, archival_dir, false,
                            /*force_fg=*/!wal_in_db_path_);
           if (!s.ok()) {
@@ -199,7 +200,7 @@ void WalManager::PurgeObsoleteWALFiles(
                            file_path.c_str(), s.ToString().c_str());
             continue;
           } else {
-            fprintf(stdout, "delete done.\n");
+            //fprintf(stdout, "delete done.\n");
             MutexLock l(&read_first_record_cache_mutex_);
             read_first_record_cache_.erase(number);
             // zhangxin
@@ -264,7 +265,7 @@ void WalManager::PurgeObsoleteWALFiles(
       }
     }
   }
-  fprintf(stdout, "after ttl logic.\n");
+  //fprintf(stdout, "after ttl logic.\n");
   if (0 == log_files_num || !size_limit_enabled) {
     return;
   }
