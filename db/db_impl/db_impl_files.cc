@@ -131,11 +131,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     for (auto& path : paths) {
+      fprintf(stdout, "path: %s.\n", path.c_str());
       // set of all files in the directory. We'll exclude files that are still
       // alive in the subsequent processings.
       std::vector<std::string> files;
       env_->GetChildren(path, &files);  // Ignore errors
       for (const std::string& file : files) {
+        fprintf(stdout, "filename: %s.\n", file.c_str());
         uint64_t number;
         FileType type;
         // 1. If we cannot parse the file name, we skip;
@@ -147,9 +149,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // https://github.com/facebook/rocksdb/issues/3573
         if (!ParseFileName(file, &number, info_log_prefix.prefix, &type) ||
             !ShouldPurge(number)) {
+          fprintf(stdout, "skipped.\n");
+          fprintf(stdout, "ShouldPurge: %d.\n", ShouldPurge(number));
           continue;
         }
 
+        fprintf(stdout, "inserted into candidate.\n\n");
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
         job_context->full_scan_candidate_files.emplace_back("/" + file, path);
       }
