@@ -270,7 +270,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
-  bool should_purge = false;
+  bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
   } else {
@@ -307,6 +307,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (!should_purge) { break; }
     }
   }
+  return should_purge;
 }
 
 namespace {
