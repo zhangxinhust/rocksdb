@@ -107,6 +107,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
+    fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
