@@ -156,6 +156,14 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           continue;
         }
 
+        // hust-cloud
+        if (type == kLogFile) {
+          if (!WALShouldPurge(number)) {
+            continue;
+          } else {
+            logs_seq_range_.erase(number);
+          }
+        }
         fprintf(stdout, "inserted into candidate.\n\n");
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
         job_context->full_scan_candidate_files.emplace_back("/" + file, path);
@@ -170,6 +178,17 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       env_->GetChildren(immutable_db_options_.wal_dir,
                         &log_files);  // Ignore errors
       for (const std::string& log_file : log_files) {
+        // hust-cloud
+        uint64_t number;
+        FileType type;
+        if (ParseFileName(log_file, &number, &type)) {
+          if (!WALShouldPurge(number)) {
+            continue;
+          } else {
+            logs_seq_range_.erase(number);
+          }
+        }
+
         job_context->full_scan_candidate_files.emplace_back(
             log_file, immutable_db_options_.wal_dir);
       }
@@ -195,6 +214,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     // find newly obsoleted log files
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
+      // hust-cloud
+      if (!WALShouldPurge(earliest.number)) {
+        continue;
+      } else {
+        logs_seq_range_.erase(earliest.number);
+      }
+
       if (immutable_db_options_.recycle_log_file_num >
           log_recycle_files_.size()) {
         ROCKS_LOG_INFO(immutable_db_options_.info_log,
@@ -252,6 +278,51 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     ++pending_purge_obsolete_files_;
   }
   logs_to_free_.clear();
+}
+
+// hust-cloud
+bool DBImpl::WALShouldPurge(uint64_t log_number) {
+  mutex_.AssertHeld();
+  SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
+  SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
+  bool should_purge = true;
+  if (log_largest_seq == kDisableGlobalSequenceNumber) {
+    should_purge = false;
+  } else {
+    for (auto cfd : *versions_->GetColumnFamilySet()) {
+      if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+        continue;
+      }
+      // L0
+      const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+      if (level0_files.size()) {
+        SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
+        SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
+        if ((log_smallest_seq <= level0_smallest_seq &&
+            level0_smallest_seq <= log_largest_seq) ||
+            (log_smallest_seq <= level0_largest_seq &&
+            level0_largest_seq <= log_largest_seq)) {
+          should_purge = false;
+          break;
+        }
+      }
+      // L1
+      if (cfd->NumberLevels() < 2) { 
+        continue;
+      }
+      for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+        if ((log_smallest_seq <= file->fd.smallest_seqno &&
+            file->fd.smallest_seqno <= log_largest_seq) ||
+            (log_smallest_seq <= file->fd.largest_seqno &&
+            file->fd.largest_seqno <= log_largest_seq)) {
+          should_purge = false;
+          break;
+        }
+      }
+      if (!should_purge) { break; }
+    }
+  }
+  return should_purge;
 }
 
 namespace {
@@ -410,69 +481,10 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     bool keep = true;
     switch (type) {
       case kLogFile:
-        {
-          // hust-cloud
-          mutex_.Lock();
-          SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
-          SequenceNumber log_largest_seq = logs_seq_range_[number].second;
-          fprintf(stdout, "log number: %lu.\n", number);
-          fprintf(stdout, "log_small: %lu, log_large: %lu, size: %lu.\n", 
-            log_smallest_seq, log_largest_seq, logs_seq_range_.size());
-          keep = ((number >= state.log_number) ||
-                  (number == state.prev_log_number) ||
-                  (log_recycle_files_set.find(number) !=
-                   log_recycle_files_set.end()) ||
-                   log_largest_seq == kDisableGlobalSequenceNumber);
-          if (keep) {
-            fprintf(stdout, "keep true-1.\n");
-          }
-          if (!keep) {
-            for (auto cfd : *versions_->GetColumnFamilySet()) {
-              if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
-                continue;
-              }
-              // L0
-              const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
-              if (level0_files.size()) {
-                SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
-                SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
-                fprintf(stdout, "L0small: %lu, L0large: %lu.\n", level0_smallest_seq, level0_largest_seq);
-                if ((log_smallest_seq <= level0_smallest_seq &&
-                    level0_smallest_seq <= log_largest_seq) ||
-                    (log_smallest_seq <= level0_largest_seq &&
-                    level0_largest_seq <= log_largest_seq)) {
-                  fprintf(stdout, "keep true-2.\n");
-                  keep = true;
-                  break;
-                }
-              }
-              // L1
-              if (cfd->NumberLevels() < 2) {
-                fprintf(stdout, "L1 empty.\n");
-                continue;
-              }
-              for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
-                fprintf(stdout, "L1small: %lu, L1large: %lu.\n",
-                    file->fd.smallest_seqno, file->fd.largest_seqno);
-                if ((log_smallest_seq <= file->fd.smallest_seqno &&
-                    file->fd.smallest_seqno <= log_largest_seq) ||
-                    (log_smallest_seq <= file->fd.largest_seqno &&
-                    file->fd.largest_seqno <= log_largest_seq)) {
-                  fprintf(stdout, "keep true-3.\n");
-                  keep = true;
-                  break;
-                }
-              }
-              if (keep) { break; }
-            }
-          }
-          if (!keep) {
-            fprintf(stdout, "erase log No.%lu.\n", number);
-            logs_seq_range_.erase(number);
-          }
-          fprintf(stdout, "\n");
-          mutex_.Unlock();
-        }
+        keep = ((number >= state.log_number) ||
+                (number == state.prev_log_number) ||
+                (log_recycle_files_set.find(number) !=
+                 log_recycle_files_set.end()));
         break;
       case kDescriptorFile:
         // Keep my manifest file, and any newer incarnations'
