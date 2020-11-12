@@ -318,6 +318,10 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         continue;
       }
       for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+        if (!file) {
+          fprintf(stdout, "empty file.\n");
+          continue;
+        }
         fprintf(stdout, "l1small: %lu, l1large: %lu.\n", file->fd.smallest_seqno, file->fd.largest_seqno);
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
