@@ -218,7 +218,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (!WALShouldPurge(earliest.number)) {
         fprintf(stdout, "should keep.\n");
-        continue;
+        break;
       } else {
         fprintf(stdout, "should delete.\n");
         logs_seq_range_.erase(earliest.number);
