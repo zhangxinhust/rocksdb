@@ -552,7 +552,7 @@ class DBImpl : public DB {
   void FindObsoleteFiles(JobContext* job_context, bool force,
                          bool no_full_scan = false);
 
-  void WALShouldPurge(uint64_t log_number); // hust-cloud
+  bool WALShouldPurge(uint64_t log_number); // hust-cloud
 
   // Diffs the files listed in filenames and those that do not
   // belong to live files are possibly removed. Also, removes all the
