@@ -302,8 +302,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       // L0
       const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
       if (level0_files.size()) {
-        SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
-        SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
+        SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
+        SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
         fprintf(stdout, "l0small: %lu, l0large: %lu.\n", level0_smallest_seq, level0_largest_seq);
         if (!(level0_largest_seq < log_smallest_seq ||
             level0_smallest_seq > log_largest_seq)) {
