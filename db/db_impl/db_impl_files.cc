@@ -289,7 +289,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
   fprintf(stdout, "log_small: %lu, log_large: %lu, size: %lu.\n", 
-    log_smallest_seq, log_largest_seq,, logs_seq_range_.size());
+    log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
