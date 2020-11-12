@@ -545,6 +545,9 @@ Status DBImpl::CloseHelper() {
   }
   logs_.clear();
 
+  // hust-cloud
+  logs_seq_range_.clear();
+
   // Table cache may have table handles holding blocks from the block cache.
   // We need to release them before the block cache is destroyed. The block
   // cache may be destroyed inside versions_.reset(), when column family data

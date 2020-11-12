@@ -398,6 +398,37 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                 (number == state.prev_log_number) ||
                 (log_recycle_files_set.find(number) !=
                  log_recycle_files_set.end()));
+        // hust-cloud
+        mutex_.Lock();
+        if (!keep) {
+          SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
+          SequenceNumber log_largest_seq = logs_seq_range_[number].second;
+          if (log_largest_seq == kDisableGlobalSequenceNumber) {
+            keep = true;
+          } else {
+            for (auto cfd : *versions_->GetColumnFamilySet()) {
+              if (cfd->IsDropped() || 
+                  !cfd->initialized() || 
+                  cfd->NumberLevels() < 2) {
+                continue;
+              }
+              for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+                if ((log_smallest_seq <= file->fd.smallest_seqno &&
+                    file->fd.smallest_seqno <= log_largest_seq) ||
+                    (log_smallest_seq <= file->fd.largest_seqno &&
+                    file->fd.largest_seqno <= log_largest_seq)) {
+                  keep = true;
+                  break;
+                }
+              }
+              if (keep) { break; }
+            }
+          }
+        }
+        if (!keep) {
+          logs_seq_range_.erase(number);
+        }
+        mutex_.Unlock();
         break;
       case kDescriptorFile:
         // Keep my manifest file, and any newer incarnations'

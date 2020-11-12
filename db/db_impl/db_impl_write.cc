@@ -1832,6 +1832,18 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
       }
     }
     if (s.ok()) {
+      // hust-cloud
+      SequenceNumber seq = versions_->LastSequence();
+      logs_seq_range_[new_log_number] = 
+          std::pair<SequenceNumber, SequenceNumber>(seq, kDisableGlobalSequenceNumber);
+      if (!alive_log_files_.empty()) {
+        uint64_t last_log_number = alive_log_files_.back().number;
+        if (logs_seq_range_.count(last_log_number)) {
+          logs_seq_range_[last_log_number] = 
+              std::pair<SequenceNumber, SequenceNumber>(logs_seq_range_[last_log_number].first, seq);
+        }
+      }
+
       logfile_number_ = new_log_number;
       log_empty_ = true;
       log_dir_synced_ = false;
