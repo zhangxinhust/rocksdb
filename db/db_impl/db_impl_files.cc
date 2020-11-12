@@ -206,7 +206,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
       if (!WALShouldPurge(earliest.number)) {
-        continue;
+        break;
       } else {
         logs_seq_range_.erase(earliest.number);
       }
@@ -283,10 +283,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (level0_files.size()) {
         SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
         SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
-        if ((log_smallest_seq <= level0_smallest_seq &&
-            level0_smallest_seq <= log_largest_seq) ||
-            (log_smallest_seq <= level0_largest_seq &&
-            level0_largest_seq <= log_largest_seq)) {
+        if (!(level0_largest_seq < log_smallest_seq ||
+            level0_smallest_seq > log_largest_seq)) {
           should_purge = false;
           break;
         }
@@ -296,10 +294,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         continue;
       }
       for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
-        if ((log_smallest_seq <= file->fd.smallest_seqno &&
-            file->fd.smallest_seqno <= log_largest_seq) ||
-            (log_smallest_seq <= file->fd.largest_seqno &&
-            file->fd.largest_seqno <= log_largest_seq)) {
+        if (!(file->fd.largest_seqno < log_smallest_seq ||
+            file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
           break;
         }
