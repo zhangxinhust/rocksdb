@@ -305,10 +305,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
         SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
         fprintf(stdout, "l0small: %lu, l0large: %lu.\n", level0_smallest_seq, level0_largest_seq);
-        if ((log_smallest_seq <= level0_smallest_seq &&
-            level0_smallest_seq <= log_largest_seq) ||
-            (log_smallest_seq <= level0_largest_seq &&
-            level0_largest_seq <= log_largest_seq)) {
+        if (!(level0_largest_seq < log_smallest_seq ||
+            level0_smallest_seq > log_largest_seq)) {
           should_purge = false;
           fprintf(stdout, "false-2\n");
           break;
@@ -321,10 +319,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
       for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
         fprintf(stdout, "l1small: %lu, l1large: %lu.\n", file->fd.smallest_seqno, file->fd.largest_seqno);
-        if ((log_smallest_seq <= file->fd.smallest_seqno &&
-            file->fd.smallest_seqno <= log_largest_seq) ||
-            (log_smallest_seq <= file->fd.largest_seqno &&
-            file->fd.largest_seqno <= log_largest_seq)) {
+        if (!(file->fd.largest_seqno < log_smallest_seq ||
+            file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
           fprintf(stdout, "false-3\n");
           break;
