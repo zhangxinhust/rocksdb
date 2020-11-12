@@ -302,6 +302,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
+  fprintf(stdout, "PurgeObsoleteFiles---------------------------------------\n");
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
@@ -405,7 +406,9 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
           mutex_.Lock();
           SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
           SequenceNumber log_largest_seq = logs_seq_range_[number].second;
-          fprintf(stdout, "log_small: %lu, log_large: %lu.\n", log_smallest_seq, log_largest_seq);
+          fprintf(stdout, "log number: %lu.\n", number);
+          fprintf(stdout, "log_small: %lu, log_large: %lu, size: %lu.\n", 
+            log_smallest_seq, log_largest_seq, logs_seq_range_.size());
           keep = ((number >= state.log_number) ||
                   (number == state.prev_log_number) ||
                   (log_recycle_files_set.find(number) !=
@@ -458,7 +461,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
             fprintf(stdout, "erase log No.%lu.\n", number);
             logs_seq_range_.erase(number);
           }
-          fprintf(stdout, "\n\n");
+          fprintf(stdout, "\n");
           mutex_.Unlock();
         }
         break;
