@@ -405,11 +405,15 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
           mutex_.Lock();
           SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
           SequenceNumber log_largest_seq = logs_seq_range_[number].second;
+          fprintf(stdout, "log_small: %lu, log_large: %lu.\n", log_smallest_seq, log_largest_seq);
           keep = ((number >= state.log_number) ||
                   (number == state.prev_log_number) ||
                   (log_recycle_files_set.find(number) !=
                    log_recycle_files_set.end()) ||
                    log_largest_seq == kDisableGlobalSequenceNumber);
+          if (keep) {
+            fprintf(stdout, "keep true-1.\n");
+          }
           if (!keep) {
             for (auto cfd : *versions_->GetColumnFamilySet()) {
               if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
@@ -420,23 +424,29 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
               if (level0_files.size()) {
                 SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
                 SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
+                fprintf(stdout, "L0small: %lu, L0large: %lu.\n", level0_smallest_seq, level0_largest_seq);
                 if ((log_smallest_seq <= level0_smallest_seq &&
                     level0_smallest_seq <= log_largest_seq) ||
                     (log_smallest_seq <= level0_largest_seq &&
                     level0_largest_seq <= log_largest_seq)) {
+                  fprintf(stdout, "keep true-2.\n");
                   keep = true;
                   break;
                 }
               }
               // L1
-              if (cfd->NumberLevels() < 2) { 
+              if (cfd->NumberLevels() < 2) {
+                fprintf(stdout, "L1 empty.\n");
                 continue;
               }
               for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+                fprintf(stdout, "L1small: %lu, L1large: %lu.\n",
+                    file->fd.smallest_seqno, file->fd.largest_seqno);
                 if ((log_smallest_seq <= file->fd.smallest_seqno &&
                     file->fd.smallest_seqno <= log_largest_seq) ||
                     (log_smallest_seq <= file->fd.largest_seqno &&
                     file->fd.largest_seqno <= log_largest_seq)) {
+                  fprintf(stdout, "keep true-3.\n");
                   keep = true;
                   break;
                 }
@@ -445,8 +455,10 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
             }
           }
           if (!keep) {
+            fprintf(stdout, "erase log No.%lu.\n", number);
             logs_seq_range_.erase(number);
           }
+          fprintf(stdout, "\n\n");
           mutex_.Unlock();
         }
         break;
