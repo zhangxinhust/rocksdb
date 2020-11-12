@@ -759,6 +759,9 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     std::string scratch;
     Slice record;
     WriteBatch batch;
+    SequenceNumber sequence;
+    // hust-cloud
+    SequenceNumber first_seqno = -1;
 
     while (!stop_replay_by_wal_filter &&
            reader.ReadRecord(&record, &scratch,
@@ -770,7 +773,11 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         continue;
       }
       WriteBatchInternal::SetContents(&batch, record);
-      SequenceNumber sequence = WriteBatchInternal::Sequence(&batch);
+      sequence = WriteBatchInternal::Sequence(&batch);
+      // hust-cloud
+      if (first_seqno == -1) {
+        first_seqno = sequence;
+      }
 
       if (immutable_db_options_.wal_recovery_mode ==
           WALRecoveryMode::kPointInTimeRecovery) {
@@ -908,6 +915,11 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
                                  *next_sequence);
         }
       }
+    }
+    // hust-cloud
+    if (first_seqno != -1) {
+      logs_seq_range_[log_number] = 
+        std::pair<SequenceNumber, SequenceNumber>(first_seqno, sequence);
     }
 
     if (!status.ok()) {

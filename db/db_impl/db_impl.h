@@ -1683,6 +1683,9 @@ class DBImpl : public DB {
 
   std::unordered_set<uint64_t> log_numbers_; // zhangxin
 
+  // hust-cloud
+  std::unordered_map<uint64_t, std::pair<SequenceNumber, SequenceNumber>> logs_seq_range_;
+
   // If this is non-empty, we need to delete these log files in background
   // threads. Protected by db mutex.
   autovector<log::Writer*> logs_to_free_;
