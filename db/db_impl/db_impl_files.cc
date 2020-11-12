@@ -164,7 +164,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
             logs_seq_range_.erase(number);
           }
         }
-        fprintf(stdout, "inserted into candidate.\n\n");
+        fprintf(stdout, "inserted.\n\n");
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
         job_context->full_scan_candidate_files.emplace_back("/" + file, path);
       }
@@ -215,9 +215,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
+      fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (!WALShouldPurge(earliest.number)) {
+        fprintf(stdout, "should keep.\n");
         continue;
       } else {
+        fprintf(stdout, "should delete.\n");
         logs_seq_range_.erase(earliest.number);
       }
 
@@ -285,9 +288,12 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
+  fprintf(stdout, "log_small: %lu, log_large: %lu, size: %lu.\n", 
+    log_smallest_seq, log_largest_seq,, logs_seq_range_.size());
   bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
+    fprintf(stdout, "false-1\n");
   } else {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
@@ -298,24 +304,29 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (level0_files.size()) {
         SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
         SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
+        fprintf(stdout, "l0small: %lu, l0large: %lu.\n", level0_smallest_seq, level0_largest_seq);
         if ((log_smallest_seq <= level0_smallest_seq &&
             level0_smallest_seq <= log_largest_seq) ||
             (log_smallest_seq <= level0_largest_seq &&
             level0_largest_seq <= log_largest_seq)) {
           should_purge = false;
+          fprintf(stdout, "false-2\n");
           break;
         }
       }
       // L1
-      if (cfd->NumberLevels() < 2) { 
+      if (cfd->NumberLevels() < 2) {
+        fprintf(stdout, "no L1.\n");
         continue;
       }
       for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+        fprintf(stdout, "l1small: %lu, l1large: %lu.\n", file->fd.smallest_seqno, file->fd.largest_seqno);
         if ((log_smallest_seq <= file->fd.smallest_seqno &&
             file->fd.smallest_seqno <= log_largest_seq) ||
             (log_smallest_seq <= file->fd.largest_seqno &&
             file->fd.largest_seqno <= log_largest_seq)) {
           should_purge = false;
+          fprintf(stdout, "false-3\n");
           break;
         }
       }
