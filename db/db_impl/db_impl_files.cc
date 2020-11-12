@@ -394,35 +394,47 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     bool keep = true;
     switch (type) {
       case kLogFile:
+        // hust-cloud
+        mutex_.Lock();
+        SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
+        SequenceNumber log_largest_seq = logs_seq_range_[number].second;
         keep = ((number >= state.log_number) ||
                 (number == state.prev_log_number) ||
                 (log_recycle_files_set.find(number) !=
-                 log_recycle_files_set.end()));
-        // hust-cloud
-        mutex_.Lock();
+                 log_recycle_files_set.end()) ||
+                 log_largest_seq == kDisableGlobalSequenceNumber);
         if (!keep) {
-          SequenceNumber log_smallest_seq = logs_seq_range_[number].first;
-          SequenceNumber log_largest_seq = logs_seq_range_[number].second;
-          if (log_largest_seq == kDisableGlobalSequenceNumber) {
-            keep = true;
-          } else {
-            for (auto cfd : *versions_->GetColumnFamilySet()) {
-              if (cfd->IsDropped() || 
-                  !cfd->initialized() || 
-                  cfd->NumberLevels() < 2) {
-                continue;
-              }
-              for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
-                if ((log_smallest_seq <= file->fd.smallest_seqno &&
-                    file->fd.smallest_seqno <= log_largest_seq) ||
-                    (log_smallest_seq <= file->fd.largest_seqno &&
-                    file->fd.largest_seqno <= log_largest_seq)) {
-                  keep = true;
-                  break;
-                }
-              }
-              if (keep) { break; }
+          for (auto cfd : *versions_->GetColumnFamilySet()) {
+            if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+              continue;
             }
+            // L0
+            const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+            if (level0_files.size()) {
+              SequenceNumber level0_smallest_seq = level0_files.front()->fd.smallest_seqno;
+              SequenceNumber level0_largest_seq = level0_files.back()->fd.largest_seqno;
+              if ((log_smallest_seq <= level0_smallest_seq &&
+                  level0_smallest_seq <= log_largest_seq) ||
+                  (log_smallest_seq <= level0_largest_seq &&
+                  level0_largest_seq <= log_largest_seq)) {
+                keep = true;
+                break;
+              }
+            }
+            // L1
+            if (cfd->NumberLevels() < 2) { 
+              continue;
+            }
+            for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+              if ((log_smallest_seq <= file->fd.smallest_seqno &&
+                  file->fd.smallest_seqno <= log_largest_seq) ||
+                  (log_smallest_seq <= file->fd.largest_seqno &&
+                  file->fd.largest_seqno <= log_largest_seq)) {
+                keep = true;
+                break;
+              }
+            }
+            if (keep) { break; }
           }
         }
         if (!keep) {
