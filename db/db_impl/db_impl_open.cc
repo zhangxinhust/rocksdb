@@ -761,7 +761,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     WriteBatch batch;
     SequenceNumber sequence;
     // hust-cloud
-    SequenceNumber first_seqno = -1;
+    SequenceNumber first_seqno = kDisableGlobalSequenceNumber;
 
     while (!stop_replay_by_wal_filter &&
            reader.ReadRecord(&record, &scratch,
@@ -775,7 +775,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       WriteBatchInternal::SetContents(&batch, record);
       sequence = WriteBatchInternal::Sequence(&batch);
       // hust-cloud
-      if (first_seqno == -1) {
+      if (first_seqno == kDisableGlobalSequenceNumber) {
         first_seqno = sequence;
       }
 
@@ -917,7 +917,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
     }
     // hust-cloud
-    if (first_seqno != -1) {
+    if (first_seqno != kDisableGlobalSequenceNumber) {
       logs_seq_range_[log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(first_seqno, sequence);
     }
