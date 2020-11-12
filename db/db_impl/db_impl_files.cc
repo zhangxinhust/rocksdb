@@ -161,7 +161,8 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       }
     }
 
-    fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", immutable_db_options_.wal_dir, dbname_);
+    fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", 
+      immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
     // Add log files in wal_dir
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
