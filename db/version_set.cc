@@ -4645,7 +4645,7 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
 }
 
 // zhangxin
-void DBImpl::PrintLevelInfo() {
+void VersionStorageInfo::PrintLevelInfo() {
   fprintf(stdout, "+++++++++++++++++++\n");
   fprintf(stdout, "num_levels_: %d, num_non_empte_levels_: %d, base_level_: %d.\n", 
     num_levels_, num_non_empty_levels_, base_level_);
