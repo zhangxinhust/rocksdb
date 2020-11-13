@@ -4644,6 +4644,18 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
       mutable_cf_options, &ve, &dummy_mutex, nullptr, true);
 }
 
+// zhangxin
+void DBImpl::PrintLevelInfo() {
+  fprintf(stdout, "+++++++++++++++++++\n");
+  fprintf(stdout, "num_levels_: %d, num_non_empte_levels_: %d, base_level_: %d.\n", 
+    num_levels_, num_non_empty_levels_, base_level_);
+  fprintf(stdout, "files_ size: %lu.\n", files_->size());
+  for (uint32_t i = 0; i < files_->size(); i++) {
+    fprintf(stdout, "level %u: size: %lu.\n", i, files_[i]->fd.GetFileSize());
+  }
+  fprintf(stdout, "+++++++++++++++++++\n");
+}
+
 Status VersionSet::DumpManifest(Options& options, std::string& dscname,
                                 bool verbose, bool hex, bool json) {
   // Open the specified manifest file.

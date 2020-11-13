@@ -299,6 +299,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
         continue;
       }
+      cfd->current()->storage_info()->PrintLevelInfo();
       // L0
       const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
       if (level0_files.size()) {
