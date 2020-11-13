@@ -284,7 +284,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 }
 
 // hust-cloud
-bool VersionSto::WALShouldPurge(uint64_t log_number) {
+bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
