@@ -323,7 +323,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           continue;
         }
         fprintf(stdout, "L1small: %lu, L1large: %lu.\n", file->fd.smallest_seqno, file->fd.largest_seqno);
-        fprintf(stdout, "L1 size: %lu.\n", file->fd.file_size)
+        fprintf(stdout, "L1 size: %lu.\n", file->fd.file_size);
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
