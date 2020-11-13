@@ -1561,7 +1561,7 @@ Status CompactionJob::InstallCompactionResults(
       compaction->edit()->AddFile(compaction->output_level(), out.meta);
       // zhangxin
       fprintf(stdout, "&&&&& [%lu-%lu] InstallCompactionResults.\n",
-        out.meta.fd.smallest_seqno, largest_seqno);
+        out.meta.fd.smallest_seqno, out.meta.fd.largest_seqno);
     }
   }
   return versions_->LogAndApply(compaction->column_family_data(),
@@ -1626,7 +1626,7 @@ Status CompactionJob::OpenCompactionOutputFile(
 
   // zhangxin
   fprintf(stdout, "&&&&& [%lu:%lu] OpenCompactionOutputFile.\n",
-      out.fd.smallest_seqno, out.fd.largest_seqno);
+      out.meta.fd.smallest_seqno, out.meta.fd.largest_seqno);
 
   sub_compact->outputs.push_back(out);
   writable_file->SetIOPriority(Env::IO_LOW);
