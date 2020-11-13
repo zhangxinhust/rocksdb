@@ -4646,17 +4646,17 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
 
 // zhangxin
 void VersionStorageInfo::PrintLevelInfo() {
-  fprintf(stdout, "+++++++++++++++++++\n");
   fprintf(stdout, "num_levels_: %d, num_non_empte_levels_: %d, base_level_: %d.\n", 
     num_levels_, num_non_empty_levels_, base_level_);
   fprintf(stdout, "files_ size: %lu.\n", files_->size());
   for (uint32_t i = 0; i < files_->size(); i++) {
     fprintf(stdout, "level %u: size: %lu.\n", i, files_[i].size());
     for (uint32_t j = 0; j < files_[i].size(); j++) {
-      fprintf(stdout, "    No.%u file: size: %lu.\n", j, files_[i][j]->fd.GetFileSize());
+      fprintf(stdout, "    No.%u file: size: %lu, range[%lu-%lu].\n", 
+        j, files_[i][j]->fd.GetFileSize(), files_[i][j]->fd.smallest_seqno,
+        files_[i][j]->fd.largest_seqno);
     }
   }
-  fprintf(stdout, "+++++++++++++++++++\n");
 }
 
 Status VersionSet::DumpManifest(Options& options, std::string& dscname,
