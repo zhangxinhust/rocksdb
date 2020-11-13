@@ -675,6 +675,9 @@ Status CompactionJob::Run() {
     for (const auto& state : compact_->sub_compact_states) {
       for (const auto& output : state.outputs) {
         files_meta.emplace_back(&output.meta);
+        // zhangxin
+        fprintf(stdout, "&&&&& [%lu:%lu] Run.\n",
+            output.meta.fd.smallest_seqno, output.meta.fd.largest_seqno);
       }
     }
     ColumnFamilyData* cfd = compact_->compaction->column_family_data();
@@ -741,6 +744,9 @@ Status CompactionJob::Run() {
           TableFileName(state.compaction->immutable_cf_options()->cf_paths,
                         output.meta.fd.GetNumber(), output.meta.fd.GetPathId());
       tp[fn] = output.table_properties;
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu:%lu] Run-2.\n",
+          output.meta.fd.smallest_seqno, output.meta.fd.largest_seqno);
     }
   }
   compact_->compaction->SetOutputTableProperties(std::move(tp));
@@ -1553,6 +1559,9 @@ Status CompactionJob::InstallCompactionResults(
   for (const auto& sub_compact : compact_->sub_compact_states) {
     for (const auto& out : sub_compact.outputs) {
       compaction->edit()->AddFile(compaction->output_level(), out.meta);
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu-%lu] InstallCompactionResults.\n",
+        out.meta.fd.smallest_seqno, largest_seqno);
     }
   }
   return versions_->LogAndApply(compaction->column_family_data(),
@@ -1614,6 +1623,10 @@ Status CompactionJob::OpenCompactionOutputFile(
   out.meta.fd =
       FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0);
   out.finished = false;
+
+  // zhangxin
+  fprintf(stdout, "&&&&& [%lu:%lu] OpenCompactionOutputFile.\n",
+      out.fd.smallest_seqno, out.fd.largest_seqno);
 
   sub_compact->outputs.push_back(out);
   writable_file->SetIOPriority(Env::IO_LOW);
