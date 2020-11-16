@@ -1063,10 +1063,11 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
     assert(sub_compact->builder != nullptr);
     assert(sub_compact->current_output() != nullptr);
     // zhangxin
-    fprintf(stdout, "&&&&& [%lu:%lu], iter seq: %lu. before UpdateBoundaries.\n",
+    fprintf(stdout, "&&&&& [%lu:%lu], iter seq: %lu, level: %d. before UpdateBoundaries.\n",
         sub_compact->current_output()->meta.fd.smallest_seqno, 
         sub_compact->current_output()->meta.fd.largest_seqno, 
-        c_iter->ikey().sequence);
+        c_iter->ikey().sequence,
+        sub_compact->compaction->start_level());
 
     sub_compact->builder->Add(key, value);
     sub_compact->current_output_file_size = sub_compact->builder->FileSize();
