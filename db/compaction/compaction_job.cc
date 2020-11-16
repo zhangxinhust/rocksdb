@@ -804,6 +804,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 
   // zhangxin
   int64_t current_time = env_->NowMicros();
+  int max_live_time0 = 0, max_live_time1 = 0;
   if (env_->GetCurrentTime(&current_time).ok()) {
     std::string sst_live_str;
     for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
@@ -816,6 +817,12 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
           sprintf(buf, "%d, %ld.\n", 
             level, current_time-creation_time);
           sst_live_str.append(buf);
+
+          if (level == 0) {
+            max_live_time0 = std::max(max_live_time0, current_time-creation_time);
+          } else if (level == 1) {
+            max_live_time1 = std::max(max_live_time1, current_time-creation_time);
+          }
         }
       }
     }
@@ -824,10 +831,14 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
       log_buffer_, 
       "\n\nsst_live_time_begin.\n"
       "curr: %ld.\n"
-      "%s"
+      "max_l0: %ld.\n"
+      "max_l1: %ld.\n"
+      //"%s"
       "sst_live_time_end.\n",
       current_time,
-      sst_live_str.c_str()
+      max_live_time0,
+      max_live_time1
+      //sst_live_str.c_str()
     );
   }
 
