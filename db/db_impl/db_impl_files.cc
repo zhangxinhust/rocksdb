@@ -171,7 +171,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     //fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", 
-      immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
+    //  immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
     // Add log files in wal_dir
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
@@ -289,7 +289,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
   //fprintf(stdout, "log range[%lu-%lu], size: %lu.\n", 
-    log_smallest_seq, log_largest_seq, logs_seq_range_.size());
+  //  log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
