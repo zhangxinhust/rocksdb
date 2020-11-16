@@ -813,7 +813,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
           auto creation_time =
               f->fd.table_reader->GetTableProperties()->creation_time;
           char buf[200];
-          sprintf(buf, "level: %d, live_time: %ld.\n", level, current_time-creation_time);
+          sprintf(buf, "%d, %ld, %ld.\n", 
+            level, current_time, current_time-creation_time);
           sst_live_str.append(buf);
         }
       }
