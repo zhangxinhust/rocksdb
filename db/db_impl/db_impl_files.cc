@@ -47,7 +47,7 @@ uint64_t DBImpl::MinObsoleteSstNumberToKeep() {
 // force = true -- force the full scan
 void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                                bool no_full_scan) {
-  fprintf(stdout, "FindObsoleteFiles********************************\n");
+  //fprintf(stdout, "FindObsoleteFiles********************************\n");
   mutex_.AssertHeld();
 
   // if deletion is disabled, do nothing
@@ -107,7 +107,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
-    fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
+    //fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
@@ -133,13 +133,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     for (auto& path : paths) {
-      fprintf(stdout, "path: %s.\n", path.c_str());
+      //fprintf(stdout, "path: %s.\n", path.c_str());
       // set of all files in the directory. We'll exclude files that are still
       // alive in the subsequent processings.
       std::vector<std::string> files;
       env_->GetChildren(path, &files);  // Ignore errors
       for (const std::string& file : files) {
-        fprintf(stdout, "filename: %s.\n", file.c_str());
+        //fprintf(stdout, "filename: %s.\n", file.c_str());
         uint64_t number;
         FileType type;
         // 1. If we cannot parse the file name, we skip;
@@ -151,8 +151,8 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // https://github.com/facebook/rocksdb/issues/3573
         if (!ParseFileName(file, &number, info_log_prefix.prefix, &type) ||
             !ShouldPurge(number)) {
-          fprintf(stdout, "skipped.\n");
-          fprintf(stdout, "ShouldPurge: %d.\n", ShouldPurge(number));
+          //fprintf(stdout, "skipped.\n");
+          //fprintf(stdout, "ShouldPurge: %d.\n", ShouldPurge(number));
           continue;
         }
 
@@ -164,13 +164,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
             logs_seq_range_.erase(number);
           }
         }
-        fprintf(stdout, "inserted.\n\n");
+        //fprintf(stdout, "inserted.\n\n");
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
         job_context->full_scan_candidate_files.emplace_back("/" + file, path);
       }
     }
 
-    fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", 
+    //fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", 
       immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
     // Add log files in wal_dir
     if (immutable_db_options_.wal_dir != dbname_) {
@@ -215,12 +215,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
-      fprintf(stdout, "alive No.%lu.\n", earliest.number);
+      //fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (!WALShouldPurge(earliest.number)) {
-        fprintf(stdout, "should keep.\n");
+        //fprintf(stdout, "should keep.\n");
         break;
       } else {
-        fprintf(stdout, "should delete.\n");
+        //fprintf(stdout, "should delete.\n");
         logs_seq_range_.erase(earliest.number);
       }
 
@@ -288,47 +288,47 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
-  fprintf(stdout, "log range[%lu-%lu], size: %lu.\n", 
+  //fprintf(stdout, "log range[%lu-%lu], size: %lu.\n", 
     log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
-    fprintf(stdout, "false-1\n");
+    //fprintf(stdout, "false-1\n");
   } else {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
         continue;
       }
-      cfd->current()->storage_info()->PrintLevelInfo();
+      //cfd->current()->storage_info()->PrintLevelInfo();
       // L0
       const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
       if (level0_files.size()) {
         SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
         SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
-        fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
+        //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
         if (!(level0_largest_seq < log_smallest_seq ||
             level0_smallest_seq > log_largest_seq)) {
           should_purge = false;
-          fprintf(stdout, "false-2\n");
+          //fprintf(stdout, "false-2\n");
           break;
         }
       }
       // L1
       if (cfd->NumberLevels() < 2) {
-        fprintf(stdout, "no L1.\n");
+        //fprintf(stdout, "no L1.\n");
         continue;
       }
       for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
         if (!file) {
-          fprintf(stdout, "empty file.\n");
+          //fprintf(stdout, "empty file.\n");
           continue;
         }
-        fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
-            file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
+        //fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
+          //  file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
-          fprintf(stdout, "false-3\n");
+          //fprintf(stdout, "false-3\n");
           break;
         }
       }
@@ -395,7 +395,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
-  fprintf(stdout, "PurgeObsoleteFiles---------------------------------------\n");
+  //fprintf(stdout, "PurgeObsoleteFiles---------------------------------------\n");
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
