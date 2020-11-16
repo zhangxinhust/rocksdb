@@ -4651,6 +4651,9 @@ void VersionStorageInfo::PrintLevelInfo() {
   fprintf(stdout, "files_ size: %lu.\n", files_->size());
   for (uint32_t i = 0; i < files_->size() && i < 7; i++) {
     fprintf(stdout, "level %u: size: %lu.\n", i, files_[i].size());
+    if (i > 1) {
+      continue;
+    }
     for (uint32_t j = 0; j < files_[i].size(); j++) {
       fprintf(stdout, "    No.%u file: size: %lu, range[%lu-%lu].\n", 
         j, files_[i][j]->fd.GetFileSize(), files_[i][j]->fd.smallest_seqno,
