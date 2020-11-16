@@ -813,8 +813,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
           auto creation_time =
               f->fd.table_reader->GetTableProperties()->creation_time;
           char buf[200];
-          sprintf(buf, "%d, %ld, %ld.\n", 
-            level, current_time, current_time-creation_time);
+          sprintf(buf, "%d, %ld.\n", 
+            level, current_time-creation_time);
           sst_live_str.append(buf);
         }
       }
@@ -823,8 +823,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     ROCKS_LOG_BUFFER(
       log_buffer_, 
       "\n\nsst_live_time_begin.\n"
+      "curr: %ld.\n"
       "%s"
       "sst_live_time_end.\n",
+      current_time,
       sst_live_str.c_str()
     );
   }
