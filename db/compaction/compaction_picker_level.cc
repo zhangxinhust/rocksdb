@@ -195,8 +195,9 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 }
 
 void LevelCompactionBuilder::SetupInitialFiles() {
-  // hust-cloud	
+  // hust-cloud
   // TTL Compaction has the hignest priority
+  /*
   if (ioptions_.compaction_style == kCompactionStyleLevel) {
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
@@ -204,6 +205,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       return; // TODO: return now or continue to pick other files below?
     }
   }
+  */
 
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
@@ -292,7 +294,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   }
 
   // TTL Compaction
-  if (ioptions_.compaction_style != kCompactionStyleLevel &&
+  if (//ioptions_.compaction_style != kCompactionStyleLevel &&
       start_level_inputs_.empty()) {
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
