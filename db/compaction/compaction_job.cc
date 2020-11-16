@@ -804,7 +804,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 
   // zhangxin
   int64_t current_time = env_->NowMicros();
-  if (env_->GetCurrentTime(&current_time)) {
+  if (env_->GetCurrentTime(&current_time).ok()) {
     std::string sst_live_str;
     for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
       for (auto &f : vstorage->LevelFiles(level)) {
