@@ -1062,11 +1062,21 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
     }
     assert(sub_compact->builder != nullptr);
     assert(sub_compact->current_output() != nullptr);
+    // zhangxin
+    fprintf(stdout, "&&&&& [%lu:%lu] before UpdateBoundaries.\n",
+        sub_compact->current_output()->meta.fd.smallest_seqno, 
+        sub_compact->current_output()->meta.fd.largest_seqno);
+
     sub_compact->builder->Add(key, value);
     sub_compact->current_output_file_size = sub_compact->builder->FileSize();
     sub_compact->current_output()->meta.UpdateBoundaries(
         key, c_iter->ikey().sequence);
     sub_compact->num_output_records++;
+
+    // zhangxin
+    fprintf(stdout, "&&&&& [%lu:%lu] after UpdateBoundaries.\n",
+        sub_compact->current_output()->meta.fd.smallest_seqno, 
+        sub_compact->current_output()->meta.fd.largest_seqno);
 
     // Close output file if it is big enough. Two possibilities determine it's
     // time to close it: (1) the current key should be this file's last key, (2)
@@ -1113,9 +1123,19 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
         next_key = &c_iter->key();
       }
       CompactionIterationStats range_del_out_stats;
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu:%lu] before FinishCompactionOutputFile-1.\n",
+          sub_compact->current_output()->meta.fd.smallest_seqno, 
+          sub_compact->current_output()->meta.fd.largest_seqno);
+
       status =
           FinishCompactionOutputFile(input_status, sub_compact, &range_del_agg,
                                      &range_del_out_stats, next_key);
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu:%lu] after FinishCompactionOutputFile-1.\n",
+          sub_compact->current_output()->meta.fd.smallest_seqno, 
+          sub_compact->current_output()->meta.fd.largest_seqno);
+
       RecordDroppedKeys(range_del_out_stats,
                         &sub_compact->compaction_job_stats);
     }
@@ -1165,8 +1185,18 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
   // close the output file.
   if (sub_compact->builder != nullptr) {
     CompactionIterationStats range_del_out_stats;
+    // zhangxin
+    fprintf(stdout, "&&&&& [%lu:%lu] before FinishCompactionOutputFile-2.\n",
+        sub_compact->current_output()->meta.fd.smallest_seqno, 
+        sub_compact->current_output()->meta.fd.largest_seqno);
+
     Status s = FinishCompactionOutputFile(status, sub_compact, &range_del_agg,
                                           &range_del_out_stats);
+    // zhangxin
+    fprintf(stdout, "&&&&& [%lu:%lu] after FinishCompactionOutputFile-2.\n",
+        sub_compact->current_output()->meta.fd.smallest_seqno, 
+        sub_compact->current_output()->meta.fd.largest_seqno);
+
     if (status.ok()) {
       status = s;
     }
@@ -1406,9 +1436,16 @@ Status CompactionJob::FinishCompactionOutputFile(
         smallest_ikey_seqnum = GetInternalKeySeqno(meta->smallest.Encode());
       }
 #endif
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu:%lu] before UpdateBoundariesForRange.\n",
+          meta->fd.smallest_seqno, meta->fd.largest_seqno);
+
       meta->UpdateBoundariesForRange(smallest_candidate, largest_candidate,
                                      tombstone.seq_,
                                      cfd->internal_comparator());
+      // zhangxin
+      fprintf(stdout, "&&&&& [%lu:%lu] after UpdateBoundariesForRange.\n",
+          meta->fd.smallest_seqno, meta->fd.largest_seqno);
 
       // The smallest key in a file is used for range tombstone truncation, so
       // it cannot have a seqnum of 0 (unless the smallest data key in a file
