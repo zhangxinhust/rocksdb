@@ -804,28 +804,29 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 
   // zhangxin
   int64_t current_time = env_->NowMicros();
-  auto status = env_->GetCurrentTime(&current_time);
-  std::string sst_live_str;
-  for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
-    for (auto &f : vstorage->LevelFiles(level)) {
-      if (f->fd.table_reader != nullptr &&
-          f->fd.table_reader->GetTableProperties() != nullptr) {
-        auto creation_time =
-            f->fd.table_reader->GetTableProperties()->creation_time;
-        char buf[200];
-        sprintf(buf, "level: %d, live_time: %ld.\n", level, current_time-creation_time);
-        sst_live_str.append(buf);
+  if (env_->GetCurrentTime(&current_time)) {
+    std::string sst_live_str;
+    for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
+      for (auto &f : vstorage->LevelFiles(level)) {
+        if (f->fd.table_reader != nullptr &&
+            f->fd.table_reader->GetTableProperties() != nullptr) {
+          auto creation_time =
+              f->fd.table_reader->GetTableProperties()->creation_time;
+          char buf[200];
+          sprintf(buf, "level: %d, live_time: %ld.\n", level, current_time-creation_time);
+          sst_live_str.append(buf);
+        }
       }
     }
-  }
 
-  ROCKS_LOG_BUFFER(
-    log_buffer_, 
-    "\n\nsst_live_time_begin.\n"
-    "%s"
-    "sst_live_time_end.\n",
-    sst_live_str.c_str()
-  );
+    ROCKS_LOG_BUFFER(
+      log_buffer_, 
+      "\n\nsst_live_time_begin.\n"
+      "%s"
+      "sst_live_time_end.\n",
+      sst_live_str.c_str()
+    );
+  }
 
   //InternalStats* inter_stats = new InternalStats(cfd->ioptions()->num_levels, env_, cfd);
   cfd->internal_stats()->PrintLevelAndWalBytes(log_buffer_);
