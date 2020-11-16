@@ -803,6 +803,30 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   }
 
   // zhangxin
+  int64_t current_time = env_->NowMicros();
+  auto status = env_->GetCurrentTime(&current_time);
+  std::string sst_live_str;
+  for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
+    for (auto &f : vstorage->LevelFiles(level)) {
+      if (f->fd.table_reader != nullptr &&
+          f->fd.table_reader->GetTableProperties() != nullptr) {
+        auto creation_time =
+            f->fd.table_reader->GetTableProperties()->creation_time;
+        char buf[200];
+        sprintf(buf, "level: %d, live_time: %ld.\n", level, current_time-creation_time);
+        sst_live_str.append(buf);
+      }
+    }
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n\nsst_live_time_begin.\n"
+    "%s"
+    "sst_live_time_end.\n",
+    sst_live_str.c_str()
+  );
+
   //InternalStats* inter_stats = new InternalStats(cfd->ioptions()->num_levels, env_, cfd);
   cfd->internal_stats()->PrintLevelAndWalBytes(log_buffer_);
 
@@ -816,24 +840,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   if(input_files.size() > 1) {
     read_two_level_flag = true;
   }
-  /*
-  for(uint32_t i = 0; i < input_files.size(); i++) {
-    fprintf(stdout, "\nlevel %d.\n", i);
-    for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
-      fprintf(stdout, "\nsmallest key: %s, largest key: %s.\n",
-        input_files[i].files[j]->smallest.rep()->c_str(),
-        input_files[i].files[j]->largest.rep()->c_str());
-    }
-  }
-  */
-  /*
-  std::string str_sst_num;
-  char buf[200];
-  for(int l = 0; l < vstorage->num_levels(); l++) {
-    snprintf(buf, sizeof(buf), "sst_num: level %d: %d\n", l, vstorage->NumLevelFiles(l));
-    str_sst_num.append(buf);
-  }
-  */
 
   ROCKS_LOG_BUFFER(
     log_buffer_,
@@ -851,10 +857,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     "write_files_num: %d\n"
     "smallest_user_key_: %s.\n"
     "largest_user_key_:  %s.\n"
-    //"SmallestUserKey: %s.\n"
-    //"LargestUserKey: %s.\n"
-    //"wal_info: \n%s.\n"
-    //"\nsst_files_num: \n%s\n"
     "zhangxin: end\n\n\n",
 
     env_->NowMicros(), compaction_stats_.micros,
@@ -870,10 +872,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     compaction_stats_.num_output_files,
     compact_->compaction->GetSmallestUserKey().ToString(false).c_str(),
     compact_->compaction->GetLargestUserKey().ToString(false).c_str()
-    //compact_->SmallestUserKey().ToString(false).c_str(),
-    //compact_->LargestUserKey().ToString(false).c_str()
-    //str_to_log.c_str()
-    //str_sst_num.c_str()
   );
 
   ROCKS_LOG_BUFFER(
