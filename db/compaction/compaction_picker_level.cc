@@ -385,7 +385,11 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
 
+  fprintf(stdout, "start input size: %lu, out input size: %lu, total size: %lu.\n",
+    start_level_inputs_.size(), output_level_inputs_.size(), compaction_inputs_.size());
+
   // zhangxin
+  /*
   std::vector<uint32_t> output_files_per_input_file;
   uint32_t max_output_files_num = 0, sum_output_files_num = 0;
 
@@ -426,9 +430,8 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
     start_level_inputs_.size(), output_files_per_input_file.size(),
     output_level_inputs_.size()
   );
-
   log_buffer_->FlushBufferToLog();
-
+  */
   return c;
 }
 
