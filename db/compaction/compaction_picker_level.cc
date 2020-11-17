@@ -96,7 +96,7 @@ class LevelCompactionBuilder {
 
   void PickExpiredTtlFiles();
 
-  void PickAllExpiredTtlFiles();
+  void PickL0ExpiredTtlFiles();
 
   void PickFilesMarkedForPeriodicCompaction();
 
@@ -163,7 +163,7 @@ void LevelCompactionBuilder::PickExpiredTtlFiles() {
   start_level_inputs_.files.clear();
 }
 
-void LevelCompactionBuilder::PickAllExpiredTtlFiles() {
+void LevelCompactionBuilder::PickL0ExpiredTtlFiles() {
   if (vstorage_->ExpiredTtlFiles().empty()) {
     return;
   }
@@ -191,6 +191,9 @@ void LevelCompactionBuilder::PickAllExpiredTtlFiles() {
   for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
     if (!continuation(level_file)) {
       start_level_inputs_.files.clear();
+      break;
+    }
+    if (start_level_inputs_.files.size() >= 5) {
       break;
     }
   }
@@ -239,7 +242,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   // TTL Compaction has the hignest priority
   if (ioptions_.compaction_style == kCompactionStyleLevel) {
     //fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
-    PickAllExpiredTtlFiles();
+    PickL0ExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
       //fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
