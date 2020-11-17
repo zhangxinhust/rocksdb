@@ -193,7 +193,7 @@ void LevelCompactionBuilder::PickL0ExpiredTtlFiles() {
       start_level_inputs_.files.clear();
       break;
     }
-    if (start_level_inputs_.files.size() >= 5) {
+    if (start_level_inputs_.files.size() >= 10) {
       break;
     }
   }
