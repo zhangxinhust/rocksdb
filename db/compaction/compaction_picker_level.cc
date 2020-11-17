@@ -96,6 +96,8 @@ class LevelCompactionBuilder {
 
   void PickExpiredTtlFiles();
 
+  void PickAllExpiredTtlFiles();
+
   void PickFilesMarkedForPeriodicCompaction();
 
   const std::string& cf_name_;
@@ -160,7 +162,6 @@ void LevelCompactionBuilder::PickExpiredTtlFiles() {
 
   start_level_inputs_.files.clear();
 }
-
 
 void LevelCompactionBuilder::PickAllExpiredTtlFiles() {
   if (vstorage_->ExpiredTtlFiles().empty()) {
@@ -232,8 +233,6 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 
   start_level_inputs_.files.clear();
 }
-
-
 
 void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
