@@ -238,15 +238,15 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
   // TTL Compaction has the hignest priority
   if (ioptions_.compaction_style == kCompactionStyleLevel) {
-    fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
+    //fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
     PickAllExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
-      fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
+      //fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
       return; // TODO: return now or continue to pick other files below?
     }
   }
-  fprintf(stdout, "after ttl selete!!!\n");
+  //fprintf(stdout, "after ttl selete!!!\n");
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
   for (int i = 0; i < compaction_picker_->NumberLevels() - 1; i++) {
@@ -264,7 +264,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
           (start_level_ == 0) ? vstorage_->base_level() : start_level_ + 1;
       if (PickFileToCompact()) {
         // found the compaction!
-        fprintf(stdout, "Level %d, select %lu files.\n", start_level_, start_level_inputs_.size());
+        //fprintf(stdout, "Level %d, select %lu files.\n", start_level_, start_level_inputs_.size());
         if (start_level_ == 0) {
           // L0 score = `num L0 files` / `level0_file_num_compaction_trigger`
           compaction_reason_ = CompactionReason::kLevelL0FilesNum;
@@ -294,7 +294,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       }
     }
   }
-  fprintf(stdout, "after score selete.\n");
+  //fprintf(stdout, "after score selete.\n");
   // if we didn't find a compaction, check if there are any files marked for
   // compaction
   if (start_level_inputs_.empty()) {
@@ -425,8 +425,8 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
 
-  fprintf(stdout, "start input size: %lu, out input size: %lu, total size: %lu.\n",
-    start_level_inputs_.size(), output_level_inputs_.size(), compaction_inputs_.size());
+  //fprintf(stdout, "start input size: %lu, out input size: %lu, total size: %lu.\n",
+    //start_level_inputs_.size(), output_level_inputs_.size(), compaction_inputs_.size());
 
   // zhangxin
   /*
