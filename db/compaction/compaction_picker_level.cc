@@ -198,13 +198,15 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
   // TTL Compaction has the hignest priority
   if (ioptions_.compaction_style == kCompactionStyleLevel) {
+    fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
+      fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
       return; // TODO: return now or continue to pick other files below?
     }
   }
-
+  fprintf(stdout, "after ttl selete!!!\n");
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
   for (int i = 0; i < compaction_picker_->NumberLevels() - 1; i++) {
