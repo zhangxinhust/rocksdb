@@ -39,6 +39,7 @@ ImmutableCFOptions::ImmutableCFOptions(const ImmutableDBOptions& db_options,
       statistics(db_options.statistics.get()),
       rate_limiter(db_options.rate_limiter.get()),
       info_log_level(db_options.info_log_level),
+      use_wal_stage(db_options.use_wal_stage), // hust-cloud
       env(db_options.env),
       allow_mmap_reads(db_options.allow_mmap_reads),
       allow_mmap_writes(db_options.allow_mmap_writes),

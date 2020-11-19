@@ -2409,7 +2409,7 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   const uint64_t current_time = static_cast<uint64_t>(_current_time);
 
   // hust-cloud
-  if (compaction_style_ == kCompactionStyleLevel) {
+  if (ioptions.use_wal_stage) {
     for (auto f : files_[1]) { // L1 only
       if (!f->being_compacted && f->fd.table_reader != nullptr &&
           f->fd.table_reader->GetTableProperties() != nullptr) {
@@ -2426,7 +2426,6 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
       for (uint32_t j = i + 1; j < expired_ttl_files_.size(); j++) {
         auto &p1 = expired_ttl_files_[i];
         auto &p2 = expired_ttl_files_[j];
-
         if (p1.second->fd.table_reader->GetTableProperties()->creation_time >
             p2.second->fd.table_reader->GetTableProperties()->creation_time) {
           auto tmp = expired_ttl_files_[i];

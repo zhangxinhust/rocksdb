@@ -917,7 +917,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
     }
     // hust-cloud
-    if (first_seqno != kDisableGlobalSequenceNumber) {
+    if (immutable_db_options_.use_wal_stage &&
+        first_seqno != kDisableGlobalSequenceNumber) {
       logs_seq_range_[log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(first_seqno, sequence);
     }

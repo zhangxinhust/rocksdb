@@ -547,7 +547,9 @@ Status DBImpl::CloseHelper() {
   logs_.clear();
 
   // hust-cloud
-  logs_seq_range_.clear();
+  if (immutable_db_options_.use_wal_stage) {
+    logs_seq_range_.clear();
+  }
 
   // Table cache may have table handles holding blocks from the block cache.
   // We need to release them before the block cache is destroyed. The block

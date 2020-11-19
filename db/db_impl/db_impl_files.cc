@@ -157,7 +157,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         }
 
         // hust-cloud
-        if (type == kLogFile) {
+        if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
             continue;
           } else {
@@ -179,13 +179,15 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                         &log_files);  // Ignore errors
       for (const std::string& log_file : log_files) {
         // hust-cloud
-        uint64_t number;
-        FileType type;
-        if (ParseFileName(log_file, &number, &type)) {
-          if (!WALShouldPurge(number)) {
-            continue;
-          } else {
-            logs_seq_range_.erase(number);
+        if (immutable_db_options_.use_wal_stage) {
+          uint64_t number;
+          FileType type;
+          if (ParseFileName(log_file, &number, &type)) {
+            if (!WALShouldPurge(number)) {
+              continue;
+            } else {
+              logs_seq_range_.erase(number);
+            }
           }
         }
 
@@ -216,12 +218,14 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
       //fprintf(stdout, "alive No.%lu.\n", earliest.number);
-      if (!WALShouldPurge(earliest.number)) {
-        //fprintf(stdout, "should keep.\n");
-        break;
-      } else {
+      if (immutable_db_options_.use_wal_stage) {
+        if (!WALShouldPurge(earliest.number)) {
+          //fprintf(stdout, "should keep.\n");
+          break;
+        } else {
         //fprintf(stdout, "should delete.\n");
-        logs_seq_range_.erase(earliest.number);
+          logs_seq_range_.erase(earliest.number);
+        }
       }
 
       if (immutable_db_options_.recycle_log_file_num >
@@ -285,6 +289,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
 // hust-cloud
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
+  assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;

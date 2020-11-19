@@ -96,7 +96,7 @@ class LevelCompactionBuilder {
 
   void PickExpiredTtlFiles();
 
-  void PickL0ExpiredTtlFiles();
+  void PickL0ExpiredTtlFiles(); // hust-cloud
 
   void PickFilesMarkedForPeriodicCompaction();
 
@@ -163,7 +163,10 @@ void LevelCompactionBuilder::PickExpiredTtlFiles() {
   start_level_inputs_.files.clear();
 }
 
+// hust-cloud
 void LevelCompactionBuilder::PickL0ExpiredTtlFiles() {
+  assert(ioptions_.use_wal_stage);
+  assert(mutable_cf_options_.ttl > 0);
   if (vstorage_->ExpiredTtlFiles().empty()) {
     return;
   }
@@ -193,6 +196,8 @@ void LevelCompactionBuilder::PickL0ExpiredTtlFiles() {
       start_level_inputs_.files.clear();
       break;
     }
+
+    // TODO: The number of files should be changeable?
     if (start_level_inputs_.files.size() >= 10) {
       break;
     }
@@ -240,16 +245,17 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
   // TTL Compaction has the hignest priority
-  if (ioptions_.compaction_style == kCompactionStyleLevel) {
+  if (ioptions_.use_wal_stage) {
     //fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
     PickL0ExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
       //fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
-      return; // TODO: return now or continue to pick other files below?
+      return;
     }
   }
   //fprintf(stdout, "after ttl selete!!!\n");
+
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
   for (int i = 0; i < compaction_picker_->NumberLevels() - 1; i++) {
@@ -337,9 +343,9 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     }
   }
 
+  // hust-cloud
   // TTL Compaction
-  if (ioptions_.compaction_style != kCompactionStyleLevel &&
-      start_level_inputs_.empty()) {
+  if (!ioptions_.use_wal_stage && start_level_inputs_.empty()) {
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;

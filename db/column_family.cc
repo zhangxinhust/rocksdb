@@ -224,6 +224,11 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
     result.num_levels = 3;
   }
 
+  // hust-cloud
+  if (result.ttl == 0 && db_options.use_wal_stage) {
+    result.ttl = 60;
+  }
+
   if (result.max_write_buffer_number < 2) {
     result.max_write_buffer_number = 2;
   }
