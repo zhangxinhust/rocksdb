@@ -2404,7 +2404,7 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   const uint64_t current_time = static_cast<uint64_t>(_current_time);
 
   // hust-cloud
-  if (compaction_style_ == kCompactionStyleLevel) {
+  if (ioptions.use_wal_stage) {
     for (auto f : files_[1]) { // L1 only
       if (!f->being_compacted && f->fd.table_reader != nullptr &&
           f->fd.table_reader->GetTableProperties() != nullptr) {
