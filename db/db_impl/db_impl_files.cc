@@ -273,9 +273,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
+  bool should_purge = true;
+  if (!logs_seq_range_.count(log_number)) {
+    return should_purge;
+  }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
-  bool should_purge = true;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
   } else {
