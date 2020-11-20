@@ -686,7 +686,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
   for (auto log_number : log_numbers) {
-    if (log_number < min_log_number) {
+    if (!immutable_db_options_.use_wal_stage && // hust-cloud
+        log_number < min_log_number) {
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
                      "Skipping log #%" PRIu64
                      " since it is older than min log to keep #%" PRIu64,
