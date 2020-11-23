@@ -3511,8 +3511,12 @@ class Benchmark {
     options.target_file_size_base = FLAGS_target_file_size_base;
     options.target_file_size_multiplier = FLAGS_target_file_size_multiplier;
     options.max_bytes_for_level_base = FLAGS_max_bytes_for_level_base;
+    fprintf(stdout, "level_compaction_dynamic_level_bytes: %d.\n",
+        options.level_compaction_dynamic_level_bytes);
     options.level_compaction_dynamic_level_bytes =
         FLAGS_level_compaction_dynamic_level_bytes;
+    fprintf(stdout, "level_compaction_dynamic_level_bytes: %d.\n",
+        options.level_compaction_dynamic_level_bytes);
     options.max_bytes_for_level_multiplier =
         FLAGS_max_bytes_for_level_multiplier;
     if ((FLAGS_prefix_size == 0) && (FLAGS_rep_factory == kPrefixHash ||
