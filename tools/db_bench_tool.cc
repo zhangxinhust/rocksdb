@@ -3456,7 +3456,10 @@ class Benchmark {
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
     // hust-cloud
+    fprintf(stdout, "use_wal_stage: %d.\n", options.use_wal_stage);
     options.use_wal_stage = FLAGS_use_wal_stage == true;
+    fprintf(stdout, "FLAGS_use_wal_stage: %d, use_wal_stage: %d.\n",
+        FLAGS_use_wal_stage, options.use_wal_stage);
     if (FLAGS_db_paths.length()) {
       if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {
         FLAGS_db_paths += "/";
