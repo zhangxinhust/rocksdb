@@ -259,6 +259,11 @@ DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
 DEFINE_int64(batch_size, 1, "Batch size");
 
+// hust-cloud
+DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
+
+DEFINE_string(db_paths, "", "The path for db_paths");
+
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
 }
@@ -3450,6 +3455,19 @@ class Benchmark {
     options.use_direct_reads = FLAGS_use_direct_reads;
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
+
+    // hust-cloud
+    options.use_wal_stage = FLAGS_use_wal_stage;
+    if (FLAGS_db_paths.length()) {
+      if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {
+        FLAGS_db_paths += "/";
+      }
+      options.db_paths = std::vector<rocksdb::DbPath>();
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path0", FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path1", FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path2", 10 * FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path3", 100 * FLAGS_max_bytes_for_level_base));
+    }
 #ifndef ROCKSDB_LITE
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(
