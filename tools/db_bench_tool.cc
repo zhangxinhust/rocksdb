@@ -3456,10 +3456,7 @@ class Benchmark {
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
     // hust-cloud
-    fprintf(stdout, "use_wal_stage: %d.\n", options.use_wal_stage);
     options.use_wal_stage = FLAGS_use_wal_stage == true;
-    fprintf(stdout, "FLAGS_use_wal_stage: %d, use_wal_stage: %d.\n",
-        FLAGS_use_wal_stage, options.use_wal_stage);
     if (FLAGS_db_paths.length()) {
       if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {
         FLAGS_db_paths += "/";
@@ -3511,12 +3508,8 @@ class Benchmark {
     options.target_file_size_base = FLAGS_target_file_size_base;
     options.target_file_size_multiplier = FLAGS_target_file_size_multiplier;
     options.max_bytes_for_level_base = FLAGS_max_bytes_for_level_base;
-    fprintf(stdout, "level_compaction_dynamic_level_bytes: %d.\n",
-        options.level_compaction_dynamic_level_bytes);
     options.level_compaction_dynamic_level_bytes =
         FLAGS_level_compaction_dynamic_level_bytes;
-    fprintf(stdout, "level_compaction_dynamic_level_bytes: %d.\n",
-        options.level_compaction_dynamic_level_bytes);
     options.max_bytes_for_level_multiplier =
         FLAGS_max_bytes_for_level_multiplier;
     if ((FLAGS_prefix_size == 0) && (FLAGS_rep_factory == kPrefixHash ||
@@ -3768,10 +3761,7 @@ class Benchmark {
       exit(1);
     }
     options.max_successive_merges = FLAGS_max_successive_merges;
-    fprintf(stdout, "report_bg_io_stats: %d.\n", options.report_bg_io_stats);
     options.report_bg_io_stats = FLAGS_report_bg_io_stats;
-    fprintf(stdout, "FLAGS_report_bg_io_stats: %d.\n", FLAGS_report_bg_io_stats);
-    fprintf(stdout, "report_bg_io_stats: %d.\n", options.report_bg_io_stats);
 
     // set universal style compaction configurations, if applicable
     if (FLAGS_universal_size_ratio != 0) {
