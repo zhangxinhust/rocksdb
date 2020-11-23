@@ -259,6 +259,9 @@ DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
 DEFINE_int64(batch_size, 1, "Batch size");
 
+// hust-cloud
+DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
+
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
 }
@@ -3450,6 +3453,7 @@ class Benchmark {
     options.use_direct_reads = FLAGS_use_direct_reads;
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
+    options.use_wal_stage = FLAGS_use_wal_stage; // hust-cloud
 #ifndef ROCKSDB_LITE
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(
@@ -3790,9 +3794,6 @@ class Benchmark {
     Options& options = *opts;
 
     //zhangxin
-    options.use_wal_stage = true;
-    //options.ttl = 60;
-
     options.db_paths = std::vector<rocksdb::DbPath>();
     /*
     options.db_paths.push_back(rocksdb::DbPath("./path0", 256l * 1024 * 1024));
