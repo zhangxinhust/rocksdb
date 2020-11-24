@@ -498,7 +498,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     const std::string& to_delete = candidate_file.file_name;
     uint64_t number;
     FileType type;
-    fprintf(stdout, "to_delete: %s.\n", to_delete);
+    fprintf(stdout, "to_delete: %s.\n", to_delete.c_str());
     // Ignore file if we cannot recognize it.
     if (!ParseFileName(to_delete, &number, info_log_prefix.prefix, &type)) {
       continue;
