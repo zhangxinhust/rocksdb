@@ -237,6 +237,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                        earliest.number);
         log_recycle_files_.push_back(earliest.number);
       } else {
+        fprintf(stdout, "%lu added to log_delete_files.\n", earliest.number);
         job_context->log_delete_files.push_back(earliest.number);
       }
       if (job_context->size_log_to_delete == 0) {
@@ -440,6 +441,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 
   for (auto file_num : state.log_delete_files) {
     if (file_num > 0) {
+      fprintf(stdout, "%lu from log_delete_files to candidate_files.\n", file_num);
       candidate_files.emplace_back(LogFileName(kDumbDbName, file_num),
                                    immutable_db_options_.wal_dir);
     }
@@ -496,6 +498,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     const std::string& to_delete = candidate_file.file_name;
     uint64_t number;
     FileType type;
+    fprintf(stdout, "to_delete: %s.\n", to_delete);
     // Ignore file if we cannot recognize it.
     if (!ParseFileName(to_delete, &number, info_log_prefix.prefix, &type)) {
       continue;
