@@ -262,6 +262,8 @@ DEFINE_int64(batch_size, 1, "Batch size");
 // hust-cloud
 DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
 
+DEFINE_bool(use_existing_wal, false, "Whether to use existing wals for recovering");
+
 DEFINE_string(db_paths, "", "The path for db_paths");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
@@ -2552,15 +2554,17 @@ class Benchmark {
         blob_db::DestroyBlobDB(FLAGS_db, options, blob_db::BlobDBOptions());
       }
 #endif  // !ROCKSDB_LITE
-      DestroyDB(FLAGS_db, options);
-      if (!FLAGS_use_wal_stage && !FLAGS_wal_dir.empty()) { // hust-cloud
+      if (!FLAGS_use_existing_wal) {
+        DestroyDB(FLAGS_db, options);
+      }
+      if (!FLAGS_use_existing_wal && !FLAGS_wal_dir.empty()) { // hust-cloud
         fprintf(stdout, "delete files in wal_dir.\n");
         FLAGS_env->DeleteDir(FLAGS_wal_dir);
       }
 
       if (FLAGS_num_multi_db > 1) {
         FLAGS_env->CreateDir(FLAGS_db);
-        if (!FLAGS_use_wal_stage && !FLAGS_wal_dir.empty()) {
+        if (!FLAGS_use_existing_wal && !FLAGS_wal_dir.empty()) {
           FLAGS_env->CreateDir(FLAGS_wal_dir);
         }
       }
@@ -2963,7 +2967,9 @@ class Benchmark {
         } else {
           if (db_.db != nullptr) {
             db_.DeleteDBs();
-            DestroyDB(FLAGS_db, open_options_);
+            if (!FLAGS_use_existing_wal) {
+              DestroyDB(FLAGS_db, open_options_);
+            }
           }
           Options options = open_options_;
           for (size_t i = 0; i < multi_dbs_.size(); i++) {
@@ -2971,7 +2977,9 @@ class Benchmark {
             if (!open_options_.wal_dir.empty()) {
               options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
             }
-            DestroyDB(GetPathForMultiple(FLAGS_db, i), options);
+            if (!FLAGS_use_existing_wal) {
+              DestroyDB(GetPathForMultiple(FLAGS_db, i), options);
+            }
           }
           multi_dbs_.clear();
         }
