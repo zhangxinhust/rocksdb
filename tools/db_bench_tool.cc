@@ -2554,6 +2554,7 @@ class Benchmark {
 #endif  // !ROCKSDB_LITE
       DestroyDB(FLAGS_db, options);
       if (!FLAGS_use_wal_stage && !FLAGS_wal_dir.empty()) { // hust-cloud
+        fprintf(stdout, "delete files in wal_dir.\n");
         FLAGS_env->DeleteDir(FLAGS_wal_dir);
       }
 
