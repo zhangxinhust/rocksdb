@@ -3464,6 +3464,7 @@ class Benchmark {
     options.use_direct_reads = FLAGS_use_direct_reads;
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
+
     // hust-cloud
     options.use_wal_stage = FLAGS_use_wal_stage;
     if (FLAGS_db_paths.length()) {
