@@ -2553,7 +2553,7 @@ class Benchmark {
       }
 #endif  // !ROCKSDB_LITE
       DestroyDB(FLAGS_db, options);
-      if (!FLAGS_wal_dir.empty()) {
+      if (!FLAGS_use_wal_stage && !FLAGS_wal_dir.empty()) { // hust-cloud
         FLAGS_env->DeleteDir(FLAGS_wal_dir);
       }
 
@@ -3456,7 +3456,7 @@ class Benchmark {
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
     // hust-cloud
-    options.use_wal_stage = FLAGS_use_wal_stage == true;
+    options.use_wal_stage = FLAGS_use_wal_stage;
     if (FLAGS_db_paths.length()) {
       if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {
         FLAGS_db_paths += "/";
