@@ -481,9 +481,11 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     const std::string& fname = candidate_file.file_name;
     uint64_t number;
     FileType type;
-    if (!ParseFileName(fname, &number, info_log_prefix.prefix, &type) ||
-        type != kOptionsFile) {
-      fprintf(stdout, "parsefilename fail or type != option, type: %d, number: %lu.\n", type, number);
+    bool parse = ParseFileName(fname, &number, info_log_prefix.prefix, &type);
+    if (!parse) {
+      fprintf(stdout, "ParseFileName fail, type: %d, number: %lu.\n", type, number);
+    }
+    if (!parse || type != kOptionsFile) {
       continue;
     }
     if (number > optsfile_num1) {
