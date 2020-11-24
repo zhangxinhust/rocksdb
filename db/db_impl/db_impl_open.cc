@@ -1051,6 +1051,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     }
   }
 
+  fprintf(stdout, "status.ok: %d, data_seen: %d, flushed: %d.\n",
+    status.ok(), data_seen, flushed);
   if (status.ok() && data_seen && !flushed) {
     status = RestoreAliveLogFiles(log_numbers);
   }
