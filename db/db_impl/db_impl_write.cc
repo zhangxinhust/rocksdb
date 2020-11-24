@@ -1846,6 +1846,8 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
           if (logs_seq_range_.count(last_log_number)) {
             logs_seq_range_[last_log_number] = 
                 std::pair<SequenceNumber, SequenceNumber>(logs_seq_range_[last_log_number].first, seq);
+            fprintf(stdout, "new wal range[%lu-%lu].\n", logs_seq_range_[last_log_number].first,
+                logs_seq_range_[last_log_number].second);
           }
         }
       }
