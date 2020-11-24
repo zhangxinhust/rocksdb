@@ -405,7 +405,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
-  //fprintf(stdout, "PurgeObsoleteFiles---------------------------------------\n");
+  fprintf(stdout, "PurgeObsoleteFiles--------------------\n");
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
@@ -508,6 +508,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                 (number == state.prev_log_number) ||
                 (log_recycle_files_set.find(number) !=
                  log_recycle_files_set.end()));
+        fprintf(stdout, "kLogFile %lu keep: %d.\n", number, keep);
         break;
       case kDescriptorFile:
         // Keep my manifest file, and any newer incarnations'
@@ -592,9 +593,9 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
         real_total_log_size_ -= file_size;
-        //fprintf(stdout, "------------------------purge wal: %s, size: %lu, total_size: %lu. real_size: %lu.\n", 
-          //      fname.c_str(), file_size, uint64_t(total_log_size_),
-            //    uint64_t(real_total_log_size_));
+        fprintf(stdout, "------------------------purge wal: %s, size: %lu, total_size: %lu. real_size: %lu.\n", 
+                fname.c_str(), file_size, uint64_t(total_log_size_),
+                uint64_t(real_total_log_size_));
       } else {
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
                         "Unable to get file size: %s: %s", fname.c_str(),
@@ -617,9 +618,15 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 
     Status file_deletion_status;
     if (schedule_only) {
+      if (type == kLogFile) {
+        fprintf(stdout, "schedule delete %lu.\n", number);
+      }
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
+      if (type == kLogFile) {
+        fprintf(stdout, "directly delete %lu.\n", number);
+      }
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
   }
