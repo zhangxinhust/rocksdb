@@ -1070,7 +1070,8 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
   }
   Status s;
   mutex_.AssertHeld();
-  assert(immutable_db_options_.avoid_flush_during_recovery);
+  assert(immutable_db_options_.use_wal_stage ||
+    immutable_db_options_.avoid_flush_during_recovery); // hust-cloud
   if (two_write_queues_) {
     log_write_mutex_.Lock();
   }
