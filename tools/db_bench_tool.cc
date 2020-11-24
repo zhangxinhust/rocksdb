@@ -2560,7 +2560,7 @@ class Benchmark {
 
       if (FLAGS_num_multi_db > 1) {
         FLAGS_env->CreateDir(FLAGS_db);
-        if (!FLAGS_wal_dir.empty()) {
+        if (!FLAGS_use_wal_stage && !FLAGS_wal_dir.empty()) {
           FLAGS_env->CreateDir(FLAGS_wal_dir);
         }
       }
