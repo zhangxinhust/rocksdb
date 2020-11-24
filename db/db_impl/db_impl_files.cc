@@ -602,7 +602,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
                         "Unable to get file size: %s: %s", fname.c_str(),
                         s.ToString().c_str());
-        return;
       }
     }
 #endif  // !ROCKSDB_LITE
