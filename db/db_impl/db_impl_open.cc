@@ -462,7 +462,7 @@ Status DBImpl::Recover(
       uint64_t number;
       FileType type;
       if (ParseFileName(filenames[i], &number, &type) && type == kLogFile) {
-        if (is_new_db) {
+        if (!immutable_db_options_.use_wal_stage && is_new_db) {
           return Status::Corruption(
               "While creating a new Db, wal_dir contains "
               "existing log file: ",
