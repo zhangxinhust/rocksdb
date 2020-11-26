@@ -1472,8 +1472,8 @@ Status DBImpl::Get(const ReadOptions& read_options,
 
 Status DBImpl::GetImpl(const ReadOptions& read_options,
                        ColumnFamilyHandle* column_family, const Slice& key,
-                       PinnableSlice* pinnable_val, bool* value_found,
-                       ReadCallback* callback, bool* is_blob_index, int* hit_level) {
+                       PinnableSlice* pinnable_val, int* hit_level, bool* value_found,
+                       ReadCallback* callback, bool* is_blob_index) {
   // zhangxin
   uint64_t micro_start = env_->NowMicros();
   
