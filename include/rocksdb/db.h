@@ -393,11 +393,11 @@ class DB {
   // May return some other Status on an error.
   virtual inline Status Get(const ReadOptions& options,
                             ColumnFamilyHandle* column_family, const Slice& key,
-                            std::string* value, int* hit_level = nullptr) {
+                            std::string* value) {
     assert(value != nullptr);
     PinnableSlice pinnable_val(value);
     assert(!pinnable_val.IsPinned());
-    auto s = Get(options, column_family, key, &pinnable_val, hit_level);
+    auto s = Get(options, column_family, key, &pinnable_val);
     if (s.ok() && pinnable_val.IsPinned()) {
       value->assign(pinnable_val.data(), pinnable_val.size());
     }  // else value is already assigned
@@ -405,7 +405,7 @@ class DB {
   }
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,
-                     PinnableSlice* value, int* hit_level = nullptr) = 0;
+                     PinnableSlice* value) = 0;
   virtual Status Get(const ReadOptions& options, const Slice& key,
                      std::string* value) {
     return Get(options, DefaultColumnFamily(), key, value);
