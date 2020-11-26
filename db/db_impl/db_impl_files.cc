@@ -620,13 +620,13 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     Status file_deletion_status;
     if (schedule_only) {
       if (type == kLogFile) {
-        //fprintf(stdout, "schedule delete %lu.\n", number);
+        fprintf(stdout, "schedule delete %lu.\n", number);
       }
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
       if (type == kLogFile) {
-        //fprintf(stdout, "directly delete %lu.\n", number);
+        fprintf(stdout, "directly delete %lu.\n", number);
       }
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
