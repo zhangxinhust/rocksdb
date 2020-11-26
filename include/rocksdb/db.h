@@ -393,7 +393,7 @@ class DB {
   // May return some other Status on an error.
   virtual inline Status Get(const ReadOptions& options,
                             ColumnFamilyHandle* column_family, const Slice& key,
-                            std::string* value, int* hit_level) {
+                            std::string* value, int* hit_level = nullptr) {
     assert(value != nullptr);
     PinnableSlice pinnable_val(value);
     assert(!pinnable_val.IsPinned());

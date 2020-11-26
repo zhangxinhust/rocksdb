@@ -1466,14 +1466,14 @@ ColumnFamilyHandle* DBImpl::PersistentStatsColumnFamily() const {
 
 Status DBImpl::Get(const ReadOptions& read_options,
                    ColumnFamilyHandle* column_family, const Slice& key,
-                   PinnableSlice* value, int *hit_level) {
+                   PinnableSlice* value, int *hit_level = nullptr) {
   return GetImpl(read_options, column_family, key, value, hit_level);
 }
 
 Status DBImpl::GetImpl(const ReadOptions& read_options,
                        ColumnFamilyHandle* column_family, const Slice& key,
                        PinnableSlice* pinnable_val, bool* value_found,
-                       ReadCallback* callback, bool* is_blob_index, int* hit_level) {
+                       ReadCallback* callback, bool* is_blob_index, int* hit_level = nullptr) {
   // zhangxin
   uint64_t micro_start = env_->NowMicros();
   
