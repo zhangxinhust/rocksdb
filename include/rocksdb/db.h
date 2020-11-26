@@ -25,6 +25,7 @@
 #include "rocksdb/transaction_log.h"
 #include "rocksdb/types.h"
 #include "rocksdb/version.h"
+#include "db/read_callback.h"
 
 #ifdef _WIN32
 // Windows API macro interference
@@ -419,7 +420,6 @@ class DB {
                        ColumnFamilyHandle* column_family, const Slice& key,
                        PinnableSlice* pinnable_val, int* hit_level = nullptr, bool* value_found = nullptr,
                        ReadCallback* callback = nullptr, bool* is_blob_index = nullptr);
-
 
   // If keys[i] does not exist in the database, then the i'th returned
   // status will be one for which Status::IsNotFound() is true, and
