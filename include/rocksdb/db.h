@@ -411,6 +411,16 @@ class DB {
     return Get(options, DefaultColumnFamily(), key, value);
   }
 
+  Status GetValueLevel(const ReadOptions& read_options,
+                   ColumnFamilyHandle* column_family, const Slice& key,
+                   PinnableSlice* value, int* hit_level = nullptr);
+
+  Status GetValueLevelImpl(const ReadOptions& read_options,
+                       ColumnFamilyHandle* column_family, const Slice& key,
+                       PinnableSlice* pinnable_val, int* hit_level = nullptr, bool* value_found = nullptr,
+                       ReadCallback* callback = nullptr, bool* is_blob_index = nullptr);
+
+
   // If keys[i] does not exist in the database, then the i'th returned
   // status will be one for which Status::IsNotFound() is true, and
   // (*values)[i] will be set to some arbitrary value (often ""). Otherwise,
