@@ -165,7 +165,7 @@ class DBImpl : public DB {
 
   Status GetValueLevel(const ReadOptions& read_options,
                    ColumnFamilyHandle* column_family, const Slice& key,
-                   PinnableSlice* value, int* hit_level = nullptr);
+                   PinnableSlice* value, int* hit_level = nullptr) override;
 
   Status GetValueLevelImpl(const ReadOptions& read_options,
                        ColumnFamilyHandle* column_family, const Slice& key,

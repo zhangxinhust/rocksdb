@@ -15,49 +15,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <atomic>
-#include <deque>
-#include <functional>
-#include <limits>
-#include <list>
-#include <map>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-#include "db/column_family.h"
-#include "db/compaction/compaction_job.h"
-#include "db/dbformat.h"
-#include "db/error_handler.h"
-#include "db/event_helpers.h"
-#include "db/external_sst_file_ingestion_job.h"
-#include "db/flush_job.h"
-#include "db/flush_scheduler.h"
-#include "db/import_column_family_job.h"
-#include "db/internal_stats.h"
-#include "db/log_writer.h"
-#include "db/logs_with_prep_tracker.h"
-#include "db/memtable_list.h"
-#include "db/pre_release_callback.h"
-#include "db/range_del_aggregator.h"
-#include "db/read_callback.h"
-#include "db/snapshot_checker.h"
-#include "db/snapshot_impl.h"
-#include "db/version_edit.h"
-#include "db/wal_manager.h"
-#include "db/write_controller.h"
-#include "db/write_thread.h"
-#include "logging/event_logger.h"
-#include "monitoring/instrumented_mutex.h"
-#include "options/db_options.h"
-#include "port/port.h"
-#include "rocksdb/db.h"
-#include "rocksdb/env.h"
-#include "rocksdb/memtablerep.h"
-#include "rocksdb/status.h"
-#include "rocksdb/trace_reader_writer.h"
-#include "rocksdb/transaction_log.h"
-#include "rocksdb/write_buffer_manager.h"
 #include "rocksdb/iterator.h"
 #include "rocksdb/listener.h"
 #include "rocksdb/metadata.h"
@@ -68,14 +25,6 @@
 #include "rocksdb/transaction_log.h"
 #include "rocksdb/types.h"
 #include "rocksdb/version.h"
-#include "table/scoped_arena_iterator.h"
-#include "trace_replay/block_cache_tracer.h"
-#include "trace_replay/trace_replay.h"
-#include "util/autovector.h"
-#include "util/hash.h"
-#include "util/repeatable_thread.h"
-#include "util/stop_watch.h"
-#include "util/thread_local.h"
 
 #ifdef _WIN32
 // Windows API macro interference
@@ -465,11 +414,6 @@ class DB {
   virtual Status GetValueLevel(const ReadOptions& read_options,
                    ColumnFamilyHandle* column_family, const Slice& key,
                    PinnableSlice* value, int* hit_level = nullptr);
-
-  virtual Status GetValueLevelImpl(const ReadOptions& read_options,
-                       ColumnFamilyHandle* column_family, const Slice& key,
-                       PinnableSlice* pinnable_val, int* hit_level = nullptr, bool* value_found = nullptr,
-                       ReadCallback* callback = nullptr, bool* is_blob_index = nullptr);
 
   // If keys[i] does not exist in the database, then the i'th returned
   // status will be one for which Status::IsNotFound() is true, and
