@@ -2742,8 +2742,8 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
                            f->largest, f->fd.smallest_seqno,
                            f->fd.largest_seqno, f->marked_for_compaction);
         // zhangxin
-        fprintf(stdout, "&&&&& [%lu:%lu] BackgroundCompaction.\n",
-            f->fd.smallest_seqno, f->fd.largest_seqno);
+        //fprintf(stdout, "&&&&& [%lu:%lu] BackgroundCompaction.\n",
+          //  f->fd.smallest_seqno, f->fd.largest_seqno);
 
         ROCKS_LOG_BUFFER(
             log_buffer,
