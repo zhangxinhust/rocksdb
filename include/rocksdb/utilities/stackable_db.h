@@ -84,7 +84,7 @@ class StackableDB : public DB {
   using DB::Get;
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,
-                     PinnableSlice* value) override {
+                     PinnableSlice* value, int* hit_level = nullptr) override {
     return db_->Get(options, column_family, key, value);
   }
 
