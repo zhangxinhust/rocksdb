@@ -413,7 +413,9 @@ class DB {
 
   virtual Status GetValueLevel(const ReadOptions& read_options,
                    ColumnFamilyHandle* column_family, const Slice& key,
-                   PinnableSlice* value, int* hit_level = nullptr);
+                   PinnableSlice* value, int* hit_level = nullptr){
+    return Status::OK();
+  };
 
   // If keys[i] does not exist in the database, then the i'th returned
   // status will be one for which Status::IsNotFound() is true, and
