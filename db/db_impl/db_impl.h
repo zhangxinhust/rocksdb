@@ -161,7 +161,7 @@ class DBImpl : public DB {
   using DB::Get;
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,
-                     PinnableSlice* value) override;
+                     PinnableSlice* value, int* hit_level = nullptr) override;
 
   using DB::MultiGet;
   virtual std::vector<Status> MultiGet(
@@ -405,7 +405,7 @@ class DBImpl : public DB {
   Status GetImpl(const ReadOptions& options, ColumnFamilyHandle* column_family,
                  const Slice& key, PinnableSlice* value,
                  bool* value_found = nullptr, ReadCallback* callback = nullptr,
-                 bool* is_blob_index = nullptr);
+                 bool* is_blob_index = nullptr, int* hit_level);
 
   ArenaWrappedDBIter* NewIteratorImpl(const ReadOptions& options,
                                       ColumnFamilyData* cfd,
