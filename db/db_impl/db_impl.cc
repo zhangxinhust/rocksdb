@@ -2990,6 +2990,60 @@ Status DBImpl::DeleteFile(std::string name) {
   return status;
 }
 
+Status DBImpl::ForceDeleteFile(std::string name) {
+  uint64_t number;
+  FileType type;
+  WalFileType log_type;
+  if (!ParseFileName(name, &number, &type, &log_type) ||
+      (type != kTableFile && type != kLogFile)) {
+    ROCKS_LOG_ERROR(immutable_db_options_.info_log, "DeleteFile %s failed.\n",
+                    name.c_str());
+    return Status::InvalidArgument("Invalid file name");
+  }
+
+  Status status;
+  int level;
+  FileMetaData* metadata;
+  ColumnFamilyData* cfd;
+  VersionEdit edit;
+  JobContext job_context(next_job_id_.fetch_add(1), true);
+  {
+    InstrumentedMutexLock l(&mutex_);
+    status = versions_->GetMetadataForFile(number, &level, &metadata, &cfd);
+    if (!status.ok()) {
+      ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                     "DeleteFile %s failed. File not found\n", name.c_str());
+      job_context.Clean();
+      return Status::InvalidArgument("File not found");
+    }
+    assert(level < cfd->NumberLevels());
+
+    // If the file is being compacted no need to delete.
+    if (metadata->being_compacted) {
+      ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                     "DeleteFile %s Skipped. File about to be compacted\n",
+                     name.c_str());
+      job_context.Clean();
+      return Status::OK();
+    }
+
+    edit.SetColumnFamily(cfd->GetID());
+    edit.DeleteFile(level, number);
+    status = versions_->LogAndApply(cfd, *cfd->GetLatestMutableCFOptions(),
+                                    &edit, &mutex_, directories_.GetDbDir());
+    if (status.ok()) {
+      InstallSuperVersionAndScheduleWork(cfd,
+                                         &job_context.superversion_contexts[0],
+                                         *cfd->GetLatestMutableCFOptions());
+    }
+  }  // lock released here
+
+  LogFlush(immutable_db_options_.info_log);
+  job_context.Clean();
+  return status;
+}
+
+
 Status DBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                                    const RangePtr* ranges, size_t n,
                                    bool include_end) {

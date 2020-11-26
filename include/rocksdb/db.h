@@ -1136,6 +1136,8 @@ class DB {
   // path relative to the db directory. eg. 000001.sst, /archive/000003.log
   virtual Status DeleteFile(std::string name) = 0;
 
+  virtual Status ForceDeleteFile(std::string name) = 0;
+
   // Returns a list of all table files with their level, start key
   // and end key
   virtual void GetLiveFilesMetaData(
