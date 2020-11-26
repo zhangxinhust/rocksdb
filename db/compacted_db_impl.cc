@@ -34,7 +34,7 @@ size_t CompactedDBImpl::FindFile(const Slice& key) {
 }
 
 Status CompactedDBImpl::Get(const ReadOptions& options, ColumnFamilyHandle*,
-                            const Slice& key, PinnableSlice* value) {
+                            const Slice& key, PinnableSlice* value, int*hit_level) {
   GetContext get_context(user_comparator_, nullptr, nullptr, nullptr,
                          GetContext::kNotFound, key, value, nullptr, nullptr,
                          nullptr, nullptr);
