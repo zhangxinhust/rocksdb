@@ -107,7 +107,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
-    fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
+    //fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
@@ -155,12 +155,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
         // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
-          fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
+          //fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
           if (!WALShouldPurge(number)) {
-            fprintf(stdout, "should keep.\n");
+            //fprintf(stdout, "should keep.\n");
             continue;
           } else {
-            fprintf(stdout, "should delete.\n");
+            //fprintf(stdout, "should delete.\n");
             logs_seq_range_.erase(number);
           }
         }
@@ -182,12 +182,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           uint64_t number;
           FileType type;
           if (ParseFileName(log_file, &number, &type)) {
-            fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
+            //fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
             if (!WALShouldPurge(number)) {
-              fprintf(stdout, "should keep.\n");
+              //fprintf(stdout, "should keep.\n");
               continue;
             } else {
-              fprintf(stdout, "should delete.\n");
+              //fprintf(stdout, "should delete.\n");
               logs_seq_range_.erase(number);
             }
           }
@@ -219,13 +219,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
-      fprintf(stdout, "alive No.%lu.\n", earliest.number);
+      //fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
-          fprintf(stdout, "should keep.\n");
+          //fprintf(stdout, "should keep.\n");
           break;
         } else {
-          fprintf(stdout, "should delete.\n");
+          //fprintf(stdout, "should delete.\n");
           logs_seq_range_.erase(earliest.number);
         }
       }
@@ -237,7 +237,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                        earliest.number);
         log_recycle_files_.push_back(earliest.number);
       } else {
-        fprintf(stdout, "%lu added to log_delete_files.\n", earliest.number);
+        //fprintf(stdout, "%lu added to log_delete_files.\n", earliest.number);
         job_context->log_delete_files.push_back(earliest.number);
       }
       if (job_context->size_log_to_delete == 0) {
@@ -406,7 +406,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
-  fprintf(stdout, "PurgeObsoleteFiles--------------------\n");
+  //fprintf(stdout, "PurgeObsoleteFiles--------------------\n");
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
@@ -441,7 +441,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 
   for (auto file_num : state.log_delete_files) {
     if (file_num > 0) {
-      fprintf(stdout, "%lu from log_delete_files to candidate_files.\n", file_num);
+      //fprintf(stdout, "%lu from log_delete_files to candidate_files.\n", file_num);
       candidate_files.emplace_back(LogFileName(kDumbDbName, file_num),
                                    immutable_db_options_.wal_dir);
     }
@@ -483,7 +483,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     FileType type;
     bool parse = ParseFileName(fname, &number, info_log_prefix.prefix, &type);
     if (!parse) {
-      fprintf(stdout, "ParseFileName fail, type: %d, number: %lu.\n", type, number);
+      //fprintf(stdout, "ParseFileName fail, type: %d, number: %lu.\n", type, number);
     }
     if (!parse || type != kOptionsFile) {
       continue;
@@ -513,7 +513,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                 (number == state.prev_log_number) ||
                 (log_recycle_files_set.find(number) !=
                  log_recycle_files_set.end()));
-        fprintf(stdout, "kLogFile %lu keep: %d.\n", number, keep);
+        ///fprintf(stdout, "kLogFile %lu keep: %d.\n", number, keep);
         break;
       case kDescriptorFile:
         // Keep my manifest file, and any newer incarnations'
@@ -620,13 +620,13 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     Status file_deletion_status;
     if (schedule_only) {
       if (type == kLogFile) {
-        fprintf(stdout, "schedule delete %lu.\n", number);
+        //fprintf(stdout, "schedule delete %lu.\n", number);
       }
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
       if (type == kLogFile) {
-        fprintf(stdout, "directly delete %lu.\n", number);
+        //fprintf(stdout, "directly delete %lu.\n", number);
       }
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
