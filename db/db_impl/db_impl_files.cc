@@ -296,15 +296,16 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   bool should_purge = true;
   if (!logs_seq_range_.count(log_number)) {
+    fprintf(stdout, "%lu false-0.\n", log_number)
     return should_purge;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
-  //fprintf(stdout, "log range[%lu-%lu], size: %lu.\n", 
-  //  log_smallest_seq, log_largest_seq, logs_seq_range_.size());
+  fprintf(stdout, "log %lu range[%lu-%lu], size: %lu.\n", 
+    log_number, log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
-    //fprintf(stdout, "false-1\n");
+    fprintf(stdout, "%lu false-1\n", log_number);
   } else {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
@@ -316,11 +317,11 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (level0_files.size()) {
         SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
         SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
-        //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
+        fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
         if (!(level0_largest_seq < log_smallest_seq ||
             level0_smallest_seq > log_largest_seq)) {
           should_purge = false;
-          //fprintf(stdout, "false-2\n");
+          fprintf(stdout, "%lu false-2\n", log_number);
           break;
         }
       }
@@ -334,12 +335,12 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           //fprintf(stdout, "empty file.\n");
           continue;
         }
-        //fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
-          //  file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
+        fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
+            file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
-          //fprintf(stdout, "false-3\n");
+          fprintf(stdout, "%lu false-3\n", log_number);
           break;
         }
       }
@@ -597,6 +598,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       uint64_t file_size = 0;
       Status s = env_->GetFileSize(fname, &file_size);
       if (s.ok()) {
+        fprintf(stdout, "Purge %lu: %lu MB.\n", number, file_size / 1024 / 1024);
         real_total_log_size_ -= file_size;
       } else {
         ROCKS_LOG_ERROR(immutable_db_options_.info_log,
