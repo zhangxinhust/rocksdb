@@ -302,7 +302,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
   //fprintf(stdout, "log %lu range[%lu-%lu], size: %lu.\n", 
-    log_number, log_smallest_seq, log_largest_seq, logs_seq_range_.size());
+  //  log_number, log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
     //fprintf(stdout, "%lu false-1\n", log_number);
@@ -336,7 +336,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           continue;
         }
         //fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
-            file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
+        //    file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
