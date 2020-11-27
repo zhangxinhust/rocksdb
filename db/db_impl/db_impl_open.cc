@@ -1358,6 +1358,8 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       impl->logfile_number_ = new_log_number;
       assert(new_log != nullptr);
       impl->logs_.emplace_back(new_log_number, new_log);
+      impl->logs_seq_range_[new_log_number] = 
+        std::pair<SequenceNumber, SequenceNumber>(impl->versions_->LastSequence(), kDisableGlobalSequenceNumber);
     }
 
     if (s.ok()) {
