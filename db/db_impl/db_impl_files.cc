@@ -296,7 +296,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   bool should_purge = true;
   if (!logs_seq_range_.count(log_number)) {
-    fprintf(stdout, "%lu false-0.\n", log_number)
+    fprintf(stdout, "%lu false-0.\n", log_number);
     return should_purge;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
