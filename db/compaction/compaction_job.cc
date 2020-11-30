@@ -853,13 +853,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     log_buffer_, 
     "\n\nlevel_wal_mb_begin.\n"
     "curr_time: %ld.\n"
-    "wal_total_mb: %lf"
+    "wal_total_mb: %lf.\n"
     "level0 realtime: %lf.\n"
     "level1 realtime: %lf.\n"
     "level0 total: %lf.\n"
     "level1 total: %lf.\n"
     "level_wal_mb_end.\n",
-    current_time,
+    env_->NowMicros(),
     wal_mb,
     level_mb[0][0],
     level_mb[0][1],
