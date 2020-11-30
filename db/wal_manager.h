@@ -53,8 +53,7 @@ class WalManager {
       const TransactionLogIterator::ReadOptions& read_options,
       VersionSet* version_set);
 
-  void PurgeObsoleteWALFiles(std::unordered_set<uint64_t> *log_numbers = nullptr, 
-                                          std::atomic<uint64_t> *real_total_log_size = nullptr); // zhangxin
+  void PurgeObsoleteWALFiles();
 
   void ArchiveWALFile(const std::string& fname, uint64_t number);
 
