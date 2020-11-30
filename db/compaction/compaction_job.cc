@@ -584,11 +584,6 @@ Status CompactionJob::Run() {
   char buf[1000];
   for(uint32_t i = 0; i < input_files.size(); i++) {
     for(uint32_t j = 0; j < input_files[i].files.size(); j++) {
-      /*sprintf(buf, "No. %u sst: level %d, path %u, id: %lu.\n", 
-                   j, input_files[i].level,
-                   input_files[i].files[j]->fd.GetPathId(),
-                   input_files[i].files[j]->fd.GetNumber()
-      );*/
       sprintf(buf, "sst: level %d, id: %lu.\n", 
                    input_files[i].level, input_files[i].files[j]->fd.GetNumber()
       );
@@ -842,8 +837,35 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     );
   }
 
-  //InternalStats* inter_stats = new InternalStats(cfd->ioptions()->num_levels, env_, cfd);
-  cfd->internal_stats()->PrintLevelAndWalBytes(log_buffer_);
+  double wal_mb = 0;
+  std::vector<std::vector<float>> level_mb;
+  for (int i = 0; i < 3; i++) {
+    level_wal_mb.push_back(std::vector<float>(7));
+  }
+  for (auto cfd : *versions_->GetColumnFamilySet()) {
+    if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+      continue;
+    }
+    cfd->internal_stats()->AddLevelAndWalBytes(level_mb, &wal_mb);
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n\nlevel_wal_mb_begin.\n"
+    "curr_time: %ld.\n"
+    "wal_total_mb: %lf"
+    "level0 realtime: %lf.\n"
+    "level1 realtime: %lf.\n"
+    "level0 total: %lf.\n"
+    "level1 total: %lf.\n"
+    "level_wal_mb_end.\n",
+    current_time,
+    wal_mb,
+    level_mb[0][0],
+    level_mb[0][1],
+    level_mb[1][0],
+    level_mb[1][1]
+  );
 
   uint32_t read_path_id, read_level_id;
   bool read_two_level_flag = false;

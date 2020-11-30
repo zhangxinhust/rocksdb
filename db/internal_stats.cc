@@ -961,6 +961,22 @@ bool InternalStats::HandleBlockCachePinnedUsage(uint64_t* value, DBImpl* /*db*/,
 }
 
 // zhangxin
+void InternalStats::AddLevelAndWalBytes(std::vector<std::vector<double>>& level_mb, double *wal_mb) {
+  uint64_t wal_bytes = GetDBStats(InternalStats::kIntStatsWalFileBytes);
+  *wal_mb += wal_bytes / 1024.0 / 1024.0;
+
+  std::map<int, std::map<LevelStatType, double>> levels_stats;
+  CompactionStats compaction_stats_sum;
+  DumpCFMapStats(&levels_stats, &compaction_stats_sum);
+  for (int l = 0; l < number_levels_; ++l) {
+    if (levels_stats.find(l) != levels_stats.end()) {
+      level_mb[0][l] += levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0;
+      level_mb[1][l] += 1024 * levels_stats[l].at(LevelStatType::WRITE_GB);
+      level_mb[2][l] += 1024 * levels_stats[l].at(LevelStatType::W_NEW_GB);
+    }
+  }
+}
+
 void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
   char buf[200];
   std::string str_to_log;
