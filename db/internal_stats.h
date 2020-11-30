@@ -90,7 +90,7 @@ class InternalStats {
  public:
   // zhangxin
   void PrintLevelAndWalBytes(LogBuffer* log_buffer);
-  void AddLevelAndWalBytes(std::vector<std::vector<double>>& level_wal_mb, double *wal_mb);
+  void AddLevelAndWalBytes(std::vector<std::vector<double>>& level_mb, double *wal_mb);
 
   static const std::map<LevelStatType, LevelStat> compaction_level_stats;
 

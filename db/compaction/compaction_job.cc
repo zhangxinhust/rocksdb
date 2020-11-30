@@ -840,13 +840,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   double wal_mb = 0;
   std::vector<std::vector<float>> level_mb;
   for (int i = 0; i < 3; i++) {
-    level_wal_mb.push_back(std::vector<float>(7));
+    level_mb.push_back(std::vector<float>(7));
   }
-  for (auto cfd : *versions_->GetColumnFamilySet()) {
-    if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+  for (auto _cfd : *versions_->GetColumnFamilySet()) {
+    if (_cfd->IsDropped() || !_cfd->initialized() || _cfd->NumberLevels() < 1) {
       continue;
     }
-    cfd->internal_stats()->AddLevelAndWalBytes(level_mb, &wal_mb);
+    _cfd->internal_stats()->AddLevelAndWalBytes(level_mb, &wal_mb);
   }
 
   ROCKS_LOG_BUFFER(
