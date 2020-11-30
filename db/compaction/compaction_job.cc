@@ -838,7 +838,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   }
 
   double wal_mb = 0;
-  std::vector<std::vector<float>> level_mb;
+  std::vector<std::vector<double>> level_mb;
   for (int i = 0; i < 3; i++) {
     level_mb.push_back(std::vector<float>(7));
   }
