@@ -1157,7 +1157,6 @@ Status DBImpl::WriteToWAL(const WriteBatch& merged_batch,
     *log_used = logfile_number_;
   }
   total_log_size_ += log_entry.size();
-  real_total_log_size_ += log_entry.size(); // zhangxin
   //fprintf(stdout, "log_entry.size: %lu, total_size: %lu, real_total_size: %lu.\n",
     //      log_entry.size(), uint64_t(total_log_size_), uint64_t(real_total_log_size_));
 

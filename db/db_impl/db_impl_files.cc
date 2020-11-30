@@ -594,29 +594,12 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                              immutable_db_options_.wal_size_limit_mb > 0)) {
       wal_manager_.ArchiveWALFile(fname, number);
       continue;
-    } else if (type == kLogFile) { // zhangxin
-      uint64_t file_size = 0;
-      Status s = env_->GetFileSize(fname, &file_size);
-      if (s.ok()) {
-        //fprintf(stdout, "Purge %lu: %lu MB.\n", number, file_size / 1024 / 1024);
-        real_total_log_size_ -= file_size;
-      } else {
-        ROCKS_LOG_ERROR(immutable_db_options_.info_log,
-                        "Unable to get file size: %s: %s", fname.c_str(),
-                        s.ToString().c_str());
-      }
     }
 #endif  // !ROCKSDB_LITE
 
     for (const auto w : state.logs_to_free) {
       // TODO: maybe check the return value of Close.
       w->Close();
-    }
-
-    // zhangxin
-    if (log_numbers_.count(number)) {
-      log_numbers_.erase(number);
-      //fprintf(stdout, "delete %lu, size: %lu.\n", number, log_numbers_.size());
     }
 
     Status file_deletion_status;
@@ -684,7 +667,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     }
   }
 #ifndef ROCKSDB_LITE
-  wal_manager_.PurgeObsoleteWALFiles(&log_numbers_, &real_total_log_size_); // zhangxin
+  wal_manager_.PurgeObsoleteWALFiles();
 #endif  // ROCKSDB_LITE
   LogFlush(immutable_db_options_.info_log);
   InstrumentedMutexLock l(&mutex_);

@@ -1691,9 +1691,6 @@ class DBImpl : public DB {
   WriteBatch cached_recoverable_state_;
   std::atomic<bool> cached_recoverable_state_empty_ = {true};
   std::atomic<uint64_t> total_log_size_;
-  std::atomic<uint64_t> real_total_log_size_; // zhangxin
-
-  std::unordered_set<uint64_t> log_numbers_; // zhangxin
 
   // hust-cloud
   std::unordered_map<uint64_t, std::pair<SequenceNumber, SequenceNumber>> logs_seq_range_;

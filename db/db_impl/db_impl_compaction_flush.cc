@@ -2316,56 +2316,18 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
 
   // zhangxin
   uint64_t wal_file_bytes = 0;
-  uint64_t global_wal_size = 0;
   if (stats_) {
     wal_file_bytes = stats_->getTickerCount(WAL_FILE_BYTES);
-  }
-  for(auto log_number : log_numbers_) {
-    std::string log_name = LogFileName(immutable_db_options_.wal_dir, log_number);
-    std::string archived_dir = ArchivalDirectory(immutable_db_options_.wal_dir);
-    std::string log_name_archived = LogFileName(archived_dir, log_number);
-    FileType type;
-    WalFileType wal_type;
-    uint64_t tmp_number;
-    //fprintf(stdout, "log_name: %s, archived_dir: %s.\n", log_name.c_str(), archived_dir.c_str());
-    /*
-    if (ParseFileName(log_name, &tmp_number, &type, &wal_type)) {
-      if (wal_type == kArchivedLogFile) {
-        log_name = LogFileName(archived_dir, log_number);
-      }
-    } else {
-      continue;
-    }
-    */
-
-    uint64_t tmp_size = 0;
-    Status s = env_->GetFileSize(log_name_archived, &tmp_size);
-    if (s.ok()) {
-      global_wal_size += tmp_size;
-      //fprintf(stdout, "file %s size: %lu.\n", log_name.c_str(), tmp_size);
-    } else {
-      s = env_->GetFileSize(log_name, &tmp_size);
-      if (s.ok()) {
-        global_wal_size += tmp_size;
-      }
-      //fprintf(stdout, "fail to get size: %s.\n", log_name.c_str());
-    }
   }
   ROCKS_LOG_BUFFER(
     &log_buffer,
     "\n\ntotal_log_size_begin.\n"
     "wal_file_bytes: %lu.\n"
     "total_log_size: %lu.\n"
-    "real_total_log_size: %lu.\n"
-    "wal_counts: %lu.\n"
-    "global_wal_size: %lu.\n"
     "curr_time: %lu.\n"
     "total_log_size_end.\n",
     wal_file_bytes,
     uint64_t(total_log_size_),
-    uint64_t(real_total_log_size_),
-    log_numbers_.size(),
-    global_wal_size,
     env_->NowMicros()
   );
 

@@ -1078,7 +1078,6 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
   // Mark these as alive so they'll be considered for deletion later by
   // FindObsoleteFiles()
   total_log_size_ = 0;
-  real_total_log_size_ = 0; // zhangxin
   log_empty_ = false;
   for (auto log_number : log_numbers) {
     LogFileNumberSize log(log_number);
@@ -1089,10 +1088,6 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
       break;
     }
     total_log_size_ += log.size;
-
-    // zhangxin
-    real_total_log_size_ += log.size;
-    log_numbers_.insert(log_number);
 
     alive_log_files_.push_back(log);
     // We preallocate space for logs, but then after a crash and restart, those
@@ -1272,14 +1267,10 @@ Status DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
                    recycle_log_number);
     std::string old_log_fname =
         LogFileName(immutable_db_options_.wal_dir, recycle_log_number);
-    log_numbers_.insert(recycle_log_number); // zhangxin
-    //fprintf(stdout, "insert %lu, size: %lu.\n", recycle_log_number, log_numbers_.size());
     s = env_->ReuseWritableFile(log_fname, old_log_fname, &lfile,
                                 opt_env_options);
   } else {
     s = NewWritableFile(env_, log_fname, &lfile, opt_env_options);
-    log_numbers_.insert(log_file_num); // zhangxin
-    //fprintf(stdout, "insert %lu, size: %lu.\n", log_file_num, log_numbers_.size());
   }
 
   if (s.ok()) {
