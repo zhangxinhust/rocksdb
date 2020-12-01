@@ -1474,6 +1474,10 @@ Status DBImpl::GetValueLevel(const ReadOptions& read_options,
                    PinnableSlice* value, int* hit_level) {
   return GetValueLevelImpl(read_options, column_family, key, value, hit_level);
 }
+Status DBImpl::GetValueLevel(const ReadOptions& read_options,
+                   const Slice& key, PinnableSlice* value, int* hit_level) {
+  return GetValueLevelImpl(read_options, DefaultColumnFamily(), key, value, hit_level);
+}
 
 Status DBImpl::GetValueLevelImpl(const ReadOptions& read_options,
                        ColumnFamilyHandle* column_family, const Slice& key,
