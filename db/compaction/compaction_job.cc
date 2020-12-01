@@ -854,17 +854,21 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     "\n\nlevel_wal_mb_begin.\n"
     "curr_time: %ld.\n"
     "wal_total_mb: %lf.\n"
-    "level0 realtime: %lf.\n"
-    "level1 realtime: %lf.\n"
-    "level0 total: %lf.\n"
-    "level1 total: %lf.\n"
+    "level_realtime: %d, %lf.\n"
+    "level_realtime: %d, %lf.\n"
+    "level_realtime: %d, %lf.\n"
+    "level_total: %d, %lf.\n"
+    "level_total: %d, %lf.\n"
+    "level_total: %d, %lf.\n"
     "level_wal_mb_end.\n",
     env_->NowMicros(),
     wal_mb,
-    level_mb[0][0],
-    level_mb[0][1],
-    level_mb[1][0],
-    level_mb[1][1]
+    0, level_mb[0][0],
+    1, level_mb[0][1],
+    2, level_mb[0][2],
+    0, level_mb[1][0],
+    1, level_mb[1][1],
+    2, level_mb[1][2]
   );
 
   uint32_t read_path_id, read_level_id;
