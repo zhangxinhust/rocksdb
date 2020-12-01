@@ -410,6 +410,9 @@ class InternalStats {
   void DumpCFMapStats(
       std::map<int, std::map<LevelStatType, double>>* level_stats,
       CompactionStats* compaction_stats_sum);
+  // zhangxin
+  void DumpCFMapStatsLight(std::map<int, std::map<LevelStatType, double>>* level_stats);
+
   void DumpCFMapStatsByPriority(
       std::map<int, std::map<LevelStatType, double>>* priorities_stats);
   void DumpCFMapStatsIOStalls(std::map<std::string, std::string>* cf_stats);
