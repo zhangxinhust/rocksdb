@@ -416,7 +416,7 @@ class DB {
                    PinnableSlice* value, int* hit_level = nullptr){
     return Status::OK();
   };
-  virtual Status GetValueLevel(const ReadOptions& read_options,
+  virtual Status GetValueLevelDefault(const ReadOptions& read_options,
                    const Slice& key, PinnableSlice* value, int* hit_level = nullptr){
     return Status::OK();
   };
