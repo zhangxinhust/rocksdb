@@ -122,6 +122,15 @@ void PrepareLevelStats(std::map<LevelStatType, double>* level_stats,
       static_cast<double>(stats.num_dropped_records);
 }
 
+// zhangxin
+void PrepareLevelStatsLight(std::map<LevelStatType, double>* level_stats,
+                       double total_file_size, const InternalStats::CompactionStats& stats) {
+  int64_t bytes_new = stats.bytes_written - stats.bytes_read_output_level;
+  (*level_stats)[LevelStatType::SIZE_BYTES] = total_file_size;
+  (*level_stats)[LevelStatType::WRITE_GB] = stats.bytes_written / kGB;
+  (*level_stats)[LevelStatType::W_NEW_GB] = bytes_new / kGB;
+}
+
 void PrintLevelStats(char* buf, size_t len, const std::string& name,
                      const std::map<LevelStatType, double>& stat_value) {
   snprintf(
@@ -966,8 +975,7 @@ void InternalStats::AddLevelAndWalBytes(std::vector<std::vector<double>>& level_
   *wal_mb += wal_bytes / 1024.0 / 1024.0;
 
   std::map<int, std::map<LevelStatType, double>> levels_stats;
-  CompactionStats compaction_stats_sum;
-  DumpCFMapStats(&levels_stats, &compaction_stats_sum);
+  DumpCFMapStatsLight(&levels_stats);
   for (int l = 0; l < number_levels_; ++l) {
     if (levels_stats.find(l) != levels_stats.end()) {
       level_mb[0][l] += levels_stats[l].at(LevelStatType::SIZE_BYTES) / 1024.0 / 1024.0;
@@ -989,8 +997,7 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
   str_to_log.append(buf);
 
   std::map<int, std::map<LevelStatType, double>> levels_stats;
-  CompactionStats compaction_stats_sum;
-  DumpCFMapStats(&levels_stats, &compaction_stats_sum);
+  DumpCFMapStatsLight(&levels_stats);
   for (int l = 0; l < number_levels_; ++l) {
     if (levels_stats.find(l) != levels_stats.end()) {
       snprintf(buf, sizeof(buf), 
@@ -1013,6 +1020,21 @@ void InternalStats::PrintLevelAndWalBytes(LogBuffer* log_buffer_) {
     "\nlog_end.\n",
     str_to_log.c_str()
   );
+}
+
+void InternalStats::DumpCFMapStatsLight(
+    std::map<int, std::map<LevelStatType, double>>* levels_stats) {
+  const VersionStorageInfo* vstorage = cfd_->current()->storage_info();
+
+  for (int level = 0; level < number_levels_; level++) {
+    int files = vstorage->NumLevelFiles(level);
+    if (comp_stats_[level].micros > 0 || files > 0) {
+      std::map<LevelStatType, double> level_stats;
+      PrepareLevelStatsLight(&level_stats,
+                        static_cast<double>(vstorage->NumLevelBytes(level)), comp_stats_[level]);
+      (*levels_stats)[level] = level_stats;
+    }
+  }
 }
 
 void InternalStats::DumpDBStats(std::string* value) {
