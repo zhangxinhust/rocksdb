@@ -3310,6 +3310,7 @@ Status DBImpl::CheckConsistency() {
         uint64_t number;
         FileType type;
         if (ParseFileName(md.name, &number, &type)) {
+          fprintf(stdout, "Delete %s since this sst non-exist.\n", md.name.c_str());
           ColumnFamilyData *cfd = versions_->GetColumnFamilySet()->GetColumnFamily(md.column_family_name);
           VersionEdit edit;
           edit.SetColumnFamily(cfd->GetID());
