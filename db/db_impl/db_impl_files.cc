@@ -292,7 +292,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   mutex_.AssertHeld();
   bool should_purge = true;
   if (!logs_seq_range_.count(log_number)) {
-    //fprintf(stdout, "%lu true-0.\n", log_number);
+    fprintf(stdout, "%lu true-0.\n", log_number);
     return should_purge;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
@@ -301,10 +301,11 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   //  log_number, log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     should_purge = false;
-    //fprintf(stdout, "%lu false-1\n", log_number);
+    fprintf(stdout, "%lu false-1\n", log_number);
   } else {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+        fprintf(stdout, "cfd skipped.\n");
         continue;
       }
       //cfd->current()->storage_info()->PrintLevelInfo();
@@ -317,7 +318,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         if (!(level0_largest_seq < log_smallest_seq ||
             level0_smallest_seq > log_largest_seq)) {
           should_purge = false;
-          //fprintf(stdout, "%lu false-2\n", log_number);
+          fprintf(stdout, "%lu false-2\n", log_number);
           break;
         }
       }
@@ -336,7 +337,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         if (!(file->fd.largest_seqno < log_smallest_seq ||
             file->fd.smallest_seqno > log_largest_seq)) {
           should_purge = false;
-          //fprintf(stdout, "%lu false-3\n", log_number);
+          fprintf(stdout, "%lu false-3\n", log_number);
           break;
         }
       }
