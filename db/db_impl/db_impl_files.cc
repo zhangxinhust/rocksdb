@@ -285,6 +285,12 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
+  fprintf(stdout, "%lu cf count: %lu.\n", log_number,
+        versions_->GetColumnFamilySet()->NumberOfColumnFamilies());
+  if (versions_->GetColumnFamilySet()->NumberOfColumnFamilies() == 0) {
+    fprintf(stdout, "%lu false-0, no cfd.\n", log_number);
+    return false;
+  }
   if (!logs_seq_range_.count(log_number)) {
     fprintf(stdout, "%lu true-0, not in logs_seq_range_.\n", log_number);
     return true;
@@ -297,11 +303,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     fprintf(stdout, "%lu false-1\n", log_number);
     return false;
   }
-  if (versions_->GetColumnFamilySet()->NumberOfColumnFamilies() == 0) {
-    fprintf(stdout, "%lu false-0, no cfd.\n",log_number);
-    return false;
-  }
   for (auto cfd : *versions_->GetColumnFamilySet()) {
+    fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
       fprintf(stdout, "%lu false-1, cfd skipped.\n", log_number);
       return false;
@@ -338,6 +341,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
   }
+  fprintf(stdout, "%lu final true.\n", log_number);
   return true;
 }
 
