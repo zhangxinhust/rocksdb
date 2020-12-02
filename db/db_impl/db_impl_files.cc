@@ -311,9 +311,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
-        return false;
         fprintf(stdout, "%lu false-2\n", log_number);
-        break;
+        return false;
       }
     }
     // L1
@@ -330,9 +329,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //    file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        return false;
         fprintf(stdout, "%lu false-3\n", log_number);
-        break;
+        return false;
       }
     }
   }
