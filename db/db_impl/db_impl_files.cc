@@ -156,10 +156,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
-            fprintf(stdout, "%lu keep.\n", number);
+            fprintf(stdout, "%lu keep-11.\n", number);
             continue;
           } else {
-            fprintf(stdout, "%lu delete.\n", number);
+            fprintf(stdout, "%lu delete-1.\n", number);
             logs_seq_range_.erase(number);
           }
         }
@@ -180,10 +180,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           FileType type;
           if (ParseFileName(log_file, &number, &type)) {
             if (!WALShouldPurge(number)) {
-              fprintf(stdout, "%lu keep.\n", number);
+              fprintf(stdout, "%lu keep-2.\n", number);
               continue;
             } else {
-              fprintf(stdout, "%lu delete.\n", number);
+              fprintf(stdout, "%lu delete-2.\n", number);
               logs_seq_range_.erase(number);
             }
           }
@@ -218,10 +218,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
-          fprintf(stdout, "%lu keep.\n", earliest.number);
+          fprintf(stdout, "%lu keep-3.\n", earliest.number);
           break;
         } else {
-          fprintf(stdout, "%lu delete.\n", earliest.number);
+          fprintf(stdout, "%lu delete-3.\n", earliest.number);
           logs_seq_range_.erase(earliest.number);
         }
       }
@@ -233,7 +233,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                        earliest.number);
         log_recycle_files_.push_back(earliest.number);
       } else {
-        //fprintf(stdout, "%lu added to log_delete_files.\n", earliest.number);
         job_context->log_delete_files.push_back(earliest.number);
       }
       if (job_context->size_log_to_delete == 0) {
