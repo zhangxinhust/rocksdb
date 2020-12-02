@@ -3096,8 +3096,27 @@ Status DBImpl::CheckConsistency() {
       s = Status::OK();
     }
     if (!s.ok()) {
-      corruption_messages +=
-          "Can't access " + md.name + ": " + s.ToString() + "\n";
+      // hust-cloud
+      if (immutable_db_options_.use_wal_stage && md.level <= 1) {
+        uint64_t number;
+        FileType type;
+        if (ParseFileName(md.name, &number, &type)) {
+          ColumnFamilyData *cfd = versions_->GetColumnFamilySet()->GetColumnFamily(md.column_family_name);
+          VersionEdit edit;
+          edit.SetColumnFamily(cfd->GetID());
+          edit.DeleteFile(md.level, number);
+          s = versions_->LogAndApply(cfd, *cfd->GetLatestMutableCFOptions(),
+                                     &edit, &mutex_, directories_.GetDbDir());
+          if (!s.ok()) {
+            corruption_messages += "Cant't delete " + md.name + ": " + s.ToString() + "\n";
+          }
+        } else {
+          corruption_messages += "Cant parse file " + md.name + "\n";
+        }
+      } else {
+        corruption_messages +=
+            "Can't access " + md.name + ": " + s.ToString() + "\n";
+      }
     } else if (fsize != md.size) {
       corruption_messages += "Sst file size mismatch: " + file_path +
                              ". Size recorded in manifest " +
