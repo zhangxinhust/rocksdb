@@ -286,7 +286,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
   if (!logs_seq_range_.count(log_number)) {
-    fprintf(stdout, "%lu true-0.\n", log_number);
+    fprintf(stdout, "%lu true-0, not in logs_seq_range_.\n", log_number);
     return true;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
@@ -297,9 +297,13 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     fprintf(stdout, "%lu false-1\n", log_number);
     return false;
   }
+  if (versions_->GetColumnFamilySet()->NumberOfColumnFamilies() == 0) {
+    fprintf(stdout, "%lu false-0, no cfd.\n",log_number);
+    return false;
+  }
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
-      fprintf(stdout, "cfd skipped.\n");
+      fprintf(stdout, "%lu false-1, cfd skipped.\n", log_number);
       return false;
     }
     //cfd->current()->storage_info()->PrintLevelInfo();
@@ -311,7 +315,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
-        fprintf(stdout, "%lu false-2\n", log_number);
+        fprintf(stdout, "%lu false-2, L0 overlap.\n", log_number);
         return false;
       }
     }
@@ -329,7 +333,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //    file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        fprintf(stdout, "%lu false-3\n", log_number);
+        fprintf(stdout, "%lu false-3, L1 overlap\n", log_number);
         return false;
       }
     }
