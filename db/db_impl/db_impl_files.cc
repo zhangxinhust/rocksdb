@@ -312,6 +312,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     //cfd->current()->storage_info()->PrintLevelInfo();
     // L0
     const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+    fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
     if (level0_files.size()) {
       SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
       SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
@@ -327,6 +328,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //fprintf(stdout, "no L1.\n");
       continue;
     }
+    fprintf(stdout, "L1 file count: %lu.\n", cfd->current()->storage_info()->LevelFiles(1));
     for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
       if (!file) {
         //fprintf(stdout, "empty file.\n");
