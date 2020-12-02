@@ -107,7 +107,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
-    //fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
+    fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
@@ -155,12 +155,11 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
         // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
-          //fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
           if (!WALShouldPurge(number)) {
-            //fprintf(stdout, "should keep.\n");
+            fprintf(stdout, "%lu keep.\n", number);
             continue;
           } else {
-            //fprintf(stdout, "should delete.\n");
+            fprintf(stdout, "%lu delete.\n", number);
             logs_seq_range_.erase(number);
           }
         }
@@ -169,8 +168,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       }
     }
 
-    //fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", 
-    //  immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
     // Add log files in wal_dir
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
@@ -182,12 +179,11 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           uint64_t number;
           FileType type;
           if (ParseFileName(log_file, &number, &type)) {
-            //fprintf(stdout, "%lu, WALShouldPurge: %d.\n", number, WALShouldPurge(number));
             if (!WALShouldPurge(number)) {
-              //fprintf(stdout, "should keep.\n");
+              fprintf(stdout, "%lu keep.\n", number);
               continue;
             } else {
-              //fprintf(stdout, "should delete.\n");
+              fprintf(stdout, "%lu delete.\n", number);
               logs_seq_range_.erase(number);
             }
           }
@@ -219,13 +215,13 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
-      //fprintf(stdout, "alive No.%lu.\n", earliest.number);
+      fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
-          //fprintf(stdout, "should keep.\n");
+          fprintf(stdout, "%lu keep.\n", earliest.number);
           break;
         } else {
-          //fprintf(stdout, "should delete.\n");
+          fprintf(stdout, "%lu delete.\n", earliest.number);
           logs_seq_range_.erase(earliest.number);
         }
       }
