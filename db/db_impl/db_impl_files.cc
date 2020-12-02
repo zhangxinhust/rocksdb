@@ -328,7 +328,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //fprintf(stdout, "no L1.\n");
       continue;
     }
-    fprintf(stdout, "L1 file count: %lu.\n", cfd->current()->storage_info()->LevelFiles(1));
+    fprintf(stdout, "L1 file count: %lu.\n", cfd->current()->storage_info()->LevelFiles(1).size());
     for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
       if (!file) {
         //fprintf(stdout, "empty file.\n");
