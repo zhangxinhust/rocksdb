@@ -3323,7 +3323,6 @@ Status DBImpl::CheckConsistency() {
         } else {
           corruption_messages += "Cant parse file " + md.name + "\n";
         }
-
       } else {
         corruption_messages +=
             "Can't access " + md.name + ": " + s.ToString() + "\n";
