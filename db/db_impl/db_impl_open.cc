@@ -329,6 +329,7 @@ Status Directories::SetDirectories(Env* env, const std::string& dbname,
 Status DBImpl::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families, bool read_only,
     bool error_if_log_file_exist, bool error_if_data_exists_in_logs) {
+  fprintf(stdout, "DBImpl::Recover!!!!!-----------.\n");
   mutex_.AssertHeld();
 
   bool is_new_db = false;
@@ -628,6 +629,7 @@ Status DBImpl::InitPersistStatsColumnFamily() {
 // REQUIRES: log_numbers are sorted in ascending order
 Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
                                SequenceNumber* next_sequence, bool read_only) {
+  fprintf(stdout, "DBImpl::RecoverLogFiles!!!!!!!!!!!!-------------\n");
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -685,17 +687,20 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   bool flushed = false;
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
+  fprintf(stdout, "min_log_number: %lu.\n", min_log_number);
   for (auto log_number : log_numbers) {
     fprintf(stdout, "current log number: %lu.\n", log_number);
     if (!immutable_db_options_.use_wal_stage && // hust-cloud
         log_number < min_log_number) {
+      fprintf(stdout, "Skipping log %lu since it is older than min log %lu.\n",
+        log_number, min_log_number);
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
                      "Skipping log #%" PRIu64
                      " since it is older than min log to keep #%" PRIu64,
                      log_number, min_log_number);
       continue;
     }
-    fprintf(stdout, "log %lu recovered.\n", log_number);
+    fprintf(stdout, "log %lu not skipped.\n", log_number);
     // The previous incarnation may not have written any MANIFEST
     // records after allocating this log number.  So we manually
     // update the file number allocation counter in VersionSet.
@@ -715,6 +720,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
     };
     if (stop_replay_by_wal_filter) {
+      fprintf(stdout, "%lu stop_replay_by_wal_filter", log_number);
       logFileDropped();
       continue;
     }
@@ -725,12 +731,14 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       status = env_->NewSequentialFile(fname, &file,
                                        env_->OptimizeForLogRead(env_options_));
       if (!status.ok()) {
+        fprintf(stdout, "%lu create SequentialFile failed.\n", log_number);
         MaybeIgnoreError(&status);
         if (!status.ok()) {
           return status;
         } else {
           // Fail with one log file, but that's ok.
           // Try next one.
+          fprintf(stdout, "%lu continue after create sequentialfile.\n", log_number);
           continue;
         }
       }
@@ -773,6 +781,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       if (record.size() < WriteBatchInternal::kHeader) {
         reporter.Corruption(record.size(),
                             Status::Corruption("log record too small"));
+        fprintf(stdout, "%lu log too small.\n", log_number);
         continue;
       }
       WriteBatchInternal::SetContents(&batch, record);
@@ -792,6 +801,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           stop_replay_for_corruption = false;
         }
         if (stop_replay_for_corruption) {
+          fprintf(stdout, "%lu stop_replay_for_corruption.\n", log_number);
           logFileDropped();
           break;
         }
@@ -799,6 +809,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
 
 #ifndef ROCKSDB_LITE
       if (immutable_db_options_.wal_filter != nullptr) {
+        fprintf(stdout, "%lu wal_filter not empty\n", log_number);
         WriteBatch new_batch;
         bool batch_changed = false;
 
@@ -839,6 +850,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
               return status;
             } else {
               // Ignore the error with current record processing.
+              //fprintf(stdout, "%lu continue after MaybeIgnoreError.\n", log_number);
               continue;
             }
           }
@@ -889,6 +901,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       if (!status.ok()) {
         // We are treating this as a failure while reading since we read valid
         // blocks that do not form coherent data
+        fprintf(stdout, "%lu statut not ok after InsertInto.\n", log_number);
         reporter.Corruption(record.size(), status);
         continue;
       }
@@ -910,6 +923,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
             // file-systems cause the DB::Open() to fail.
+            fprintf(stdout, "%lu status not ok after WriteLevel0TableForRecovery.\n", log_number);
             return status;
           }
           flushed = true;
@@ -922,13 +936,14 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     // hust-cloud
     if (immutable_db_options_.use_wal_stage &&
         first_seqno != kDisableGlobalSequenceNumber) {
-      fprintf(stdout, "added to logs_seq_range_, [%lu-%lu].\n",
-        first_seqno, sequence);
+      fprintf(stdout, "%lu added to logs_seq_range_, [%lu-%lu].\n",
+        log_number, first_seqno, sequence);
       logs_seq_range_[log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(first_seqno, sequence);
     }
 
     if (!status.ok()) {
+      fprintf(stdout, "%lu status not ok final.\n", log_number);
       if (status.IsNotSupported()) {
         // We should not treat NotSupported as corruption. It is rather a clear
         // sign that we are processing a WAL that is produced by an incompatible
@@ -1065,6 +1080,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
 }
 
 Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
+  fprintf(stdout, "RestoreAliveLogFiles!!!!!!!!-------------\n");
   if (log_numbers.empty()) {
     return Status::OK();
   }
