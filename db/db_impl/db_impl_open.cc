@@ -906,7 +906,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         continue;
       }
 
-      fprintf(stdout, "%d ", has_valid_writes);
+      //fprintf(stdout, "%d ", has_valid_writes);
       if (has_valid_writes && !read_only) {
         // we can do this because this is called before client has access to the
         // DB and there is only a single thread operating on DB
@@ -921,7 +921,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
-          fprintf(stdout, "WriteLevel0TableForRecovery. ");
+          //fprintf(stdout, "WriteLevel0TableForRecovery. ");
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
@@ -1142,7 +1142,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
 
 Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
                                            MemTable* mem, VersionEdit* edit) {
-  fprintf(stdout, "WriteLevel0TableForRecovery\n");
+  fprintf(stdout, "WL0 ");
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
