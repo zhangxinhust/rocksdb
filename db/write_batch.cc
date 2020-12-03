@@ -562,7 +562,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
       case kTypeValue:
         assert(content_flags_.load(std::memory_order_relaxed) &
                (ContentFlags::DEFERRED | ContentFlags::HAS_PUT));
-        fprintf(stdout, ", ");
+        //fprintf(stdout, ", ");
         s = handler->PutCF(column_family, key, value);
         if (LIKELY(s.ok())) {
           empty_batch = false;
