@@ -153,7 +153,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
             continue;
-          } else if (logs_seq_range_.count(number)){
+          } else if (logs_seq_range_.count(number)) {
             logs_seq_range_.erase(number);
           }
         }
@@ -163,6 +163,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     // Add log files in wal_dir
+    // TODO: false if wal_dir ends with "/" while dbname_ not, vice versa
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
       env_->GetChildren(immutable_db_options_.wal_dir,
@@ -175,7 +176,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           if (ParseFileName(log_file, &number, &type) && type == kLogFile) {
             if (!WALShouldPurge(number)) {
               continue;
-            } else if (logs_seq_range_.count(number)){
+            } else if (logs_seq_range_.count(number)) {
               logs_seq_range_.erase(number);
             }
           }
@@ -210,7 +211,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
           break;
-        } else if (logs_seq_range_.count(earliest.number)){
+        } else if (logs_seq_range_.count(earliest.number)) {
           logs_seq_range_.erase(earliest.number);
         }
       }
