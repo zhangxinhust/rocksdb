@@ -273,45 +273,50 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
-  bool should_purge = true;
   if (!logs_seq_range_.count(log_number)) {
-    return should_purge;
+    return true;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
-    should_purge = false;
-  } else {
-    for (auto cfd : *versions_->GetColumnFamilySet()) {
-      if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+    return false;
+  }
+  uint32_t empty_cf_count = 0;
+  for (auto cfd : *versions_->GetColumnFamilySet()) {
+    if (cfd->IsDropped() || !cfd->initialized()) {
+      return false;
+    }
+    assert(cfd->NumberLevels() > 1);
+    const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+    const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
+    if (level0_files.size() == 0 && level1_files.size() == 0) {
+      empty_cf_count++;
+      continue;
+    }
+    // L0
+    if (level0_files.size()) {
+      SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
+      SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
+      if (!(level0_largest_seq < log_smallest_seq ||
+          level0_smallest_seq > log_largest_seq)) {
+        return false;
+      }
+    }
+    // L1
+    for (const auto& file : level1_files) {
+      if (!file) {
         continue;
       }
-      // L0
-      const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
-      if (level0_files.size()) {
-        SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
-        SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
-        if (!(level0_largest_seq < log_smallest_seq ||
-            level0_smallest_seq > log_largest_seq)) {
-          should_purge = false;
-          break;
-        }
+      if (!(file->fd.largest_seqno < log_smallest_seq ||
+          file->fd.smallest_seqno > log_largest_seq)) {
+        return false;
       }
-      // L1
-      if (cfd->NumberLevels() < 2) { 
-        continue;
-      }
-      for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
-        if (!(file->fd.largest_seqno < log_smallest_seq ||
-            file->fd.smallest_seqno > log_largest_seq)) {
-          should_purge = false;
-          break;
-        }
-      }
-      if (!should_purge) { break; }
     }
   }
-  return should_purge;
+  if (empty_cf_count == versions_->GetColumnFamilySet()->NumberOfColumnFamilies()) {
+    return false;
+  }
+  return true;
 }
 
 namespace {
