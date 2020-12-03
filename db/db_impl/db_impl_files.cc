@@ -139,7 +139,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       std::vector<std::string> files;
       env_->GetChildren(path, &files);  // Ignore errors
       for (const std::string& file : files) {
-        fprintf(stdout, "in path: %s.\n", file.c_str());
+        //fprintf(stdout, "in path: %s.\n", file.c_str());
         uint64_t number;
         FileType type;
         // 1. If we cannot parse the file name, we skip;
