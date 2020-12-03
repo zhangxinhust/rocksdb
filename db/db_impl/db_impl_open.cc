@@ -906,6 +906,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         continue;
       }
 
+      fprintf(stdout, "%d ", has_valid_writes);
       if (has_valid_writes && !read_only) {
         // we can do this because this is called before client has access to the
         // DB and there is only a single thread operating on DB
@@ -1031,6 +1032,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         // being full), we flush at the end. Otherwise we'll need to record
         // where we were on last flush, which make the logic complicated.
         if (flushed || !immutable_db_options_.avoid_flush_during_recovery) {
+          fprintf(stdout, "final WriteL0Table \n");
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Recovery failed
@@ -1139,7 +1141,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
 
 Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
                                            MemTable* mem, VersionEdit* edit) {
-  fprintf(stdout, "WL0 ");
+  fprintf(stdout, "WriteLevel0TableForRecovery\n");
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
