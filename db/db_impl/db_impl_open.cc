@@ -1139,6 +1139,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
 
 Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
                                            MemTable* mem, VersionEdit* edit) {
+  fprintf(stdout, "WL0 ");
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;

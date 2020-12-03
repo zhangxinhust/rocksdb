@@ -562,7 +562,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
       case kTypeValue:
         assert(content_flags_.load(std::memory_order_relaxed) &
                (ContentFlags::DEFERRED | ContentFlags::HAS_PUT));
-        fprintf(stdout, "put kv, ");
+        fprintf(stdout, ", ");
         s = handler->PutCF(column_family, key, value);
         if (LIKELY(s.ok())) {
           empty_batch = false;
@@ -1957,7 +1957,7 @@ Status WriteBatchInternal::InsertInto(
     bool ignore_missing_column_families, uint64_t log_number, DB* db,
     bool concurrent_memtable_writes, bool seq_per_batch, size_t batch_cnt,
     bool batch_per_txn) {
-  fprintf(stdout, "InsertInto1 ");
+  //fprintf(stdout, "InsertInto1 ");
 #ifdef NDEBUG
   (void)batch_cnt;
 #endif
@@ -1983,7 +1983,7 @@ Status WriteBatchInternal::InsertInto(
     uint64_t log_number, DB* db, bool concurrent_memtable_writes,
     SequenceNumber* next_seq, bool* has_valid_writes, bool seq_per_batch,
     bool batch_per_txn) {
-  fprintf(stdout, "InsertInto2 ");
+  //fprintf(stdout, "InsertInto2 ");
   MemTableInserter inserter(Sequence(batch), memtables, flush_scheduler,
                             ignore_missing_column_families, log_number, db,
                             concurrent_memtable_writes, has_valid_writes,
