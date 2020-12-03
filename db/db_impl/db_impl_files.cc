@@ -300,7 +300,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   }
   uint32_t empty_cf_count = 0;
   for (auto cfd : *versions_->GetColumnFamilySet()) {
-    fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
+    //fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized()) {
       fprintf(stdout, "%lu false-1, cfd skipped.\n", log_number);
       return false;
@@ -314,7 +314,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       continue;
     }
     // L0
-    fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
+    //fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
     if (level0_files.size()) {
       SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
       SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
@@ -326,7 +326,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
     // L1
-    fprintf(stdout, "L1 file count: %lu.\n", level1_files.size());
+    //fprintf(stdout, "L1 file count: %lu.\n", level1_files.size());
     for (const auto& file : level1_files) {
       if (!file) {
         //fprintf(stdout, "empty file.\n");
