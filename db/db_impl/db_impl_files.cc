@@ -285,14 +285,9 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
-  fprintf(stdout, "%lu cf count: %lu.\n", log_number,
-        versions_->GetColumnFamilySet()->NumberOfColumnFamilies());
-  if (versions_->GetColumnFamilySet()->NumberOfColumnFamilies() == 0) {
-    fprintf(stdout, "%lu false-0, no cfd.\n", log_number);
-    return false;
-  }
   if (!logs_seq_range_.count(log_number)) {
-    fprintf(stdout, "%lu true-0, not in logs_seq_range_.\n", log_number);
+    fprintf(stdout, "%lu true-0, not in logs_seq_range_!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n", 
+        log_number);
     return true;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
@@ -303,15 +298,22 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     fprintf(stdout, "%lu false-1\n", log_number);
     return false;
   }
+  uint32_t empty_cf_count = 0;
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
-    if (cfd->IsDropped() || !cfd->initialized() || cfd->NumberLevels() < 1) {
+    if (cfd->IsDropped() || !cfd->initialized()) {
       fprintf(stdout, "%lu false-1, cfd skipped.\n", log_number);
       return false;
     }
+    assert(cfd->NumberLevels() > 1);
     //cfd->current()->storage_info()->PrintLevelInfo();
-    // L0
     const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+    const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
+    if (level0_files.size() == 0 && level1_files.size() == 0) {
+      empty_cf_count++;
+      continue;
+    }
+    // L0
     fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
     if (level0_files.size()) {
       SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
@@ -324,12 +326,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
     // L1
-    if (cfd->NumberLevels() < 2) {
-      //fprintf(stdout, "no L1.\n");
-      continue;
-    }
-    fprintf(stdout, "L1 file count: %lu.\n", cfd->current()->storage_info()->LevelFiles(1).size());
-    for (const auto& file : cfd->current()->storage_info()->LevelFiles(1)) {
+    fprintf(stdout, "L1 file count: %lu.\n", level1_files.size());
+    for (const auto& file : level1_files) {
       if (!file) {
         //fprintf(stdout, "empty file.\n");
         continue;
@@ -342,6 +340,10 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         return false;
       }
     }
+  }
+  if (empty_cf_count == versions_->GetColumnFamilySet()->NumberOfColumnFamilies()) {
+    fprintf(stdout, "%lu false-4, empty cf.\n", log_number);
+    return false;
   }
   fprintf(stdout, "%lu final true.\n", log_number);
   return true;
