@@ -901,7 +901,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       if (!status.ok()) {
         // We are treating this as a failure while reading since we read valid
         // blocks that do not form coherent data
-        fprintf(stdout, "%lu statut not ok after InsertInto.\n", log_number);
+        fprintf(stdout, "%lu status not ok after InsertInto.\n", log_number);
         reporter.Corruption(record.size(), status);
         continue;
       }
@@ -919,6 +919,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
+          fprintf(stdout, "WriteLevel0TableForRecovery. ");
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
