@@ -153,7 +153,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
             continue;
-          } else {
+          } else if (logs_seq_range_.count(number)){
             logs_seq_range_.erase(number);
           }
         }
@@ -175,7 +175,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           if (ParseFileName(log_file, &number, &type)) {
             if (!WALShouldPurge(number)) {
               continue;
-            } else {
+            } else if (logs_seq_range_.count(number)){
               logs_seq_range_.erase(number);
             }
           }
@@ -210,7 +210,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
           break;
-        } else {
+        } else if (logs_seq_range_.count(earliest.number)){
           logs_seq_range_.erase(earliest.number);
         }
       }
