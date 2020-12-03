@@ -1384,6 +1384,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       impl->logs_.emplace_back(new_log_number, new_log);
       impl->logs_seq_range_[new_log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(impl->versions_->LastSequence(), kDisableGlobalSequenceNumber);
+      fprintf(stdout, "Create log in Open: %lu [%lu-max].\n", new_log_number, impl->versions_->LastSequence());
     }
 
     if (s.ok()) {

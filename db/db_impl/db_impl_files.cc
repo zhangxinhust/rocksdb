@@ -139,6 +139,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       std::vector<std::string> files;
       env_->GetChildren(path, &files);  // Ignore errors
       for (const std::string& file : files) {
+        fprintf(stdout, "in path: %s.\n", file.c_str());
         uint64_t number;
         FileType type;
         // 1. If we cannot parse the file name, we skip;
@@ -156,7 +157,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
-            fprintf(stdout, "%lu keep-11.\n", number);
+            fprintf(stdout, "%lu keep-1.\n", number);
             continue;
           } else {
             fprintf(stdout, "%lu delete-1.\n", number);
@@ -170,6 +171,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
     // Add log files in wal_dir
     if (immutable_db_options_.wal_dir != dbname_) {
+      fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
       std::vector<std::string> log_files;
       env_->GetChildren(immutable_db_options_.wal_dir,
                         &log_files);  // Ignore errors
