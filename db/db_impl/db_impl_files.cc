@@ -172,7 +172,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         if (immutable_db_options_.use_wal_stage) {
           uint64_t number;
           FileType type;
-          if (ParseFileName(log_file, &number, &type)) {
+          if (ParseFileName(log_file, &number, &type) && type == kLogFile) {
             if (!WALShouldPurge(number)) {
               continue;
             } else if (logs_seq_range_.count(number)){
