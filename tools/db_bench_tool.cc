@@ -3441,7 +3441,9 @@ class Benchmark {
     printf("Initializing RocksDB Options from command-line flags\n");
     Options& options = *opts;
 
-    assert(db_.db == nullptr);
+    if (!FLAGS_use_wal_stage) {
+      assert(db_.db == nullptr);
+    }
 
     options.max_open_files = FLAGS_open_files;
     if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
