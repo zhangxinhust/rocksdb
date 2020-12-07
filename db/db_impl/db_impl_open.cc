@@ -926,7 +926,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
             // file-systems cause the DB::Open() to fail.
-            fprintf(stdout, "%lu status not ok after WriteLevel0TableForRecovery.\n", log_number);
+            fprintf(stdout, "%lu status %s after WriteLevel0TableForRecovery.\n",
+                log_number, status.ToString().c_str());
             return status;
           }
           flushed = true;
