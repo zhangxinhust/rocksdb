@@ -264,7 +264,8 @@ DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
 
 DEFINE_bool(use_existing_wal, false, "Whether to use existing wals for recovering");
 
-DEFINE_string(db_paths, "", "The path for db_paths");
+DEFINE_string(db_paths, "/nvme1n1/zhangxin/ssd/", "The path for L0 and L1");
+DEFINE_string(db_paths2, "/home/zhangxin/hdd/", "The path for L2 and upper levels");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
@@ -3467,15 +3468,16 @@ class Benchmark {
 
     // hust-cloud
     options.use_wal_stage = FLAGS_use_wal_stage;
-    if (FLAGS_db_paths.length()) {
+    if (FLAGS_db_paths.length() && FLAGS_db_paths2.length()) {
       if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {
         FLAGS_db_paths += "/";
       }
+      if (FLAGS_db_paths2[FLAGS_db_paths2.length()-1] != '/') {
+        FLAGS_db_paths2 += "/";
+      }
       options.db_paths = std::vector<rocksdb::DbPath>();
-      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path0", FLAGS_max_bytes_for_level_base));
-      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path1", FLAGS_max_bytes_for_level_base));
-      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path2", 10 * FLAGS_max_bytes_for_level_base));
-      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path3", 100 * FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths + "path0", 2l * FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths2 + "path1", 100l * FLAGS_max_bytes_for_level_base));
     }
 
 #ifndef ROCKSDB_LITE
