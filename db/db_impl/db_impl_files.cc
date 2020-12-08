@@ -301,7 +301,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     fprintf(stdout, "%lu false-1\n", log_number);
     return false;
   }
-  uint32_t empty_cf_count = 0;
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     //fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized()) {
@@ -312,10 +311,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     //cfd->current()->storage_info()->PrintLevelInfo();
     const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
     const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
-    if (level0_files.size() == 0 && level1_files.size() == 0) {
-      empty_cf_count++;
-      continue;
-    }
     // L0
     //fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
     if (level0_files.size()) {
@@ -343,10 +338,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         return false;
       }
     }
-  }
-  if (empty_cf_count == versions_->GetColumnFamilySet()->NumberOfColumnFamilies()) {
-    fprintf(stdout, "%lu false-4, empty cf.\n", log_number);
-    return false;
   }
   fprintf(stdout, "%lu final true.\n", log_number);
   return true;
