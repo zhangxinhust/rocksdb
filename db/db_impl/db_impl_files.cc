@@ -282,7 +282,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
     return false;
   }
-  uint32_t empty_cf_count = 0;
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     if (cfd->IsDropped() || !cfd->initialized()) {
       return false;
@@ -290,10 +289,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     assert(cfd->NumberLevels() > 1);
     const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
     const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
-    if (level0_files.size() == 0 && level1_files.size() == 0) {
-      empty_cf_count++;
-      continue;
-    }
     // L0
     if (level0_files.size()) {
       SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
@@ -313,9 +308,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         return false;
       }
     }
-  }
-  if (empty_cf_count == versions_->GetColumnFamilySet()->NumberOfColumnFamilies()) {
-    return false;
   }
   return true;
 }
