@@ -1340,8 +1340,7 @@ class MemTableInserter : public WriteBatch::Handler {
 
     // hust-cloud
     if (recovering_log_number_ != 0 &&
-        recovering_log_number_ < cf_mems_->GetLogNumber() &&
-        !cf_mems_->current()->ioptions()->use_wal_stage) {
+        recovering_log_number_ < cf_mems_->GetLogNumber()) {
       // This is true only in recovery environment (recovering_log_number_ is
       // always 0 in
       // non-recovery, regular write code-path)
