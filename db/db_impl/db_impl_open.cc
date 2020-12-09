@@ -900,7 +900,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           cfd->Unref();
           // If this asserts, it means that InsertInto failed in
           // filtering updates to already-flushed column families
-          assert(cfd->GetLogNumber() <= log_number);
+          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number); // hust-cloud
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
