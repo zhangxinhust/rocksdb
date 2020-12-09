@@ -1734,6 +1734,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
   }
 
   //zhangxin
+  /*
   LogBuffer log_buffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
   ROCKS_LOG_BUFFER(
     &log_buffer, 
@@ -1745,6 +1746,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
     hit_level
   );
   log_buffer.FlushBufferToLog();
+  */
   return s;
 }
 

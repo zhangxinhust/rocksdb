@@ -917,11 +917,11 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           // If this asserts, it means that InsertInto failed in
           // filtering updates to already-flushed column families
           // hust-cloud
-          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number);
+          assert(cfd->GetLogNumber() <= log_number);
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
-          //fprintf(stdout, "WriteLevel0TableForRecovery. ");
+          fprintf(stdout, "WL0- ");
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
@@ -1143,7 +1143,6 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
 
 Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
                                            MemTable* mem, VersionEdit* edit) {
-  fprintf(stdout, "WL0 ");
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
