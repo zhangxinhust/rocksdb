@@ -801,22 +801,24 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   int64_t current_time = env_->NowMicros();
   int64_t max_live_time0 = 0, max_live_time1 = 0;
   if (env_->GetCurrentTime(&current_time).ok()) {
-    std::string sst_live_str;
-    for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
-      for (auto &f : vstorage->LevelFiles(level)) {
-        if (f->fd.table_reader != nullptr &&
-            f->fd.table_reader->GetTableProperties() != nullptr) {
-          auto creation_time =
-              f->fd.table_reader->GetTableProperties()->creation_time;
-          char buf[200];
-          sprintf(buf, "%d, %ld.\n", 
-            level, current_time-creation_time);
-          sst_live_str.append(buf);
+    //std::string sst_live_str;
+    for (auto _cfd : *versions_->GetColumnFamilySet()) {
+      for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
+        for (auto &f : vstorage->LevelFiles(level)) {
+          if (f->fd.table_reader != nullptr &&
+              f->fd.table_reader->GetTableProperties() != nullptr) {
+            auto creation_time =
+                f->fd.table_reader->GetTableProperties()->creation_time;
+            //char buf[200];
+            //sprintf(buf, "%d, %ld.\n", 
+            //  level, current_time-creation_time);
+            //sst_live_str.append(buf);
 
-          if (level == 0) {
-            max_live_time0 = std::max(max_live_time0, int64_t(current_time-creation_time));
-          } else if (level == 1) {
-            max_live_time1 = std::max(max_live_time1, int64_t(current_time-creation_time));
+            if (level == 0) {
+              max_live_time0 = std::max(max_live_time0, int64_t(current_time-creation_time));
+            } else if (level == 1) {
+              max_live_time1 = std::max(max_live_time1, int64_t(current_time-creation_time));
+            }
           }
         }
       }
