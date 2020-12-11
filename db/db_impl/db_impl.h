@@ -163,17 +163,6 @@ class DBImpl : public DB {
                      ColumnFamilyHandle* column_family, const Slice& key,
                      PinnableSlice* value) override;
 
-  Status GetValueLevel(const ReadOptions& read_options,
-                   ColumnFamilyHandle* column_family, const Slice& key,
-                   PinnableSlice* value, int* hit_level = nullptr) override;
-  Status GetValueLevelDefault(const ReadOptions& read_options,
-                     const Slice& key, PinnableSlice* value, int* hit_level = nullptr) override;
-
-  Status GetValueLevelImpl(const ReadOptions& read_options,
-                       ColumnFamilyHandle* column_family, const Slice& key,
-                       PinnableSlice* pinnable_val, int* hit_level = nullptr, bool* value_found = nullptr,
-                       ReadCallback* callback = nullptr, bool* is_blob_index = nullptr);
-
   using DB::MultiGet;
   virtual std::vector<Status> MultiGet(
       const ReadOptions& options,
@@ -343,7 +332,6 @@ class DBImpl : public DB {
       const TransactionLogIterator::ReadOptions& read_options =
           TransactionLogIterator::ReadOptions()) override;
   virtual Status DeleteFile(std::string name) override;
-  virtual Status ForceDeleteFile(std::string name) override;
   Status DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                              const RangePtr* ranges, size_t n,
                              bool include_end = true);

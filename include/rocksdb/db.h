@@ -411,16 +411,6 @@ class DB {
     return Get(options, DefaultColumnFamily(), key, value);
   }
 
-  virtual Status GetValueLevel(const ReadOptions& read_options,
-                   ColumnFamilyHandle* column_family, const Slice& key,
-                   PinnableSlice* value, int* hit_level = nullptr){
-    return Status::OK();
-  };
-  virtual Status GetValueLevelDefault(const ReadOptions& read_options,
-                   const Slice& key, PinnableSlice* value, int* hit_level = nullptr){
-    return Status::OK();
-  };
-
   // If keys[i] does not exist in the database, then the i'th returned
   // status will be one for which Status::IsNotFound() is true, and
   // (*values)[i] will be set to some arbitrary value (often ""). Otherwise,
@@ -1145,10 +1135,6 @@ class DB {
   // reflect that. Supports deletion of sst and log files only. 'name' must be
   // path relative to the db directory. eg. 000001.sst, /archive/000003.log
   virtual Status DeleteFile(std::string name) = 0;
-
-  virtual Status ForceDeleteFile(std::string name) {
-    return Status::OK();
-  };
 
   // Returns a list of all table files with their level, start key
   // and end key
