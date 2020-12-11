@@ -803,8 +803,9 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   if (env_->GetCurrentTime(&current_time).ok()) {
     //std::string sst_live_str;
     for (auto _cfd : *versions_->GetColumnFamilySet()) {
-      for (int level = 0; level < 2 && level < vstorage->num_levels(); level++) {
-        for (auto &f : vstorage->LevelFiles(level)) {
+      auto _vstorage = _cfd->current()->storage_info();
+      for (int level = 0; level < 2 &&  level < _vstorage->num_levels(); level++) {
+        for (auto &f : _vstorage->LevelFiles(level)) {
           if (f->fd.table_reader != nullptr &&
               f->fd.table_reader->GetTableProperties() != nullptr) {
             auto creation_time =
