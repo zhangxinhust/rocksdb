@@ -1474,8 +1474,8 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
                        PinnableSlice* pinnable_val, bool* value_found,
                        ReadCallback* callback, bool* is_blob_index) {
   // zhangxin
-  uint64_t micro_start = env_->NowMicros();
-  int hit_level = -1;
+  //uint64_t micro_start = env_->NowMicros();
+  //int hit_level = -1;
 
   assert(pinnable_val != nullptr);
   PERF_CPU_TIMER_GUARD(get_cpu_nanos, env_);
@@ -1578,7 +1578,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options,
     PERF_TIMER_GUARD(get_from_output_files_time);
     sv->current->Get(read_options, lkey, pinnable_val, &s, &merge_context,
                      &max_covering_tombstone_seq, value_found, nullptr, nullptr,
-                     callback, is_blob_index, &hit_level); // zhangxin
+                     callback, is_blob_index/*, &hit_level*/); // zhangxin
     RecordTick(stats_, MEMTABLE_MISS);
   }
 
