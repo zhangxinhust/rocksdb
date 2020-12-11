@@ -188,11 +188,44 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   output_level_ = 2;
   start_level_inputs_.level = 1;
 
+  if (start_level_inputs_.files.size()) {
+    fprintf(stdout, "PickL1ExpiredTtlFiles %lu, [%lu-%lu].\n", start_level_inputs_.files.size(),
+        start_level_inputs_.files.front()->fd.GetNumber(),
+        start_level_inputs_.files.back()->fd.GetNumber());
+
+    int64_t curr_time = 0;
+    ioptions_->env->GetCurrentTime(&curr_time);
+    ROCKS_LOG_BUFFER(
+      log_buffer_, 
+      "\nttl_files_begin:\n"
+      "currtime: %lu\n"
+      "files_size: %lu\n"
+      "max_file_num: %lu\n"
+      "min_file_num: %lu\n"
+      "max_live_time: %lu\n"
+      "min_live_time: %lu\n",
+      ioptions_.env->NowMicros(),
+      start_level_inputs_.files.size(),
+      start_level_inputs_.files.front()->fd.GetNumber(),
+      start_level_inputs_.files.back()->fd.GetNumber(),
+      curr_time - start_level_inputs_.files.front()->fd.table_reader->GetTableProperties()->creation_time,
+      curr_time - start_level_inputs_.files.back()->fd.table_reader->GetTableProperties()->creation_time
+    );
+  }
+
+
   if (start_level_inputs_.files.size() &&
       !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
                                                &start_level_inputs_)) {
     start_level_inputs_.files.clear();
   }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\nfiles_size: %lu\n"
+    "ttl_files_end.\n",
+    start_level_inputs_.files.size()
+  );
 
   if (start_level_inputs_.files.size() && mutable_cf_options_.ttl > 0) {
     vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);
