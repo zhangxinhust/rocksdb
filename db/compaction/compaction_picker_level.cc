@@ -238,7 +238,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   // TTL Compaction has the hignest priority
   if (ioptions_.use_wal_stage) {
     //fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
-    PickL0ExpiredTtlFiles();
+    PickL1ExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
       //fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
