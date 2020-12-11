@@ -194,7 +194,7 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
         start_level_inputs_.files.back()->fd.GetNumber());
 
     int64_t curr_time = 0;
-    ioptions_->env->GetCurrentTime(&curr_time);
+    ioptions_.env->GetCurrentTime(&curr_time);
     ROCKS_LOG_BUFFER(
       log_buffer_, 
       "\nttl_files_begin:\n"
