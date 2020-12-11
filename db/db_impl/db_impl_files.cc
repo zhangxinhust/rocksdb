@@ -338,7 +338,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           file->fd.smallest_seqno > log_largest_seq)) {
         fprintf(stdout, "%lu false-3, L1 overlap, wal[%lu-%lu], L1[%lu-%lu] %lu\n", 
             log_number, log_smallest_seq, log_largest_seq,
-            file->fd.smallest_seqno, file->fd.largest_seqno, fild->fd.GetNumber());
+            file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.GetNumber());
         return false;
       }
     }
