@@ -183,20 +183,19 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
       break;
     }
   }
+
+  start_level_ = 1;
+  output_level_ = 2;
+  start_level_inputs_.level = 1;
+
   if (start_level_inputs_.files.size() &&
       !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
                                                &start_level_inputs_)) {
     start_level_inputs_.files.clear();
   }
 
-  if (start_level_inputs_.files.size()) {
-    start_level_ = 1;
-    output_level_ = 2;
-    start_level_inputs_.level = start_level_;
-
-    if (mutable_cf_options_.ttl > 0) {
-      vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);
-    }
+  if (start_level_inputs_.files.size() && mutable_cf_options_.ttl > 0) {
+    vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);
   }
 }
 
