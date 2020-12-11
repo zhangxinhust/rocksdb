@@ -319,7 +319,9 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
-        fprintf(stdout, "%lu false-2, L0 overlap.\n", log_number);
+        fprintf(stdout, "%lu false-2, L0 overlap, wal[%lu-%lu], L0[%lu-%lu] %lu.\n", 
+            log_number, log_smallest_seq, log_largest_seq, 
+            level0_smallest_seq, level0_largest_seq, level0_files.back()->fd.GetNumber());
         return false;
       }
     }
@@ -334,7 +336,9 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       //    file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        fprintf(stdout, "%lu false-3, L1 overlap\n", log_number);
+        fprintf(stdout, "%lu false-3, L1 overlap, wal[%lu-%lu], L1[%lu-%lu] %lu\n", 
+            log_number, log_smallest_seq, log_largest_seq,
+            file->fd.smallest_seqno, file->fd.largest_seqno, fild->fd.GetNumber());
         return false;
       }
     }
