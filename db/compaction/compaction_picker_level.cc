@@ -207,6 +207,12 @@ void LevelCompactionBuilder::PickL0ExpiredTtlFiles() {
                                                &start_level_inputs_)) {
     start_level_inputs_.files.clear();
   }
+
+  if (start_level_inputs_.size()) {
+    if (mutable_cf_options_.ttl > 0) {
+      vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);
+    }
+  }
 }
 
 void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
