@@ -222,7 +222,7 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
 
   ROCKS_LOG_BUFFER(
     log_buffer_, 
-    "\nfiles_size: %lu\n"
+    "\nfiles_size_2: %lu\n"
     "ttl_files_end.\n",
     start_level_inputs_.files.size()
   );
