@@ -189,10 +189,6 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   start_level_inputs_.level = 1;
 
   if (start_level_inputs_.files.size()) {
-    fprintf(stdout, "PickL1ExpiredTtlFiles %lu, [%lu-%lu].\n", start_level_inputs_.files.size(),
-        start_level_inputs_.files.front()->fd.GetNumber(),
-        start_level_inputs_.files.back()->fd.GetNumber());
-
     int64_t curr_time = 0;
     ioptions_.env->GetCurrentTime(&curr_time);
     ROCKS_LOG_BUFFER(
@@ -212,7 +208,6 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
       curr_time - start_level_inputs_.files.back()->fd.table_reader->GetTableProperties()->creation_time
     );
   }
-
 
   if (start_level_inputs_.files.size() &&
       !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
@@ -270,15 +265,12 @@ void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
   // TTL Compaction has the hignest priority
   if (ioptions_.use_wal_stage) {
-    //fprintf(stdout, "total expired files: %lu.\n", vstorage_->ExpiredTtlFiles().size());
     PickL1ExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;
-      //fprintf(stdout, "select %lu  expired files.\n", start_level_inputs_.size());
       return;
     }
   }
-  //fprintf(stdout, "after ttl selete!!!\n");
 
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
