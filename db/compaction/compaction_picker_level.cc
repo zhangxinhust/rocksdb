@@ -170,36 +170,23 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
     return;
   }
 
-  auto continuation = [&](std::pair<int, FileMetaData*> level_file) {
+  for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
     // If it's being compacted it has nothing to do here.
     // If this assert() fails that means that some function marked some
     // files as being_compacted, but didn't call ComputeCompactionScore()
     assert(!level_file.second->being_compacted);
-    start_level_ = level_file.first;
-    output_level_ =
-        (start_level_ == 0) ? vstorage_->base_level() : start_level_ + 1;
-
-    if ((start_level_ == vstorage_->num_non_empty_levels() - 1) ||
-        (start_level_ == 0 &&
-         !compaction_picker_->level0_compactions_in_progress()->empty())) {
-      return false;
-    }
-
     start_level_inputs_.files.push_back(level_file.second);
-    start_level_inputs_.level = start_level_;
-    return true;
-  };
 
-  for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
-    if (!continuation(level_file)) {
-      start_level_inputs_.files.clear();
-      break;
-    }
     // TODO: The number of files should be changeable?
     if (start_level_inputs_.files.size() >= 10) {
       break;
     }
   }
+
+  start_level_ = 1;
+  output_level_ = 2;
+  start_level_inputs_.level = 1;
+
   if (start_level_inputs_.files.size() &&
       !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
                                                &start_level_inputs_)) {
