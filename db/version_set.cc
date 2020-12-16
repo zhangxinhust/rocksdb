@@ -2457,10 +2457,10 @@ void VersionStorageInfo::PickL1ExpiredTtlFiles(std::vector<std::string>& input_f
     // If this assert() fails that means that some function marked some
     // files as being_compacted, but didn't call ComputeCompactionScore()
     assert(!level_file.second->being_compacted);
-    input_files.files.push_back(level_file.second);
+    input_files.push_back(level_file.second);
 
     // TODO: The number of files should be dynamic?
-    if (input_files.files.size() >= 10) {
+    if (input_files.size() >= 10) {
       break;
     }
   }
