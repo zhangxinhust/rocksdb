@@ -2446,6 +2446,26 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   }
 }
 
+// hust-cloud
+void VersionStorageInfo::PickL1ExpiredTtlFiles(std::vector<std::string>& input_files) {
+  if (expired_ttl_files_.empty()) {
+    return;
+  }
+
+  for (auto& level_file : expired_ttl_files_) {
+    // If it's being compacted it has nothing to do here.
+    // If this assert() fails that means that some function marked some
+    // files as being_compacted, but didn't call ComputeCompactionScore()
+    assert(!level_file.second->being_compacted);
+    input_files.files.push_back(level_file.second);
+
+    // TODO: The number of files should be dynamic?
+    if (input_files.files.size() >= 10) {
+      break;
+    }
+  }
+}
+
 void VersionStorageInfo::ComputeFilesMarkedForPeriodicCompaction(
     const ImmutableCFOptions& ioptions,
     const uint64_t periodic_compaction_seconds) {
