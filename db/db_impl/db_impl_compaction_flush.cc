@@ -1082,8 +1082,12 @@ bool DBImpl::CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd) {
     return false;
   }
   mutex_.AssertHeld(); // Is this necessary?
+  std::vector<uint64_t> input_files_num;
   std::vector<std::string> input_files;
-  cfd->current()->storage_info()->PickL1ExpiredTtlFiles(input_files);
+  cfd->current()->storage_info()->PickL1ExpiredTtlFiles(input_files_num);
+  for (auto num : input_files_num) {
+    input_files.push_back(TableFileName(immutable_db_options_.db_paths, num, 1));
+  }
   if (!input_files.size()) {
     return false;
   }

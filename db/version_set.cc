@@ -2447,7 +2447,7 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
 }
 
 // hust-cloud
-void VersionStorageInfo::PickL1ExpiredTtlFiles(std::vector<std::string>& input_files) {
+void VersionStorageInfo::PickL1ExpiredTtlFiles(std::vector<uint64_t>& input_files_num) {
   if (expired_ttl_files_.empty()) {
     return;
   }
@@ -2457,10 +2457,10 @@ void VersionStorageInfo::PickL1ExpiredTtlFiles(std::vector<std::string>& input_f
     // If this assert() fails that means that some function marked some
     // files as being_compacted, but didn't call ComputeCompactionScore()
     assert(!level_file.second->being_compacted);
-    input_files.push_back(level_file.second);
+    input_files_num.push_back(level_file.second->fd.GetNumber());
 
     // TODO: The number of files should be dynamic?
-    if (input_files.size() >= 10) {
+    if (input_files_num.size() >= 10) {
       break;
     }
   }
