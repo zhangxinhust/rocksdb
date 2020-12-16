@@ -1077,6 +1077,39 @@ Status DBImpl::CompactFilesImpl(
 }
 #endif  // ROCKSDB_LITE
 
+// hust-cloud
+bool DBImpl::CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd) {
+  if (cfd == nullptr || cfd->IsDropped()) {
+    return false;
+  }
+  mutex_.AssertHeld(); // Is this necessary?
+  std::vector<uint64_t> input_files_num;
+  std::vector<std::string> input_files;
+  cfd->current()->storage_info()->PickL1ExpiredTtlFiles(input_files_num);
+  for (auto num : input_files_num) {
+    input_files.push_back(TableFileName(immutable_db_options_.db_paths, num, 1));
+  }
+  if (!input_files.size()) {
+    return false;
+  }
+
+  CompactionOptions options;
+  ColumnFamilyHandle* column_family = GetColumnFamilyHandle(cfd->GetID());
+  mutex_.Unlock();
+  Status s = CompactFiles(options, column_family, input_files, 2, 1);
+  mutex_.Lock();
+  if (!s.ok()) {
+    ROCKS_LOG_ERROR(
+        immutable_db_options_.info_log,
+        "[%s] ttl files manual compaction error %s\n",
+        cfd->GetName().c_str(),
+        s.ToString().c_str()
+    );
+    return false;
+  }
+  return true;
+}
+
 Status DBImpl::PauseBackgroundWork() {
   InstrumentedMutexLock guard_lock(&mutex_);
   bg_compaction_paused_++;
@@ -2574,7 +2607,8 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     // throughout the compaction procedure to make sure consistency. It will
     // eventually be installed into SuperVersion
     auto* mutable_cf_options = cfd->GetLatestMutableCFOptions();
-    if (!mutable_cf_options->disable_auto_compactions && !cfd->IsDropped()) {
+    if (!CompactL1ExpiredTtlFiles(cfd) && // hust-cloud
+        !mutable_cf_options->disable_auto_compactions && !cfd->IsDropped()) {
       // NOTE: try to avoid unnecessary copy of MutableCFOptions if
       // compaction is not necessary. Need to make sure mutex is held
       // until we make a copy in the following code

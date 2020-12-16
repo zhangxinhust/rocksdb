@@ -145,6 +145,9 @@ class VersionStorageInfo {
   void ComputeExpiredTtlFiles(const ImmutableCFOptions& ioptions,
                               const uint64_t ttl);
 
+  // hust-cloud
+  void PickL1ExpiredTtlFiles(std::vector<uint64_t>& input_files);
+
   // This computes files_marked_for_periodic_compaction_ and is called by
   // ComputeCompactionScore()
   void ComputeFilesMarkedForPeriodicCompaction(

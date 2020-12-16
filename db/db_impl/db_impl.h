@@ -260,6 +260,9 @@ class DBImpl : public DB {
       std::vector<std::string>* const output_file_names = nullptr,
       CompactionJobInfo* compaction_job_info = nullptr) override;
 
+  // hust-cloud
+  bool CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd);
+
   virtual Status PauseBackgroundWork() override;
   virtual Status ContinueBackgroundWork() override;
 
