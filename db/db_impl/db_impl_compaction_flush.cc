@@ -1077,7 +1077,7 @@ Status DBImpl::CompactFilesImpl(
 #endif  // ROCKSDB_LITE
 
 // hust-cloud
-bool DBImpl::CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd, LogBuffer* log_buffer) {
+bool DBImpl::CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd) {
   if (cfd == nullptr || cfd->IsDropped()) {
     return false;
   }
@@ -1095,7 +1095,7 @@ bool DBImpl::CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd, LogBuffer* log_buff
   mutex_.Lock();
   if (!s.ok()) {
     ROCKS_LOG_ERROR(
-        log_buffer,
+        immutable_db_options_.info_log,
         "[%s] ttl files manual compaction error %s\n",
         cfd->GetName().c_str(),
         s.ToString().c_str()
@@ -2567,7 +2567,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     // throughout the compaction procedure to make sure consistency. It will
     // eventually be installed into SuperVersion
     auto* mutable_cf_options = cfd->GetLatestMutableCFOptions();
-    if (!CompactL1ExpiredTtlFiles(cfd, log_buffer) && // hust-cloud
+    if (!CompactL1ExpiredTtlFiles(cfd) && // hust-cloud
         !mutable_cf_options->disable_auto_compactions && !cfd->IsDropped()) {
       // NOTE: try to avoid unnecessary copy of MutableCFOptions if
       // compaction is not necessary. Need to make sure mutex is held

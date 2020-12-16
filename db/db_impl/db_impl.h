@@ -261,7 +261,7 @@ class DBImpl : public DB {
       CompactionJobInfo* compaction_job_info = nullptr) override;
 
   // hust-cloud
-  bool CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd, LogBuffer* log_buffer);
+  bool CompactL1ExpiredTtlFiles(ColumnFamilyData* cfd);
 
   virtual Status PauseBackgroundWork() override;
   virtual Status ContinueBackgroundWork() override;
