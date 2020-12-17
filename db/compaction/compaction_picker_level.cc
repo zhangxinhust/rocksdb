@@ -179,7 +179,7 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
     start_level_inputs_.files.push_back(level_file.second);
 
     // TODO: The number of files should be changeable?
-    if (start_level_inputs_.files.size() >= 20) {
+    if (start_level_inputs_.files.size() >= 10) {
       break;
     }
   }
@@ -279,7 +279,6 @@ void LevelCompactionBuilder::SetupInitialFiles() {
           (start_level_ == 0) ? vstorage_->base_level() : start_level_ + 1;
       if (PickFileToCompact()) {
         // found the compaction!
-        //fprintf(stdout, "Level %d, select %lu files.\n", start_level_, start_level_inputs_.size());
         if (start_level_ == 0) {
           // L0 score = `num L0 files` / `level0_file_num_compaction_trigger`
           compaction_reason_ = CompactionReason::kLevelL0FilesNum;
@@ -309,7 +308,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       }
     }
   }
-  //fprintf(stdout, "after score selete.\n");
+
   // if we didn't find a compaction, check if there are any files marked for
   // compaction
   if (start_level_inputs_.empty()) {
