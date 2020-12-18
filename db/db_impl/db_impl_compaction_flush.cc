@@ -2585,7 +2585,8 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     // throughout the compaction procedure to make sure consistency. It will
     // eventually be installed into SuperVersion
     auto* mutable_cf_options = cfd->GetLatestMutableCFOptions();
-    if (!mutable_cf_options->disable_auto_compactions && !cfd->IsDropped()) {
+    if (!input_files.size() && // hust-cloud
+        !mutable_cf_options->disable_auto_compactions && !cfd->IsDropped()) {
       // NOTE: try to avoid unnecessary copy of MutableCFOptions if
       // compaction is not necessary. Need to make sure mutex is held
       // until we make a copy in the following code
