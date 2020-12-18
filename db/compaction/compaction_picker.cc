@@ -245,7 +245,6 @@ bool CompactionPicker::ExpandInputsToCleanCut(const std::string& /*cf_name*/,
                                               InternalKey** next_smallest) {
   // This isn't good compaction
   assert(!inputs->empty());
-  fprintf(stdout, "ExpandInputsToCleanCut inputs: %lu.\n", inputs->size());
 
   const int level = inputs->level;
   // GetOverlappingInputs will always do the right thing for level-0.
@@ -269,8 +268,6 @@ bool CompactionPicker::ExpandInputsToCleanCut(const std::string& /*cf_name*/,
                                    hint_index, &hint_index, true,
                                    next_smallest);
   } while (inputs->size() > old_size);
-
-  fprintf(stdout, "ExpandInputsToCleanCut inputs2: %lu.\n", inputs->size());
 
   // we started off with inputs non-empty and the previous loop only grew
   // inputs. thus, inputs should be non-empty here
