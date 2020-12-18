@@ -178,8 +178,8 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
     assert(!level_file.second->being_compacted);
     start_level_inputs_.files.push_back(level_file.second);
 
-    // TODO: The number of files should be changeable?
-    if (start_level_inputs_.files.size() >= 5) {
+    // TODO: The number of files should be dynamic?
+    if (start_level_inputs_.files.size() >= 6) {
       break;
     }
   }
