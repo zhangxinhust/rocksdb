@@ -1846,14 +1846,18 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
             if (log_buffer_ == nullptr) {
               log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
             }
+            LogBuffer* log_buffer = log_buffer_;
+            if (log_buffer == nullptr) {
+              log_buffer = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+            }
             ROCKS_LOG_BUFFER(
-              log_buffer_,
+              log_buffer,
               "\nnew wal %lu range[%lu-%lu].\n",
               last_log_number,
               logs_seq_range_[last_log_number].first,
               logs_seq_range_[last_log_number].second
             );
-            log_buffer_->FlushBufferToLog();
+            log_buffer->FlushBufferToLog();
           }
         }
       }
