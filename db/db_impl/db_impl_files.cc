@@ -347,28 +347,28 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
       stream.EndArray();
 
-      // stream << "smallest_seqno: ";
-      // stream.StartArray();
-      // for (const auto& file : level1_files) {
-      //   stream << file->fd.smallest_seqno;
-      // }
-      // stream.EndArray();
+      stream << "smallest_seqno: ";
+      stream.StartArray();
+      for (const auto& file : level1_files) {
+        stream << file->fd.smallest_seqno;
+      }
+      stream.EndArray();
 
-      // stream << "largest_seqno: ";
-      // stream.StartArray();
-      // for (const auto& file : level1_files) {
-      //   stream << file->fd.largest_seqno;
-      // }
-      // stream.EndArray();
+      stream << "largest_seqno: ";
+      stream.StartArray();
+      for (const auto& file : level1_files) {
+        stream << file->fd.largest_seqno;
+      }
+      stream.EndArray();
 
-      // stream << "live time: ";
-      // stream.StartArray();
-      // for (const auto& file : level1_files) {
-      //   if (file->fd.table_reader && file->fd.table_reader->GetTableProperties()) {
-      //     stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
-      //   }
-      // }        
-      // stream.EndArray();
+      stream << "live time: ";
+      stream.StartArray();
+      for (const auto& file : level1_files) {
+        if (file->fd.table_reader && file->fd.table_reader->GetTableProperties()) {
+          stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
+        }
+      }        
+      stream.EndArray();
     }
 
     for (const auto& file : level1_files) {
