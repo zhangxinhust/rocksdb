@@ -354,7 +354,9 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     stream << "\n live time: ";
     stream.StartArray();
     for (const auto& file : level1_files) {
-      stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
+      if (file->fd.table_reader && file->fd.table_reader->GetTableProperties()) {
+        stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
+      }
     }        
     stream.EndArray();
 
