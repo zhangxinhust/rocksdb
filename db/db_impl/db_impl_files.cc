@@ -330,6 +330,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     env_->GetCurrentTime(&_curr_time);
     curr_time = static_cast<uint64_t>(_curr_time);
 
+    /*
     for (auto &file : level1_files) {
       ROCKS_LOG_INFO(
         immutable_db_options_.info_log,
@@ -338,6 +339,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000
       );
     }
+    */
     /*
     auto stream = event_logger_.LogToBuffer(log_buffer);
     stream << "\nWALShouldPurge L1 files: ";
