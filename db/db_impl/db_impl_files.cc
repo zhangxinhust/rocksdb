@@ -330,12 +330,14 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     env_->GetCurrentTime(&_curr_time);
     curr_time = static_cast<uint64_t>(_curr_time);
 
-    ROCKS_LOG_INFO(
-      immutable_db_options.info_log,
-      "L1_num: %lu, [%lu-%lu], %lu. ",
-      file->fd.GetNumber(), file->fd.smallest_seqno, file->fd.largest_seqno,
-      (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000
-    );
+    for (auto &file : level1_files) {
+      ROCKS_LOG_INFO(
+        immutable_db_options_.info_log,
+        "L1_num: %lu, [%lu-%lu], %lu. ",
+        file->fd.GetNumber(), file->fd.smallest_seqno, file->fd.largest_seqno,
+        (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000
+      );
+    }
     /*
     auto stream = event_logger_.LogToBuffer(log_buffer);
     stream << "\nWALShouldPurge L1 files: ";
