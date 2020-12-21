@@ -275,6 +275,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
 // hust-cloud
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
+  int64_t _curr_time;
+  uint64_t curr_time;
+  env_->GetCurrentTime(&_curr_time);
+  curr_time = static_cast<uint64_t>(_curr_time);
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
   if (log_buffer_ == nullptr) {
@@ -327,10 +331,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
     // L1
-    int64_t _curr_time;
-    uint64_t curr_time;
-    env_->GetCurrentTime(&_curr_time);
-    curr_time = static_cast<uint64_t>(_curr_time);
     if (level1_files.size()) {
       fprintf(stdout, "curr_time: %lu, ", curr_time);
       for (auto &file : level1_files) {
@@ -384,7 +384,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     //     }        
     //     stream.EndArray();
     //   }
-    // }
+    }
 
     for (const auto& file : level1_files) {
       if (!file) {
