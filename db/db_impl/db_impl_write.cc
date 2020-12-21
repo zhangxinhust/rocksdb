@@ -1852,10 +1852,11 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
             }
             ROCKS_LOG_BUFFER(
               log_buffer,
-              "\nnew wal %lu range[%lu-%lu].\n",
+              "\nnew wal %lu range[%lu-%lu], %lu.\n",
               last_log_number,
               logs_seq_range_[last_log_number].first,
-              logs_seq_range_[last_log_number].second
+              logs_seq_range_[last_log_number].second,
+              env_->NowMicros()
             );
             log_buffer->FlushBufferToLog();
           }

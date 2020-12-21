@@ -324,12 +324,30 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
     // L1
+    int64_t _curr_time;
+    uint64_t curr_time;
+    env_->GetCurrentTime(&_curr_time);
+    curr_time = static_cast<uint64_t>(_curr_time);
+    
+    auto stream = event_logger_->LogToBuffer(log_buffer);
+    stream << "\nWALShouldPurge L1 files: ";
+    stream.StartArray();
+    for (const auto& file : level1_files) {
+      stream << file->fd.GetNumber() << "[" <<
+        file->fd.smallest_seqno << "-" << file->fd.largest_seqno << "], " <<
+        file->fd.table_reader->GetTableProperties()->creation_time - curr_time;
+    }
+    stream.EndArray();
     for (const auto& file : level1_files) {
       if (!file) {
         continue;
       }
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
+        stream << "\nL1 overlap " << "currtime: " << env_->NowMicros() <<
+          "wal" << log_number << " [" << log_smallest_seq << "-" << log_largest_seq <<
+          "]. L1: " << file->fd.GetNumber() << file->fd.smallest_seqno << file->fd.largest_seqno << "\n";
+        /*
         ROCKS_LOG_BUFFER(
           log_buffer,
           "\nWALShouldPurge_begin\n"
@@ -341,6 +359,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           file->fd.GetNumber(),
           file->fd.smallest_seqno, file->fd.largest_seqno
         );
+        */
         log_buffer->FlushBufferToLog();
         return false;
       }

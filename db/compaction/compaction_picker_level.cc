@@ -221,10 +221,14 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
     log_buffer_, 
     "\nttl_files_begin:\n"
     "currtime: %lu\n"
+    "ttl_files : %lu, [%lu-%lu].\n"
     "oldest: %lu, %lu, [%lu-%lu]\n"
     "latest: %lu, %lu, [%lu-%lu]\n"
     "ttl_files_end\n",
     ioptions_.env->NowMicros(),
+    vstorage_->ExpiredTtlFiles().size(), 
+    vstorage_->ExpiredTtlFiles().front().second->fd.GetNumber(),
+    vstorage_->ExpiredTtlFiles().back().second->fd.GetNumber(),
     oldest_number, curr_time - oldest_ttl, oldest_s, oldest_l,
     latest_number, curr_time - latest_ttl, latest_s, latest_l
   );
