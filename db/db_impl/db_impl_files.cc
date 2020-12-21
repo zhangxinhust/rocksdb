@@ -328,8 +328,8 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     uint64_t curr_time;
     env_->GetCurrentTime(&_curr_time);
     curr_time = static_cast<uint64_t>(_curr_time);
-    
-    auto stream = event_logger_->LogToBuffer(log_buffer);
+
+    auto stream = event_logger_.LogToBuffer(log_buffer);
     stream << "\nWALShouldPurge L1 files: ";
     stream.StartArray();
     for (const auto& file : level1_files) {
