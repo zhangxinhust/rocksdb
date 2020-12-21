@@ -310,12 +310,12 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           "curr_time: %lu\n"
           "L0 overlap, wal %lu: [%lu-%lu], L0: [%lu-%lu], [%lu-%lu] %lu.\n"
           "WALShouldPurge_end\n",
-          ,
+          env_->NowMicros(),
           log_number, log_smallest_seq, log_largest_seq,
           level0_files.back()->fd.GetNumber(), level0_files.front()->fd.GetNumber(),
           level0_smallest_seq, level0_largest_seq
         );
-        log_buffer.FlushBufferToLog();
+        log_buffer->FlushBufferToLog();
         return false;
       }
     }
@@ -332,12 +332,12 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           "curr_time: %lu\n"
           "L1 overlap, wal %lu: [%lu-%lu], L1: %lu, [%lu-%lu] %lu.\n"
           "WALShouldPurge_end\n",
-          ,
+          env_->NowMicros(),
           log_number, log_smallest_seq, log_largest_seq,
           file->fd.GetNumber(),
           file->fd.smallest_seqno, file->fd.largest_seqno
         );
-        log_buffer.FlushBufferToLog();
+        log_buffer_->FlushBufferToLog();
         return false;
       }
     }
