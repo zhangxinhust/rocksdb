@@ -324,7 +324,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         for (auto &f : level1_files) {
           fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", f->fd.GetNumber(), 
             f->fd.smallest_seqno, f->fd.largest_seqno,
-            (curr_time - f->fd.table_reader->GetTableProperties()->creation_time) / 1000000);
+            curr_time - f->fd.table_reader->GetTableProperties()->creation_time);
         }
         return false;
       }
