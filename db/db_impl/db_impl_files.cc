@@ -280,6 +280,10 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   if (log_buffer_ == nullptr) {
     log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
   }
+  LogBuffer* log_buffer = log_buffer_;
+  if (log_buffer == nullptr) {
+    log_buffer = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+  }
 
   if (!logs_seq_range_.count(log_number)) {
     fprintf(stdout, "%lu true-0, not in logs_seq_range_!!!!!!!.\n", 
@@ -305,7 +309,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
         ROCKS_LOG_BUFFER(
-          log_buffer_,
+          log_buffer,
           "\nWALShouldPurge_begin\n"
           "curr_time: %lu\n"
           "L0 overlap, wal %lu: [%lu-%lu], L0: [%lu-%lu], [%lu-%lu] %lu.\n"
@@ -315,7 +319,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           level0_files.back()->fd.GetNumber(), level0_files.front()->fd.GetNumber(),
           level0_smallest_seq, level0_largest_seq
         );
-        log_buffer_->FlushBufferToLog();
+        log_buffer->FlushBufferToLog();
         return false;
       }
     }
@@ -327,7 +331,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
         ROCKS_LOG_BUFFER(
-          log_buffer_,
+          log_buffer,
           "\nWALShouldPurge_begin\n"
           "curr_time: %lu\n"
           "L1 overlap, wal %lu: [%lu-%lu], L1: %lu, [%lu-%lu] %lu.\n"
@@ -337,7 +341,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           file->fd.GetNumber(),
           file->fd.smallest_seqno, file->fd.largest_seqno
         );
-        log_buffer_->FlushBufferToLog();
+        log_buffer->FlushBufferToLog();
         return false;
       }
     }
