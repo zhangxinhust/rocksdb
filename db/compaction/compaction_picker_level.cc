@@ -571,7 +571,6 @@ uint32_t LevelCompactionBuilder::GetPathId(
     if (level_size <= current_path_size) {
       if (cur_level == level) {
         // Does desired level fit in this path?
-        fprintf(stdout, "level: %d, path: %u.\n", level, p);
         return p;
       } else {
         current_path_size -= level_size;
@@ -597,7 +596,6 @@ uint32_t LevelCompactionBuilder::GetPathId(
     p++;
     current_path_size = ioptions.cf_paths[p].target_size;
   }
-  fprintf(stdout, "level: %d, path: %u.\n", level, p);
   return p;
 }
 
