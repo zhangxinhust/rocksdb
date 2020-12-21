@@ -315,7 +315,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
           level0_files.back()->fd.GetNumber(), level0_files.front()->fd.GetNumber(),
           level0_smallest_seq, level0_largest_seq
         );
-        log_buffer->FlushBufferToLog();
+        log_buffer_->FlushBufferToLog();
         return false;
       }
     }
