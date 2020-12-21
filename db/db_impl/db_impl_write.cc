@@ -1157,8 +1157,6 @@ Status DBImpl::WriteToWAL(const WriteBatch& merged_batch,
     *log_used = logfile_number_;
   }
   total_log_size_ += log_entry.size();
-  //fprintf(stdout, "log_entry.size: %lu, total_size: %lu, real_total_size: %lu.\n",
-    //      log_entry.size(), uint64_t(total_log_size_), uint64_t(real_total_log_size_));
 
   // TODO(myabandeh): it might be unsafe to access alive_log_files_.back() here
   // since alive_log_files_ might be modified concurrently
@@ -1845,8 +1843,17 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
           if (logs_seq_range_.count(last_log_number)) {
             logs_seq_range_[last_log_number] = 
                 std::pair<SequenceNumber, SequenceNumber>(logs_seq_range_[last_log_number].first, seq);
-            fprintf(stdout, "new wal %lu range[%lu-%lu].\n", last_log_number, logs_seq_range_[last_log_number].first,
-                logs_seq_range_[last_log_number].second);
+            if (log_buffer_ == nullptr) {
+              log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+            }
+            ROCKS_LOG_BUFFER(
+              log_buffer_,
+              "\nnew wal %lu range[%lu-%lu].\n",
+              last_log_number,
+              logs_seq_range_[last_log_number].first,
+              logs_seq_range_[last_log_number].second
+            );
+            log_buffer_->FlushBufferToLog();
           }
         }
       }

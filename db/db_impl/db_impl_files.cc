@@ -47,7 +47,6 @@ uint64_t DBImpl::MinObsoleteSstNumberToKeep() {
 // force = true -- force the full scan
 void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                                bool no_full_scan) {
-  //fprintf(stdout, "FindObsoleteFiles********************************\n");
   mutex_.AssertHeld();
 
   // if deletion is disabled, do nothing
@@ -107,7 +106,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
-    fprintf(stdout, "full scan!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n");
+    fprintf(stdout, "full scan!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
@@ -133,13 +132,11 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     for (auto& path : paths) {
-      //fprintf(stdout, "path: %s.\n", path.c_str());
       // set of all files in the directory. We'll exclude files that are still
       // alive in the subsequent processings.
       std::vector<std::string> files;
       env_->GetChildren(path, &files);  // Ignore errors
       for (const std::string& file : files) {
-        //fprintf(stdout, "in path: %s.\n", file.c_str());
         uint64_t number;
         FileType type;
         // 1. If we cannot parse the file name, we skip;
@@ -157,10 +154,8 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
-            fprintf(stdout, "%lu keep-1.\n", number);
             continue;
           } else if (logs_seq_range_.count(number)) {
-            fprintf(stdout, "%lu delete-1.\n", number);
             logs_seq_range_.erase(number);
           }
         }
@@ -172,7 +167,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     // Add log files in wal_dir
     // TODO: false if wal_dir ends with "/" while dbname_ not, vice versa
     if (immutable_db_options_.wal_dir != dbname_) {
-      fprintf(stdout, "wal_dir: %s, dbname_: %s.\n", immutable_db_options_.wal_dir.c_str(), dbname_.c_str());
       std::vector<std::string> log_files;
       env_->GetChildren(immutable_db_options_.wal_dir,
                         &log_files);  // Ignore errors
@@ -183,10 +177,8 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           FileType type;
           if (ParseFileName(log_file, &number, &type) && type == kLogFile) {
             if (!WALShouldPurge(number)) {
-              fprintf(stdout, "%lu keep-2.\n", number);
               continue;
             } else if (logs_seq_range_.count(number)) {
-              fprintf(stdout, "%lu delete-2.\n", number);
               logs_seq_range_.erase(number);
             }
           }
@@ -218,13 +210,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
       // hust-cloud
-      fprintf(stdout, "alive No.%lu.\n", earliest.number);
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
-          fprintf(stdout, "%lu keep-3.\n", earliest.number);
           break;
         } else if (logs_seq_range_.count(earliest.number)) {
-          fprintf(stdout, "%lu delete-3.\n", earliest.number);
           logs_seq_range_.erase(earliest.number);
         }
       }
@@ -288,62 +277,71 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
+  if (log_buffer_ == nullptr) {
+    log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
+  }
+
   if (!logs_seq_range_.count(log_number)) {
-    fprintf(stdout, "%lu true-0, not in logs_seq_range_!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.\n", 
+    fprintf(stdout, "%lu true-0, not in logs_seq_range_!!!!!!!.\n", 
         log_number);
     return true;
   }
   SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
   SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
-  //fprintf(stdout, "log %lu range[%lu-%lu], size: %lu.\n", 
-  //  log_number, log_smallest_seq, log_largest_seq, logs_seq_range_.size());
   if (log_largest_seq == kDisableGlobalSequenceNumber) {
-    fprintf(stdout, "%lu false-1\n", log_number);
     return false;
   }
   for (auto cfd : *versions_->GetColumnFamilySet()) {
-    //fprintf(stdout, "cf name: %s.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized()) {
-      fprintf(stdout, "%lu false-1, cfd skipped.\n", log_number);
       return false;
     }
     assert(cfd->NumberLevels() > 1);
-    //cfd->current()->storage_info()->PrintLevelInfo();
     const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
     const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
     // L0
-    //fprintf(stdout, "L0 file count: %lu.\n", level0_files.size());
     if (level0_files.size()) {
       SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
       SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
-      //fprintf(stdout, "L0 range[%lu-%lu].\n", level0_smallest_seq, level0_largest_seq);
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
-        fprintf(stdout, "%lu false-2, L0 overlap, wal[%lu-%lu], L0[%lu-%lu] %lu.\n", 
-            log_number, log_smallest_seq, log_largest_seq, 
-            level0_smallest_seq, level0_largest_seq, level0_files.back()->fd.GetNumber());
+        ROCKS_LOG_BUFFER(
+          log_buffer_,
+          "\nWALShouldPurge_begin\n"
+          "curr_time: %lu\n"
+          "L0 overlap, wal %lu: [%lu-%lu], L0: [%lu-%lu], [%lu-%lu] %lu.\n"
+          "WALShouldPurge_end\n",
+          ,
+          log_number, log_smallest_seq, log_largest_seq,
+          level0_files.back()->fd.GetNumber(), level0_files.front()->fd.GetNumber(),
+          level0_smallest_seq, level0_largest_seq
+        );
+        log_buffer.FlushBufferToLog();
         return false;
       }
     }
     // L1
-    //fprintf(stdout, "L1 file count: %lu.\n", level1_files.size());
     for (const auto& file : level1_files) {
       if (!file) {
-        //fprintf(stdout, "empty file.\n");
         continue;
       }
-      //fprintf(stdout, "L1 range[%lu-%lu], size: %lu.\n", 
-      //    file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.file_size);
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        fprintf(stdout, "%lu false-3, L1 overlap, wal[%lu-%lu], L1[%lu-%lu] %lu\n", 
-            log_number, log_smallest_seq, log_largest_seq,
-            file->fd.smallest_seqno, file->fd.largest_seqno, file->fd.GetNumber());
+        ROCKS_LOG_BUFFER(
+          log_buffer_,
+          "\nWALShouldPurge_begin\n"
+          "curr_time: %lu\n"
+          "L1 overlap, wal %lu: [%lu-%lu], L1: %lu, [%lu-%lu] %lu.\n"
+          "WALShouldPurge_end\n",
+          ,
+          log_number, log_smallest_seq, log_largest_seq,
+          file->fd.GetNumber(),
+          file->fd.smallest_seqno, file->fd.largest_seqno
+        );
+        log_buffer.FlushBufferToLog();
         return false;
       }
     }
   }
-  fprintf(stdout, "%lu final true.\n", log_number);
   return true;
 }
 
@@ -404,7 +402,6 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
-  //fprintf(stdout, "PurgeObsoleteFiles--------------------\n");
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
@@ -439,7 +436,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 
   for (auto file_num : state.log_delete_files) {
     if (file_num > 0) {
-      //fprintf(stdout, "%lu from log_delete_files to candidate_files.\n", file_num);
       candidate_files.emplace_back(LogFileName(kDumbDbName, file_num),
                                    immutable_db_options_.wal_dir);
     }
@@ -481,7 +477,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     FileType type;
     bool parse = ParseFileName(fname, &number, info_log_prefix.prefix, &type);
     if (!parse) {
-      //fprintf(stdout, "ParseFileName fail, type: %d, number: %lu.\n", type, number);
     }
     if (!parse || type != kOptionsFile) {
       continue;
@@ -511,7 +506,6 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
                 (number == state.prev_log_number) ||
                 (log_recycle_files_set.find(number) !=
                  log_recycle_files_set.end()));
-        ///fprintf(stdout, "kLogFile %lu keep: %d.\n", number, keep);
         break;
       case kDescriptorFile:
         // Keep my manifest file, and any newer incarnations'
@@ -602,13 +596,11 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     Status file_deletion_status;
     if (schedule_only) {
       if (type == kLogFile) {
-        //fprintf(stdout, "schedule delete %lu.\n", number);
       }
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
       if (type == kLogFile) {
-        //fprintf(stdout, "directly delete %lu.\n", number);
       }
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }

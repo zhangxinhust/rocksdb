@@ -188,26 +188,46 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   output_level_ = 2;
   start_level_inputs_.level = 1;
 
-  if (start_level_inputs_.files.size()) {
-    int64_t curr_time = 0;
-    ioptions_.env->GetCurrentTime(&curr_time);
-    ROCKS_LOG_BUFFER(
-      log_buffer_, 
-      "\nttl_files_begin:\n"
-      "currtime: %lu\n"
-      "files_size: %lu\n"
-      "max_file_num: %lu\n"
-      "min_file_num: %lu\n"
-      "max_live_time: %lu\n"
-      "min_live_time: %lu\n",
-      ioptions_.env->NowMicros(),
-      start_level_inputs_.files.size(),
-      start_level_inputs_.files.front()->fd.GetNumber(),
-      start_level_inputs_.files.back()->fd.GetNumber(),
-      curr_time - start_level_inputs_.files.front()->fd.table_reader->GetTableProperties()->creation_time,
-      curr_time - start_level_inputs_.files.back()->fd.table_reader->GetTableProperties()->creation_time
-    );
+  // zhangxin
+  uint64_t oldest_number, latest_number;
+  int64_t _curr_time;
+  uint64_t oldest_ttl, latest_ttl, curr_time;
+  SequenceNumber oldest_s, oldest_l, latest_s, latest_l;
+  ioptions_.env->GetCurrentTime(&_curr_time);
+  curr_time = static_cast<uint64_t>(_curr_time);
+  oldest_ttl = curr_time;
+  lastet_ttl = 0;
+  for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
+    FileMetaData* meta = level_file->second;
+    if (meta->fd.table_reader &&
+        meta->fd.table_reader->GetTableProperties()) {
+      auto creation_time = meta->fd.table_reader->GetTableProperties()->creation_time;
+      if (creation_time < oldest_ttl) {
+        oldest_ttl = creation_time;
+        oldest_number = meta->fd.GetNumber();
+        oldest_s = meta->fd.smallest_seqno;
+        oldest_l = meta->fd.largest_seqno;
+      }
+      if (creation_time > latest_ttl) {
+        latest_ttl = creation_time;
+        latest_number = meta->fd.GetNumber();
+        latest_s = meta->fd.smallest_seqno;
+        latest_l = meta->fd.largest_seqno;
+      }
+    }
   }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\nttl_files_begin:\n"
+    "currtime: %lu\n"
+    "oldest: %lu, %lu, [%lu-%lu]\n"
+    "latest: %lu, %lu, [%lu-%lu]\n"
+    "ttl_files_end\n",
+    ioptions_.env->NowMicros(),
+    oldest_number, curr_time - oldest_ttl, oldest_s, oldest_l,
+    latest_number, curr_time - latest_ttl, latest_s, latest_l
+  );
 
   if (start_level_inputs_.files.size() &&
       !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
@@ -215,12 +235,6 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
     start_level_inputs_.files.clear();
   }
 
-  ROCKS_LOG_BUFFER(
-    log_buffer_, 
-    "\nfiles_size_2: %lu\n"
-    "ttl_files_end.\n",
-    start_level_inputs_.files.size()
-  );
   /*
   if (start_level_inputs_.files.size() && mutable_cf_options_.ttl > 0) {
     vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);

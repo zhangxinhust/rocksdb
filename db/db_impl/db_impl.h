@@ -912,6 +912,7 @@ class DBImpl : public DB {
   bool own_info_log_;
   const DBOptions initial_db_options_;
   const ImmutableDBOptions immutable_db_options_;
+  LogBuffer* log_buffer_; // zhangxin
   MutableDBOptions mutable_db_options_;
   Statistics* stats_;
   std::unordered_map<std::string, RecoveredTransaction*>

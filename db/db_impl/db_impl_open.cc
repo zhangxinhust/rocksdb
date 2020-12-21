@@ -1070,8 +1070,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     }
   }
 
-  //fprintf(stdout, "status.ok: %d, data_seen: %d, flushed: %d.\n",
-  //  status.ok(), data_seen, flushed);
   if (status.ok() && ((data_seen && !flushed) ||
                       immutable_db_options_.use_wal_stage)) { // hust-cloud
     status = RestoreAliveLogFiles(log_numbers);
