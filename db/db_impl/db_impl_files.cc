@@ -340,23 +340,24 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     stream << "\n smallest_seqno: ";
     stream.StartArray();
     for (const auto& file : level1_files) {
-      stream << fd.smallest_seqno;
+      stream << file->fd.smallest_seqno;
     }
     stream.EndArray();
 
     stream << "\n largest_seqno: ";
     stream.StartArray();
     for (const auto& file : level1_files) {
-      stream << fd.largest_seqno;
+      stream << file->fd.largest_seqno;
     }
     stream.EndArray();
 
-    stream << "\n live time: "
+    stream << "\n live time: ";
     stream.StartArray();
     for (const auto& file : level1_files) {
       stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
     }        
     stream.EndArray();
+
     for (const auto& file : level1_files) {
       if (!file) {
         continue;
