@@ -281,13 +281,6 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
   curr_time = static_cast<uint64_t>(_curr_time);
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
-  if (log_buffer_ == nullptr) {
-    log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
-  }
-  LogBuffer* log_buffer = log_buffer_;
-  if (log_buffer == nullptr) {
-    log_buffer = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
-  }
 
   if (!logs_seq_range_.count(log_number)) {
     fprintf(stdout, "%lu true-0, not in logs_seq_range_!!!!!!!.\n", 
@@ -315,103 +308,24 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         fprintf(stdout, "L0 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L0 file: [%lu-%lu], [%lu-%lu].\n",
           curr_time, log_number, log_smallest_seq, log_largest_seq, level0_files.back()->fd.GetNumber(),
           level0_files.front()->fd.GetNumber(), level0_smallest_seq, level0_largest_seq);
-        // ROCKS_LOG_BUFFER(
-        //   log_buffer,
-        //   "\nWALShouldPurge_begin\n"
-        //   "curr_time: %lu\n"
-        //   "L0 overlap, wal %lu: [%lu-%lu], L0: [%lu-%lu], [%lu-%lu] %lu.\n"
-        //   "WALShouldPurge_end\n",
-        //   env_->NowMicros(),
-        //   log_number, log_smallest_seq, log_largest_seq,
-        //   level0_files.back()->fd.GetNumber(), level0_files.front()->fd.GetNumber(),
-        //   level0_smallest_seq, level0_largest_seq
-        // );
-        // log_buffer->FlushBufferToLog();
         return false;
       }
     }
     // L1
-    if (level1_files.size()) {
-      fprintf(stdout, "curr_time: %lu, ", curr_time);
-      for (auto &file : level1_files) {
-        fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", file->fd.GetNumber(), 
-          file->fd.smallest_seqno, file->fd.largest_seqno,
-          (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000);
-      }
-      // for (auto &file : level1_files) {
-      //   ROCKS_LOG_INFO(
-      //     immutable_db_options_.info_log,
-      //     "L1_num: %lu, [%lu-%lu], %lu. ",
-      //     file->fd.GetNumber(), file->fd.smallest_seqno, file->fd.largest_seqno,
-      //     (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000
-      //   );
-      // }
-    //   {
-    //     auto stream = event_logger_.LogToBuffer(log_buffer);
-    //     stream << "\nWALShouldPurge L1 files: ";
-    //     stream.StartArray();
-    //     for (const auto& file : level1_files) {
-    //       stream << file->fd.GetNumber();
-    //     }
-    //     stream.EndArray();
-    //   }
-    //   {
-    //     auto stream = event_logger_.LogToBuffer(log_buffer);
-    //     stream << "\nsmallest_seqno: ";
-    //     stream.StartArray();
-    //     for (const auto& file : level1_files) {
-    //       stream << file->fd.smallest_seqno;
-    //     }
-    //     stream.EndArray();
-    //   }
-    //   {
-    //     auto stream = event_logger_.LogToBuffer(log_buffer);
-    //     stream << "\nlargest_seqno: ";
-    //     stream.StartArray();
-    //     for (const auto& file : level1_files) {
-    //       stream << file->fd.largest_seqno;
-    //     }
-    //     stream.EndArray();
-    //   }
-    //   {
-    //     auto stream = event_logger_.LogToBuffer(log_buffer);
-    //     stream << "\nlive time: ";
-    //     stream.StartArray();
-    //     for (const auto& file : level1_files) {
-    //       if (file->fd.table_reader && file->fd.table_reader->GetTableProperties()) {
-    //         stream << (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000;
-    //       }
-    //     }        
-    //     stream.EndArray();
-    //   }
-    }
-
     for (const auto& file : level1_files) {
       if (!file) {
         continue;
       }
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        fprintf(stdout, "L1 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L1 file: %lu, [%lu-%lu].\n",
+        fprintf(stdout, "\nL1 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L1 file: %lu, [%lu-%lu].\n",
           curr_time, log_number, log_smallest_seq, log_largest_seq, file->fd.GetNumber(),
           file->fd.smallest_seqno, file->fd.largest_seqno);
-        // auto stream = event_logger_.LogToBuffer(log_buffer);
-        // stream << "\nL1 overlap " << "currtime" << env_->NowMicros() <<
-        //   "wal" << log_number << "range:" << log_smallest_seq << "-" << log_largest_seq <<
-        //   "\nL1: " << file->fd.GetNumber() << "range:" << file->fd.smallest_seqno << "-" << file->fd.largest_seqno << "\n";
-
-        // ROCKS_LOG_BUFFER(
-        //   log_buffer,
-        //   "\nWALShouldPurge_begin\n"
-        //   "curr_time: %lu\n"
-        //   "L1 overlap, wal %lu: [%lu-%lu], L1: %lu, [%lu-%lu] %lu.\n"
-        //   "WALShouldPurge_end\n",
-        //   env_->NowMicros(),
-        //   log_number, log_smallest_seq, log_largest_seq,
-        //   file->fd.GetNumber(),
-        //   file->fd.smallest_seqno, file->fd.largest_seqno
-        // );
-        // log_buffer->FlushBufferToLog();
+        for (auto &file : level1_files) {
+          fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", file->fd.GetNumber(), 
+            file->fd.smallest_seqno, file->fd.largest_seqno,
+            (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000);
+        }
         return false;
       }
     }
