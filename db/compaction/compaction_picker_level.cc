@@ -196,9 +196,9 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   ioptions_.env->GetCurrentTime(&_curr_time);
   curr_time = static_cast<uint64_t>(_curr_time);
   oldest_ttl = curr_time;
-  lastet_ttl = 0;
+  latest_ttl = 0;
   for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
-    FileMetaData* meta = level_file->second;
+    FileMetaData* meta = level_file.second;
     if (meta->fd.table_reader &&
         meta->fd.table_reader->GetTableProperties()) {
       auto creation_time = meta->fd.table_reader->GetTableProperties()->creation_time;
