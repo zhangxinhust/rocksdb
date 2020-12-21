@@ -275,6 +275,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
 // hust-cloud
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
+  fprintf(stdout, "walshouldpurge\n");
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
   if (log_buffer_ == nullptr) {
@@ -329,6 +330,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     env_->GetCurrentTime(&_curr_time);
     curr_time = static_cast<uint64_t>(_curr_time);
 
+    fprintf(stdout, "before stream\n");
     auto stream = event_logger_.LogToBuffer(log_buffer);
     fprintf(stdout, "before print file number\n");
     stream << "\nWALShouldPurge L1 files: ";
