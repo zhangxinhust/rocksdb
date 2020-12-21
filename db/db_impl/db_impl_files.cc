@@ -325,10 +325,10 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
     }
     // L1
-    int64_t _curr_time;
-    uint64_t curr_time;
-    env_->GetCurrentTime(&_curr_time);
-    curr_time = static_cast<uint64_t>(_curr_time);
+    // int64_t _curr_time;
+    // uint64_t curr_time;
+    // env_->GetCurrentTime(&_curr_time);
+    // curr_time = static_cast<uint64_t>(_curr_time);
 
     /*
     for (auto &file : level1_files) {
