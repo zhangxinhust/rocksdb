@@ -321,10 +321,10 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
         fprintf(stdout, "\nL1 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L1 file: %lu, [%lu-%lu].\n",
           curr_time, log_number, log_smallest_seq, log_largest_seq, file->fd.GetNumber(),
           file->fd.smallest_seqno, file->fd.largest_seqno);
-        for (auto &file : level1_files) {
-          fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", file->fd.GetNumber(), 
-            file->fd.smallest_seqno, file->fd.largest_seqno,
-            (curr_time - file->fd.table_reader->GetTableProperties()->creation_time) / 1000000);
+        for (auto &f : level1_files) {
+          fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", f->fd.GetNumber(), 
+            f->fd.smallest_seqno, f->fd.largest_seqno,
+            (curr_time - f->fd.table_reader->GetTableProperties()->creation_time) / 1000000);
         }
         return false;
       }
