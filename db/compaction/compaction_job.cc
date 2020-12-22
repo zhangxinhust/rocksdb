@@ -1913,6 +1913,16 @@ void CompactionJob::LogCompaction() {
                    cfd->GetName().c_str(), scratch);
     // build event logger report
     auto stream = event_logger_->Log();
+    if (compaction->start_level() <= 1) {
+      stream << "L0 num_input_files"
+             << compaction->num_input_files(0)
+             << "L0 NumLevelFiles"
+             << cfd->current()->storage_info()->NumLevelFiles(0)
+             << "L1 num_input_files"
+             << compaction->num_input_files(1)
+             << "L1 NumLevelFiles"
+             << cfd->current()->storage_info()->NumLevelFiles(1)
+    }
     stream << "job" << job_id_ << "event"
            << "compaction_started"
            << "compaction_reason"
