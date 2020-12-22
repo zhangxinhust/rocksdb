@@ -275,10 +275,11 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
 // hust-cloud
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
-  int64_t _curr_time;
-  uint64_t curr_time;
-  env_->GetCurrentTime(&_curr_time);
-  curr_time = static_cast<uint64_t>(_curr_time);
+  // int64_t _curr_time;
+  // uint64_t curr_time;
+  // env_->GetCurrentTime(&_curr_time);
+  // curr_time = static_cast<uint64_t>(_curr_time);
+  
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();
 
