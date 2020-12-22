@@ -1921,7 +1921,7 @@ void CompactionJob::LogCompaction() {
              << "L1 num_input_files"
              << compaction->num_input_files(1)
              << "L1 NumLevelFiles"
-             << cfd->current()->storage_info()->NumLevelFiles(1)
+             << cfd->current()->storage_info()->NumLevelFiles(1);
     }
     stream << "job" << job_id_ << "event"
            << "compaction_started"
