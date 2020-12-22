@@ -293,7 +293,7 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
     return false;
   }
 
-  auto stream = event_logger_.Log();
+  // auto stream = event_logger_.Log();
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     if (cfd->IsDropped() || !cfd->initialized()) {
       return false;
@@ -307,19 +307,20 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
       if (!(level0_largest_seq < log_smallest_seq ||
           level0_smallest_seq > log_largest_seq)) {
-        stream << "L0 overlap curr_time"
-               << curr_time
-               << "wal num"
-               << log_number
-               << "wal seq range"
-               << log_smallest_seq
-               << log_largest_seq
-               << "L0 num range"
-               << level0_files.back()->fd.GetNumber()
-               << level0_files.front()->fd.GetNumber()
-               << "L0 seq range"
-               << level0_smallest_seq
-               << level0_largest_seq;
+        // stream << "L0 overlap curr_time"
+        //        << curr_time
+        //        << "wal num"
+        //        << log_number
+        //        << "wal seq range"
+        //        << log_smallest_seq
+        //        << log_largest_seq
+        //        << "L0 num range"
+        //        << level0_files.back()->fd.GetNumber()
+        //        << level0_files.front()->fd.GetNumber()
+        //        << "L0 seq range"
+        //        << level0_smallest_seq
+        //        << level0_largest_seq;
+
         // fprintf(stdout, "L0 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L0 file: [%lu-%lu], [%lu-%lu].\n",
         //   curr_time, log_number, log_smallest_seq, log_largest_seq, level0_files.back()->fd.GetNumber(),
         //   level0_files.front()->fd.GetNumber(), level0_smallest_seq, level0_largest_seq);
@@ -333,56 +334,55 @@ bool DBImpl::WALShouldPurge(uint64_t log_number) {
       }
       if (!(file->fd.largest_seqno < log_smallest_seq ||
           file->fd.smallest_seqno > log_largest_seq)) {
-        stream << "L1 overlap curr_time"
-               << curr_time
-               << "wal num"
-               << log_number
-               << "wal seq range"
-               << log_smallest_seq
-               << log_largest_seq
-               << "L1 num"
-               << file->fd.GetNumber()
-               << "L1 seq range"
-               << file->fd.smallest_seqno
-               << file->fd.largest_seqno;
+        // stream << "L1 overlap curr_time"
+        //        << curr_time
+        //        << "wal num"
+        //        << log_number
+        //        << "wal seq range"
+        //        << log_smallest_seq
+        //        << log_largest_seq
+        //        << "L1 num"
+        //        << file->fd.GetNumber()
+        //        << "L1 seq range"
+        //        << file->fd.smallest_seqno
+        //        << file->fd.largest_seqno;
+
         // fprintf(stdout, "\nL1 overlap curr_time: %lu. wal: %lu, [%lu-%lu]. L1 file: %lu, [%lu-%lu].\n",
         //   curr_time, log_number, log_smallest_seq, log_largest_seq, file->fd.GetNumber(),
         //   file->fd.smallest_seqno, file->fd.largest_seqno);
-        {
-          stream << "L1 num";
-          stream.StartArray();
-          for (auto &f : level1_files) {
-            stream << f->fd.GetNumber();
-            // fprintf(stdout, "L1_num: %lu, [%lu-%lu], %lu.\n", f->fd.GetNumber(), 
-            //   f->fd.smallest_seqno, f->fd.largest_seqno,
-            //   curr_time - f->fd.table_reader->GetTableProperties()->creation_time);
-          }
-          stream.EndArray();
-        }
-        {
-          stream << "L1 small";
-          stream.StartArray();
-          for (auto &f : level1_files) {
-            stream << f->fd.smallest_seqno;
-          }
-          stream.EndArray();
-        }
-        {
-          stream << "L1 large";
-          stream.StartArray();
-          for (auto &f : level1_files) {
-            stream << f->fd.largest_seqno;
-          }
-          stream.EndArray();
-        }
-        {
-          stream << "L1 live";
-          stream.StartArray();
-          for (auto &f : level1_files) {
-            stream << curr_time - f->fd.table_reader->GetTableProperties()->creation_time;
-          }
-          stream.EndArray();
-        }
+
+        // {
+        //   stream << "L1 num";
+        //   stream.StartArray();
+        //   for (auto &f : level1_files) {
+        //     stream << f->fd.GetNumber();
+        //   }
+        //   stream.EndArray();
+        // }
+        // {
+        //   stream << "L1 small";
+        //   stream.StartArray();
+        //   for (auto &f : level1_files) {
+        //     stream << f->fd.smallest_seqno;
+        //   }
+        //   stream.EndArray();
+        // }
+        // {
+        //   stream << "L1 large";
+        //   stream.StartArray();
+        //   for (auto &f : level1_files) {
+        //     stream << f->fd.largest_seqno;
+        //   }
+        //   stream.EndArray();
+        // }
+        // {
+        //   stream << "L1 live";
+        //   stream.StartArray();
+        //   for (auto &f : level1_files) {
+        //     stream << curr_time - f->fd.table_reader->GetTableProperties()->creation_time;
+        //   }
+        //   stream.EndArray();
+        // }
         return false;
       }
     }
