@@ -842,7 +842,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 
   double wal_mb = 0;
   std::vector<std::vector<double>> level_mb;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 5; i++) {
     level_mb.push_back(std::vector<double>(7));
   }
   for (auto _cfd : *versions_->GetColumnFamilySet()) {
@@ -860,6 +860,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     "level_realtime: %d, %lf.\n"
     "level_realtime: %d, %lf.\n"
     "level_realtime: %d, %lf.\n"
+    "level_realtime: %d, %lf.\n"
+    "level_realtime: %d, %lf.\n"
+    "level_total: %d, %lf.\n"
+    "level_total: %d, %lf.\n"
     "level_total: %d, %lf.\n"
     "level_total: %d, %lf.\n"
     "level_total: %d, %lf.\n"
@@ -869,9 +873,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
     0, level_mb[0][0],
     1, level_mb[0][1],
     2, level_mb[0][2],
+    3, level_mb[0][2],
+    4, level_mb[0][2],
     0, level_mb[1][0],
     1, level_mb[1][1],
-    2, level_mb[1][2]
+    2, level_mb[1][2],
+    3, level_mb[1][2],
+    4, level_mb[1][2]
   );
 
   uint32_t read_path_id, read_level_id;
