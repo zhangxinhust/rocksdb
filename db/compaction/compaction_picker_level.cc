@@ -95,6 +95,8 @@ class LevelCompactionBuilder {
 
   void PickExpiredTtlFiles();
 
+  void PickL1ExpiredTtlFiles(); // hust-cloud
+
   void PickFilesMarkedForPeriodicCompaction();
 
   const std::string& cf_name_;
@@ -160,6 +162,38 @@ void LevelCompactionBuilder::PickExpiredTtlFiles() {
   start_level_inputs_.files.clear();
 }
 
+// hust-cloud
+void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
+  assert(ioptions_.use_wal_stage);
+  assert(mutable_cf_options_.ttl > 0);
+  if (vstorage_->ExpiredTtlFiles().empty()) {
+    return;
+  }
+
+  for (auto& level_file : vstorage_->ExpiredTtlFiles()) {
+    // If it's being compacted it has nothing to do here.
+    // If this assert() fails that means that some function marked some
+    // files as being_compacted, but didn't call ComputeCompactionScore()
+    assert(!level_file.second->being_compacted);
+    start_level_inputs_.files.push_back(level_file.second);
+
+    // TODO: The number of files should be dynamic?
+    if (start_level_inputs_.files.size() >= 10) {
+      break;
+    }
+  }
+
+  start_level_ = 1;
+  output_level_ = 2;
+  start_level_inputs_.level = 1;
+
+  if (start_level_inputs_.files.size() &&
+      !compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
+                                               &start_level_inputs_)) {
+    start_level_inputs_.files.clear();
+  }
+}
+
 void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
   if (vstorage_->FilesMarkedForPeriodicCompaction().empty()) {
     return;
@@ -194,6 +228,16 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 }
 
 void LevelCompactionBuilder::SetupInitialFiles() {
+  // hust-cloud
+  // TTL Compaction has the highest priority
+  if (ioptions_.use_wal_stage) {
+    PickL1ExpiredTtlFiles();
+    if (!start_level_inputs_.empty()) {
+      compaction_reason_ = CompactionReason::kTtl;
+      return;
+    }
+  }
+
   // Find the compactions by size on all levels.
   bool skipped_l0_to_base = false;
   for (int i = 0; i < compaction_picker_->NumberLevels() - 1; i++) {
@@ -280,8 +324,9 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     }
   }
 
+  // hust-cloud
   // TTL Compaction
-  if (start_level_inputs_.empty()) {
+  if (!ioptions_.use_wal_stage && start_level_inputs_.empty()) {
     PickExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
       compaction_reason_ = CompactionReason::kTtl;

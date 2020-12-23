@@ -44,6 +44,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       table_cache_numshardbits(options.table_cache_numshardbits),
       wal_ttl_seconds(options.WAL_ttl_seconds),
       wal_size_limit_mb(options.WAL_size_limit_MB),
+	  use_wal_stage(options.use_wal_stage), // hust-cloud
       max_write_batch_group_size_bytes(
           options.max_write_batch_group_size_bytes),
       manifest_preallocation_size(options.manifest_preallocation_size),

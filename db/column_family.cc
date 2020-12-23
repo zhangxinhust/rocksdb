@@ -387,6 +387,15 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
     }
   }
 
+  // hust-cloud
+  if (db_options.use_wal_stage) {
+    if (result.ttl == 0) {
+      result.ttl = 20;
+	} else {
+	  result.ttl = std::min(result.ttl, 20);
+	}
+  }
+
   // TTL compactions would work similar to Periodic Compactions in Universal in
   // most of the cases. So, if ttl is set, execute the periodic compaction
   // codepath.

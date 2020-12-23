@@ -149,17 +149,39 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           continue;
         }
 
+        // hust-cloud
+        if (immutable_db_options_.use_wal_stage && type == kLogFile) {
+          if (!WALShouldPurge(number)) {
+            continue;
+          } else if (logs_seq_range_.count(number)) {
+            logs_seq_range_.erase(number);
+          }
+        }
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
         job_context->full_scan_candidate_files.emplace_back("/" + file, path);
       }
     }
 
     // Add log files in wal_dir
+    // hust-cloud TODO: false if wal_dir ends with "/" while dbname_ not, vice versa
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
       env_->GetChildren(immutable_db_options_.wal_dir,
                         &log_files);  // Ignore errors
       for (const std::string& log_file : log_files) {
+        // hust-cloud
+        if (immutable_db_options_.use_wal_stage) {
+          uint64_t number;
+          FileType type;
+          if (ParseFileName(log_file, &number, &type) && type == kLogFile) {
+            if (!WALShouldPurge(number)) {
+              continue;
+            } else if (logs_seq_range_.count(number)) {
+              logs_seq_range_.erase(number);
+            }
+          }
+        }
+
         job_context->full_scan_candidate_files.emplace_back(
             log_file, immutable_db_options_.wal_dir);
       }
@@ -185,6 +207,15 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     // find newly obsoleted log files
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
+      // hust-cloud
+      if (immutable_db_options_.use_wal_stage) {
+        if (!WALShouldPurge(earliest.number)) {
+          break;
+        } else if (logs_seq_range_.count(earliest.number)) {
+          logs_seq_range_.erase(earliest.number);
+        }
+      }
+
       if (immutable_db_options_.recycle_log_file_num >
           log_recycle_files_.size()) {
         ROCKS_LOG_INFO(immutable_db_options_.info_log,
@@ -237,6 +268,48 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     ++pending_purge_obsolete_files_;
   }
   logs_to_free_.clear();
+}
+
+// hust-cloud
+bool DBImpl::WALShouldPurge(uint64_t log_number) {
+  assert(immutable_db_options_.use_wal_stage);
+  mutex_.AssertHeld();
+  if (!logs_seq_range_.count(log_number)) {
+    return true;
+  }
+  SequenceNumber log_smallest_seq = logs_seq_range_[log_number].first;
+  SequenceNumber log_largest_seq = logs_seq_range_[log_number].second;
+  if (log_largest_seq == kDisableGlobalSequenceNumber) {
+    return false;
+  }
+  for (auto cfd : *versions_->GetColumnFamilySet()) {
+    if (cfd->IsDropped() || !cfd->initialized()) {
+      return false;
+    }
+    assert(cfd->NumberLevels() > 1);
+    const auto& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+    const auto& level1_files = cfd->current()->storage_info()->LevelFiles(1);
+    // L0
+    if (level0_files.size()) {
+      SequenceNumber level0_smallest_seq = level0_files.back()->fd.smallest_seqno;
+      SequenceNumber level0_largest_seq = level0_files.front()->fd.largest_seqno;
+      if (!(level0_largest_seq < log_smallest_seq ||
+          level0_smallest_seq > log_largest_seq)) {
+        return false;
+      }
+    }
+    // L1
+    for (const auto& file : level1_files) {
+      if (!file) {
+        continue;
+      }
+      if (!(file->fd.largest_seqno < log_smallest_seq ||
+          file->fd.smallest_seqno > log_largest_seq)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 namespace {

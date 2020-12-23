@@ -2485,13 +2485,26 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   }
   const uint64_t current_time = static_cast<uint64_t>(_current_time);
 
-  for (int level = 0; level < num_levels() - 1; level++) {
-    for (FileMetaData* f : files_[level]) {
+  // hust-cloud
+  if (ioptions.use_wal_stage) {
+    for (FileMetaData* f : files_[1]) {
       if (!f->being_compacted) {
         uint64_t oldest_ancester_time = f->TryGetOldestAncesterTime();
         if (oldest_ancester_time > 0 &&
             oldest_ancester_time < (current_time - ttl)) {
           expired_ttl_files_.emplace_back(level, f);
+        }
+      }
+    }
+  } else {
+    for (int level = 0; level < num_levels() - 1; level++) {
+      for (FileMetaData* f : files_[level]) {
+        if (!f->being_compacted) {
+          uint64_t oldest_ancester_time = f->TryGetOldestAncesterTime();
+          if (oldest_ancester_time > 0 &&
+              oldest_ancester_time < (current_time - ttl)) {
+            expired_ttl_files_.emplace_back(level, f);
+          }
         }
       }
     }

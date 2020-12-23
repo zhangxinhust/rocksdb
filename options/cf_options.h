@@ -59,6 +59,8 @@ struct ImmutableCFOptions {
 
   InfoLogLevel info_log_level;
 
+  bool use_wal_stage; // hust-cloud
+
   Env* env;
 
   // Allow the OS to mmap file for reading sst tables. Default: false

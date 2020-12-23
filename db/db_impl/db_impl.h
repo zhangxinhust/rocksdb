@@ -602,6 +602,8 @@ class DBImpl : public DB {
   void FindObsoleteFiles(JobContext* job_context, bool force,
                          bool no_full_scan = false);
 
+  bool WALShouldPurge(uint64_t log_number); // hust-cloud
+
   // Diffs the files listed in filenames and those that do not
   // belong to live files are possibly removed. Also, removes all the
   // files in sst_delete_files and log_delete_files.
@@ -1810,6 +1812,9 @@ class DBImpl : public DB {
   WriteBatch cached_recoverable_state_;
   std::atomic<bool> cached_recoverable_state_empty_ = {true};
   std::atomic<uint64_t> total_log_size_;
+
+  // hust-cloud
+  std::unordered_map<uint64_t, std::pair<SequenceNumber, SequenceNumber>> logs_seq_range_;
 
   // If this is non-empty, we need to delete these log files in background
   // threads. Protected by db mutex.

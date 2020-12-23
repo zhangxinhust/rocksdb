@@ -633,6 +633,11 @@ struct DBOptions {
   uint64_t WAL_ttl_seconds = 0;
   uint64_t WAL_size_limit_MB = 0;
 
+  // hust-cloud
+  // Keep the wal file before all the data compacted to L2.
+  // Default: false
+  bool use_wal_stage = false;
+
   // Number of bytes to preallocate (via fallocate) the manifest
   // files.  Default is 4mb, which is reasonable to reduce random IO
   // as well as prevent overallocation for mounts that preallocate
