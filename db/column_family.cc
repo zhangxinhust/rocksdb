@@ -392,7 +392,7 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
     if (result.ttl == 0) {
       result.ttl = 20;
 	} else {
-	  result.ttl = std::min(result.ttl, 20);
+	  result.ttl = std::min(result.ttl, 20ul);
 	}
   }
 
