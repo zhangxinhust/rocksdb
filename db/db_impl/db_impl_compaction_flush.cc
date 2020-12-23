@@ -1992,12 +1992,11 @@ DBImpl::BGJobLimits DBImpl::GetBGJobLimits(int max_background_flushes,
   return res;
 }
 
-// zhangxin
 void DBImpl::AddToCompactionQueue(ColumnFamilyData* cfd) {
   assert(!cfd->queued_for_compaction());
   cfd->Ref();
   compaction_queue_.push_back(cfd);
-  element_insert_time_.push_back(env_->NowMicros());
+  element_insert_time_.push_back(env_->NowMicros()); // zhangxin
   cfd->set_queued_for_compaction(true);
 }
 

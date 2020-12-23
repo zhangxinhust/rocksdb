@@ -329,7 +329,6 @@ Status Directories::SetDirectories(Env* env, const std::string& dbname,
 Status DBImpl::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families, bool read_only,
     bool error_if_log_file_exist, bool error_if_data_exists_in_logs) {
-  fprintf(stdout, "DBImpl::Recover!!!!!-----------.\n");
   mutex_.AssertHeld();
 
   bool is_new_db = false;
@@ -629,7 +628,6 @@ Status DBImpl::InitPersistStatsColumnFamily() {
 // REQUIRES: log_numbers are sorted in ascending order
 Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
                                SequenceNumber* next_sequence, bool read_only) {
-  fprintf(stdout, "DBImpl::RecoverLogFiles!!!!!!!!!!!!-------------\n");
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -687,11 +685,12 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   bool flushed = false;
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
-  fprintf(stdout, "min_log_number: %lu.\n", min_log_number);
+  fprintf(stdout, "min_log_number: %lu.\n", min_log_number); // zhangxin
   for (auto log_number : log_numbers) {
-    fprintf(stdout, "current log number: %lu.\n", log_number);
+    fprintf(stdout, "current log number: %lu.\n", log_number); // zhangxin
     if (!immutable_db_options_.use_wal_stage && // hust-cloud
         log_number < min_log_number) {
+	  // zhangxin
       fprintf(stdout, "Skipping log %lu since it is older than min log %lu.\n",
         log_number, min_log_number);
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
@@ -700,7 +699,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
                      log_number, min_log_number);
       continue;
     }
-    fprintf(stdout, "log %lu not skipped.\n", log_number);
     // The previous incarnation may not have written any MANIFEST
     // records after allocating this log number.  So we manually
     // update the file number allocation counter in VersionSet.
@@ -720,7 +718,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
     };
     if (stop_replay_by_wal_filter) {
-      fprintf(stdout, "%lu stop_replay_by_wal_filter", log_number);
+      fprintf(stdout, "%lu stop_replay_by_wal_filter", log_number); // zhangxin
       logFileDropped();
       continue;
     }
@@ -731,14 +729,14 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       status = env_->NewSequentialFile(fname, &file,
                                        env_->OptimizeForLogRead(env_options_));
       if (!status.ok()) {
-        fprintf(stdout, "%lu create SequentialFile failed.\n", log_number);
+        fprintf(stdout, "%lu create SequentialFile failed.\n", log_number); // zhangxin
         MaybeIgnoreError(&status);
         if (!status.ok()) {
           return status;
         } else {
           // Fail with one log file, but that's ok.
           // Try next one.
-          fprintf(stdout, "%lu continue after create sequentialfile.\n", log_number);
+          fprintf(stdout, "%lu continue after create sequentialfile.\n", log_number); // zhangxin
           continue;
         }
       }
@@ -781,7 +779,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       if (record.size() < WriteBatchInternal::kHeader) {
         reporter.Corruption(record.size(),
                             Status::Corruption("log record too small"));
-        fprintf(stdout, "%lu log too small.\n", log_number);
+        fprintf(stdout, "%lu log too small.\n", log_number); // zhangxin
         continue;
       }
       WriteBatchInternal::SetContents(&batch, record);
@@ -801,7 +799,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           stop_replay_for_corruption = false;
         }
         if (stop_replay_for_corruption) {
-          fprintf(stdout, "%lu stop_replay_for_corruption.\n", log_number);
+          fprintf(stdout, "%lu stop_replay_for_corruption.\n", log_number); // zhangxin
           logFileDropped();
           break;
         }
@@ -809,7 +807,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
 
 #ifndef ROCKSDB_LITE
       if (immutable_db_options_.wal_filter != nullptr) {
-        fprintf(stdout, "%lu wal_filter not empty\n", log_number);
+        fprintf(stdout, "%lu wal_filter not empty\n", log_number); // zhangxin
         WriteBatch new_batch;
         bool batch_changed = false;
 
@@ -850,7 +848,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
               return status;
             } else {
               // Ignore the error with current record processing.
-              //fprintf(stdout, "%lu continue after MaybeIgnoreError.\n", log_number);
+              fprintf(stdout, "%lu continue after MaybeIgnoreError.\n", log_number); // zhangxin
               continue;
             }
           }
@@ -901,12 +899,11 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       if (!status.ok()) {
         // We are treating this as a failure while reading since we read valid
         // blocks that do not form coherent data
-        fprintf(stdout, "%lu status not ok after InsertInto.\n", log_number);
+        fprintf(stdout, "%lu status not ok after InsertInto.\n", log_number); // zhangxin
         reporter.Corruption(record.size(), status);
         continue;
       }
 
-      //fprintf(stdout, "%d ", has_valid_writes);
       if (has_valid_writes && !read_only) {
         // we can do this because this is called before client has access to the
         // DB and there is only a single thread operating on DB
@@ -920,11 +917,12 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
-          fprintf(stdout, "WL0- ");
+          fprintf(stdout, "WL0- "); // zhangxin
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Reflect errors immediately so that conditions like full
             // file-systems cause the DB::Open() to fail.
+			// zhangxin
             fprintf(stdout, "%lu status %s after WriteLevel0TableForRecovery.\n",
                 log_number, status.ToString().c_str());
             return status;
@@ -939,6 +937,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     // hust-cloud
     if (immutable_db_options_.use_wal_stage &&
         first_seqno != kDisableGlobalSequenceNumber) {
+	  // zhangxin
       fprintf(stdout, "%lu added to logs_seq_range_, [%lu-%lu].\n",
         log_number, first_seqno, sequence);
       logs_seq_range_[log_number] = 
@@ -946,6 +945,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     }
 
     if (!status.ok()) {
+	  // zhangxin
       fprintf(stdout, "%lu status not ok final.\n", log_number);
       if (status.IsNotSupported()) {
         // We should not treat NotSupported as corruption. It is rather a clear
@@ -1033,7 +1033,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         // being full), we flush at the end. Otherwise we'll need to record
         // where we were on last flush, which make the logic complicated.
         if (flushed || !immutable_db_options_.avoid_flush_during_recovery) {
-          fprintf(stdout, "final WriteL0Table \n");
+          fprintf(stdout, "final WriteL0Table \n"); // zhangxin
           status = WriteLevel0TableForRecovery(job_id, cfd, cfd->mem(), edit);
           if (!status.ok()) {
             // Recovery failed
@@ -1082,7 +1082,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
 }
 
 Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
-  fprintf(stdout, "RestoreAliveLogFiles!!!!!!!!-------------\n");
   if (log_numbers.empty()) {
     return Status::OK();
   }
@@ -1106,7 +1105,6 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
       break;
     }
     total_log_size_ += log.size;
-
     alive_log_files_.push_back(log);
     // We preallocate space for logs, but then after a crash and restart, those
     // preallocated space are not needed anymore. It is likely only the last
@@ -1387,7 +1385,8 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       // hust-cloud
       impl->logs_seq_range_[new_log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(impl->versions_->LastSequence(), kDisableGlobalSequenceNumber);
-      fprintf(stdout, "Create log in Open: %lu [%lu-max].\n", new_log_number, impl->versions_->LastSequence());
+      // zhangxin
+	  fprintf(stdout, "Create log in Open: %lu [%lu-max].\n", new_log_number, impl->versions_->LastSequence());
     }
 
     if (s.ok()) {

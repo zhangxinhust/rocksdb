@@ -106,7 +106,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 
   versions_->AddLiveFiles(&job_context->sst_live);
   if (doing_the_full_scan) {
-    fprintf(stdout, "full scan!!!!!.\n");
     InfoLogPrefix info_log_prefix(!immutable_db_options_.db_log_dir.empty(),
                                   dbname_);
     std::set<std::string> paths;
@@ -521,10 +520,8 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     const std::string& fname = candidate_file.file_name;
     uint64_t number;
     FileType type;
-    bool parse = ParseFileName(fname, &number, info_log_prefix.prefix, &type);
-    if (!parse) {
-    }
-    if (!parse || type != kOptionsFile) {
+    if (!ParseFileName(fname, &number, info_log_prefix.prefix, &type) ||
+        type != kOptionsFile) {
       continue;
     }
     if (number > optsfile_num1) {
@@ -641,13 +638,9 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 
     Status file_deletion_status;
     if (schedule_only) {
-      if (type == kLogFile) {
-      }
       InstrumentedMutexLock guard_lock(&mutex_);
       SchedulePendingPurge(fname, dir_to_sync, type, number, state.job_id);
     } else {
-      if (type == kLogFile) {
-      }
       DeleteObsoleteFileImpl(state.job_id, fname, dir_to_sync, type, number);
     }
   }

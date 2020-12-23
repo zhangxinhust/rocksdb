@@ -1651,7 +1651,7 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
                   MergeContext* merge_context,
                   SequenceNumber* max_covering_tombstone_seq, bool* value_found,
                   bool* key_exists, SequenceNumber* seq, ReadCallback* callback,
-                  bool* is_blob, int* hit_level) {
+                  bool* is_blob, int* hit_level) { // zhangxin
   Slice ikey = k.internal_key();
   Slice user_key = k.user_key();
 
@@ -4313,7 +4313,6 @@ Status VersionSet::ReadAndRecover(
 Status VersionSet::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     bool read_only) {
-  fprintf(stdout, "VersionSet::Recover!!!!!!!!!!!!!----------\n");
   std::unordered_map<std::string, ColumnFamilyOptions> cf_name_to_options;
   for (auto cf : column_families) {
     cf_name_to_options.insert({cf.name, cf.options});
@@ -4660,24 +4659,6 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
   return versions.LogAndApply(
       versions.GetColumnFamilySet()->GetDefault(),
       mutable_cf_options, &ve, &dummy_mutex, nullptr, true);
-}
-
-// zhangxin
-void VersionStorageInfo::PrintLevelInfo() {
-  fprintf(stdout, "num_levels_: %d, num_non_empte_levels_: %d, base_level_: %d.\n", 
-    num_levels_, num_non_empty_levels_, base_level_);
-  fprintf(stdout, "files_ size: %lu.\n", files_->size());
-  for (uint32_t i = 0; i < files_->size() && i < 7; i++) {
-    fprintf(stdout, "level %u: size: %lu.\n", i, files_[i].size());
-    if (i > 1) {
-      continue;
-    }
-    for (uint32_t j = 0; j < files_[i].size(); j++) {
-      fprintf(stdout, "    No.%u file: size: %lu, range[%lu-%lu].\n", 
-        j, files_[i][j]->fd.GetFileSize(), files_[i][j]->fd.smallest_seqno,
-        files_[i][j]->fd.largest_seqno);
-    }
-  }
 }
 
 Status VersionSet::DumpManifest(Options& options, std::string& dscname,

@@ -280,7 +280,6 @@ struct BlockBasedTableBuilder::Rep {
   uint64_t index_elapse_micro_total = 0;
   uint64_t index_elapse_micro_total_short = 0;
   uint64_t filter_elapse_micro_total = 0;
-  //uint64_t sst_elapse_micro_total = 0;
   
   const ImmutableCFOptions ioptions;
   const MutableCFOptions moptions;

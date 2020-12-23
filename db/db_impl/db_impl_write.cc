@@ -1157,7 +1157,6 @@ Status DBImpl::WriteToWAL(const WriteBatch& merged_batch,
     *log_used = logfile_number_;
   }
   total_log_size_ += log_entry.size();
-
   // TODO(myabandeh): it might be unsafe to access alive_log_files_.back() here
   // since alive_log_files_ might be modified concurrently
   alive_log_files_.back().AddSize(log_entry.size());
@@ -1843,7 +1842,8 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
           if (logs_seq_range_.count(last_log_number)) {
             logs_seq_range_[last_log_number] = 
                 std::pair<SequenceNumber, SequenceNumber>(logs_seq_range_[last_log_number].first, seq);
-            if (log_buffer_ == nullptr) {
+            // zhangxin
+			if (log_buffer_ == nullptr) {
               log_buffer_ = new LogBuffer(InfoLogLevel::INFO_LEVEL, immutable_db_options_.info_log.get());
             }
             LogBuffer* log_buffer = log_buffer_;

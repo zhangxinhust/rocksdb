@@ -261,8 +261,8 @@ DEFINE_int64(batch_size, 1, "Batch size");
 
 // hust-cloud
 DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
-DEFINE_string(db_paths, "/nvme1n1/zhangxin/ssd/", "The path for L0 and L1");
-DEFINE_string(db_paths2, "/home/zhangxin/hdd/", "The path for L2 and upper levels");
+DEFINE_string(db_paths, "", "The path for L0 and L1");
+DEFINE_string(db_paths2, "", "The path for L2 and upper levels");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
@@ -2553,8 +2553,7 @@ class Benchmark {
       }
 #endif  // !ROCKSDB_LITE
       DestroyDB(FLAGS_db, options);
-      if (!FLAGS_wal_dir.empty()) { // hust-cloud
-        fprintf(stdout, "delete files in wal_dir.\n");
+      if (!FLAGS_wal_dir.empty()) {
         FLAGS_env->DeleteDir(FLAGS_wal_dir);
       }
 
@@ -3432,9 +3431,7 @@ class Benchmark {
     printf("Initializing RocksDB Options from command-line flags\n");
     Options& options = *opts;
 
-    if (!FLAGS_use_wal_stage) {
-      assert(db_.db == nullptr);
-    }
+    assert(db_.db == nullptr);
 
     options.max_open_files = FLAGS_open_files;
     if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {

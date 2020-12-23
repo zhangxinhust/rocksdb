@@ -238,12 +238,6 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
                                                &start_level_inputs_)) {
     start_level_inputs_.files.clear();
   }
-
-  /*
-  if (start_level_inputs_.files.size() && mutable_cf_options_.ttl > 0) {
-    vstorage_->ComputeExpiredTtlFiles(ioptions_, mutable_cf_options_.ttl);
-  }
-  */
 }
 
 void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
@@ -281,7 +275,7 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 
 void LevelCompactionBuilder::SetupInitialFiles() {
   // hust-cloud
-  // TTL Compaction has the hignest priority
+  // TTL Compaction has the highest priority
   if (ioptions_.use_wal_stage) {
     PickL1ExpiredTtlFiles();
     if (!start_level_inputs_.empty()) {
@@ -307,7 +301,6 @@ void LevelCompactionBuilder::SetupInitialFiles() {
           (start_level_ == 0) ? vstorage_->base_level() : start_level_ + 1;
       if (PickFileToCompact()) {
         // found the compaction!
-        //fprintf(stdout, "Level %d, select %lu files.\n", start_level_, start_level_inputs_.size());
         if (start_level_ == 0) {
           // L0 score = `num L0 files` / `level0_file_num_compaction_trigger`
           compaction_reason_ = CompactionReason::kLevelL0FilesNum;
@@ -337,7 +330,7 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       }
     }
   }
-  //fprintf(stdout, "after score selete.\n");
+
   // if we didn't find a compaction, check if there are any files marked for
   // compaction
   if (start_level_inputs_.empty()) {
@@ -467,9 +460,6 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
   Compaction* c = GetCompaction();
 
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
-
-  //fprintf(stdout, "start input size: %lu, out input size: %lu, total size: %lu.\n",
-    //start_level_inputs_.size(), output_level_inputs_.size(), compaction_inputs_.size());
 
   // zhangxin
   /*

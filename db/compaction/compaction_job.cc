@@ -7,6 +7,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+// zhangxin
 #include <iostream>
 #include <sys/time.h>
 
@@ -670,11 +671,6 @@ Status CompactionJob::Run() {
     for (const auto& state : compact_->sub_compact_states) {
       for (const auto& output : state.outputs) {
         files_meta.emplace_back(&output.meta);
-        // zhangxin
-        /*
-        fprintf(stdout, "&&&&& [%lu:%lu] Run.\n",
-            output.meta.fd.smallest_seqno, output.meta.fd.largest_seqno);
-        */
       }
     }
     ColumnFamilyData* cfd = compact_->compaction->column_family_data();
@@ -741,11 +737,6 @@ Status CompactionJob::Run() {
           TableFileName(state.compaction->immutable_cf_options()->cf_paths,
                         output.meta.fd.GetNumber(), output.meta.fd.GetPathId());
       tp[fn] = output.table_properties;
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu:%lu] Run-2.\n",
-          output.meta.fd.smallest_seqno, output.meta.fd.largest_seqno);
-      */
     }
   }
   compact_->compaction->SetOutputTableProperties(std::move(tp));
@@ -801,7 +792,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   int64_t current_time = env_->NowMicros();
   int64_t max_live_time0 = 0, max_live_time1 = 0;
   if (env_->GetCurrentTime(&current_time).ok()) {
-    //std::string sst_live_str;
     for (auto _cfd : *versions_->GetColumnFamilySet()) {
       auto _vstorage = _cfd->current()->storage_info();
       for (int level = 0; level < 2 &&  level < _vstorage->num_levels(); level++) {
@@ -810,11 +800,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
               f->fd.table_reader->GetTableProperties() != nullptr) {
             auto creation_time =
                 f->fd.table_reader->GetTableProperties()->creation_time;
-            //char buf[200];
-            //sprintf(buf, "%d, %ld.\n", 
-            //  level, current_time-creation_time);
-            //sst_live_str.append(buf);
-
             if (level == 0) {
               max_live_time0 = std::max(max_live_time0, int64_t(current_time-creation_time));
             } else if (level == 1) {
@@ -831,12 +816,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
       "curr: %ld.\n"
       "max_l0: %ld.\n"
       "max_l1: %ld.\n"
-      //"%s"
       "sst_live_time_end.\n",
       current_time,
       max_live_time0,
       max_live_time1
-      //sst_live_str.c_str()
     );
   }
 
@@ -1114,27 +1097,11 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
     }
     assert(sub_compact->builder != nullptr);
     assert(sub_compact->current_output() != nullptr);
-    // zhangxin
-    /*
-    fprintf(stdout, "&&&&& [%lu:%lu], iter seq: %lu, level: %d. before UpdateBoundaries.\n",
-        sub_compact->current_output()->meta.fd.smallest_seqno, 
-        sub_compact->current_output()->meta.fd.largest_seqno, 
-        c_iter->ikey().sequence,
-        sub_compact->compaction->start_level());
-    */
-
     sub_compact->builder->Add(key, value);
     sub_compact->current_output_file_size = sub_compact->builder->FileSize();
     sub_compact->current_output()->meta.UpdateBoundaries(
         key, c_iter->ikey().sequence);
     sub_compact->num_output_records++;
-
-    // zhangxin
-    /*
-    fprintf(stdout, "&&&&& [%lu:%lu] after UpdateBoundaries.\n",
-        sub_compact->current_output()->meta.fd.smallest_seqno, 
-        sub_compact->current_output()->meta.fd.largest_seqno);
-    */
 
     // Close output file if it is big enough. Two possibilities determine it's
     // time to close it: (1) the current key should be this file's last key, (2)
@@ -1181,21 +1148,9 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
         next_key = &c_iter->key();
       }
       CompactionIterationStats range_del_out_stats;
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu:%lu] before FinishCompactionOutputFile-1.\n",
-          sub_compact->current_output()->meta.fd.smallest_seqno, 
-          sub_compact->current_output()->meta.fd.largest_seqno);
-      */
       status =
           FinishCompactionOutputFile(input_status, sub_compact, &range_del_agg,
                                      &range_del_out_stats, next_key);
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu:%lu] after FinishCompactionOutputFile-1.\n",
-          sub_compact->current_output()->meta.fd.smallest_seqno, 
-          sub_compact->current_output()->meta.fd.largest_seqno);
-      */
       RecordDroppedKeys(range_del_out_stats,
                         &sub_compact->compaction_job_stats);
     }
@@ -1245,20 +1200,8 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
   // close the output file.
   if (sub_compact->builder != nullptr) {
     CompactionIterationStats range_del_out_stats;
-    // zhangxin
-    /*
-    fprintf(stdout, "&&&&& [%lu:%lu] before FinishCompactionOutputFile-2.\n",
-        sub_compact->current_output()->meta.fd.smallest_seqno, 
-        sub_compact->current_output()->meta.fd.largest_seqno);
-    */
     Status s = FinishCompactionOutputFile(status, sub_compact, &range_del_agg,
                                           &range_del_out_stats);
-    // zhangxin
-    /*
-    fprintf(stdout, "&&&&& [%lu:%lu] after FinishCompactionOutputFile-2.\n",
-        sub_compact->current_output()->meta.fd.smallest_seqno, 
-        sub_compact->current_output()->meta.fd.largest_seqno);
-    */
     if (status.ok()) {
       status = s;
     }
@@ -1498,19 +1441,10 @@ Status CompactionJob::FinishCompactionOutputFile(
         smallest_ikey_seqnum = GetInternalKeySeqno(meta->smallest.Encode());
       }
 #endif
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu:%lu] before UpdateBoundariesForRange.\n",
-          meta->fd.smallest_seqno, meta->fd.largest_seqno);
-      */
       meta->UpdateBoundariesForRange(smallest_candidate, largest_candidate,
                                      tombstone.seq_,
                                      cfd->internal_comparator());
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu:%lu] after UpdateBoundariesForRange.\n",
-          meta->fd.smallest_seqno, meta->fd.largest_seqno);
-      */
+
       // The smallest key in a file is used for range tombstone truncation, so
       // it cannot have a seqnum of 0 (unless the smallest data key in a file
       // has a seqnum of 0). Otherwise, the truncated tombstone may expose
@@ -1660,11 +1594,6 @@ Status CompactionJob::InstallCompactionResults(
   for (const auto& sub_compact : compact_->sub_compact_states) {
     for (const auto& out : sub_compact.outputs) {
       compaction->edit()->AddFile(compaction->output_level(), out.meta);
-      // zhangxin
-      /*
-      fprintf(stdout, "&&&&& [%lu-%lu] InstallCompactionResults.\n",
-        out.meta.fd.smallest_seqno, out.meta.fd.largest_seqno);
-      */
     }
   }
   return versions_->LogAndApply(compaction->column_family_data(),
@@ -1727,11 +1656,6 @@ Status CompactionJob::OpenCompactionOutputFile(
       FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0);
   out.finished = false;
 
-  // zhangxin
-  /*
-  fprintf(stdout, "&&&&& [%lu:%lu] OpenCompactionOutputFile.\n",
-      out.meta.fd.smallest_seqno, out.meta.fd.largest_seqno);
-  */
   sub_compact->outputs.push_back(out);
   writable_file->SetIOPriority(Env::IO_LOW);
   writable_file->SetWriteLifeTimeHint(write_hint_);
@@ -1918,6 +1842,7 @@ void CompactionJob::LogCompaction() {
                    cfd->GetName().c_str(), scratch);
     // build event logger report
     auto stream = event_logger_->Log();
+	// zhangxin
     // if (compaction->start_level() <= 1) {
     //   stream << "L0 num_input_files"
     //          << compaction->num_input_files(0)

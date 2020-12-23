@@ -418,8 +418,6 @@ class VersionStorageInfo {
                                      const Slice& largest_user_key,
                                      int last_level, int last_l0_idx);
 
-  void PrintLevelInfo(); // zhangxin
-
  private:
   const InternalKeyComparator* internal_comparator_;
   const Comparator* user_comparator_;
