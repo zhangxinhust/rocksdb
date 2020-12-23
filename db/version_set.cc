@@ -2492,7 +2492,7 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
         uint64_t oldest_ancester_time = f->TryGetOldestAncesterTime();
         if (oldest_ancester_time > 0 &&
             oldest_ancester_time < (current_time - ttl)) {
-          expired_ttl_files_.emplace_back(level, f);
+          expired_ttl_files_.emplace_back(1, f);
         }
       }
     }
