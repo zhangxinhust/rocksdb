@@ -231,6 +231,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       }
       job_context->size_log_to_delete += earliest.size;
       total_log_size_ -= earliest.size;
+
       if (two_write_queues_) {
         log_write_mutex_.Lock();
       }
