@@ -189,10 +189,10 @@ void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   start_level_inputs_.level = 1;
 
   // zhangxin
-  uint64_t oldest_number, latest_number;
-  int64_t _curr_time;
-  uint64_t oldest_ttl, latest_ttl, curr_time;
-  SequenceNumber oldest_s, oldest_l, latest_s, latest_l;
+  uint64_t oldest_number(0), latest_number(0);
+  int64_t _curr_time(0);
+  uint64_t oldest_ttl(0), latest_ttl(0), curr_time(0);
+  SequenceNumber oldest_s(0), oldest_l(0), latest_s(0), latest_l(0);
   ioptions_.env->GetCurrentTime(&_curr_time);
   curr_time = static_cast<uint64_t>(_curr_time);
   oldest_ttl = curr_time;
