@@ -140,7 +140,8 @@ class TableBuilder {
   // REQUIRES: Finish(), Abandon() have not been called
   virtual Status Finish() = 0;
 
-  virtual Status FinishMeta(); // hust-cloud
+  // hust-cloud
+  virtual Status FinishMeta() { return Status::OK(); }
 
   // Indicate that the contents of this builder should be abandoned.
   // If the caller is not going to call Finish(), it must call Abandon()
@@ -163,7 +164,7 @@ class TableBuilder {
   virtual TableProperties GetTableProperties() const = 0;
 
   // hust-cloud
-  virtual void SetFileWriter(WritableFileWriter* file);
+  virtual void SetFileWriter(WritableFileWriter* file) {}
 };
 
 }  // namespace rocksdb

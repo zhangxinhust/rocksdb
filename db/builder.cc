@@ -207,7 +207,7 @@ Status BuildTable(
 
     // hust-cloud
     if (s.ok() && !empty) {
-      builder->SetFileWriter(meta_file_writer);
+      builder->SetFileWriter(meta_file_writer.get());
       s = builder->FinishMeta();
     }
 

@@ -1227,7 +1227,7 @@ TableProperties BlockBasedTableBuilder::GetTableProperties() const {
 }
 
 // hust-cloud
-void BlockBasedTableBuilder::SetFileWriter(WritableFileWriter * meta_file) {
+void BlockBasedTableBuilder::SetFileWriter(WritableFileWriter *file) {
   rep_->file = file;
 }
 

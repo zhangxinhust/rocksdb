@@ -125,8 +125,6 @@ class BlockBasedTableBuilder : public TableBuilder {
   void WriteFooter(BlockHandle& metaindex_block_handle,
                    BlockHandle& index_block_handle);
 
-  void Set
-
   struct Rep;
   class BlockBasedTablePropertiesCollectorFactory;
   class BlockBasedTablePropertiesCollector;

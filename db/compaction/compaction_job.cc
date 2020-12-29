@@ -1329,7 +1329,7 @@ Status CompactionJob::FinishCompactionOutputFile(
     sub_compact->compaction->immutable_cf_options()->listeners;
     meta_file_writer.reset(new WritableFileWriter(std::move(meta_file), meta_name, env_options_,
                            env_, db_options_.statistics.get(), listeners));
-    sub_compact->builder->SetFileWriter(meta_file_writer);
+    sub_compact->builder->SetFileWriter(meta_file_writer.get());
     s = sub_compact->builder->FinishMeta();
   }
 
