@@ -71,6 +71,8 @@ class BlockBasedTableBuilder : public TableBuilder {
   // REQUIRES: Finish(), Abandon() have not been called
   Status Finish() override;
 
+  Status FinishMeta() override; // hust-cloud
+
   // Indicate that the contents of this builder should be abandoned.  Stops
   // using the file passed to the constructor after this function returns.
   // If the caller is not going to call Finish(), it must call Abandon()
@@ -89,6 +91,8 @@ class BlockBasedTableBuilder : public TableBuilder {
 
   // Get table properties
   TableProperties GetTableProperties() const override;
+
+  void SetFileWriter(WritableFileWriter * file) override; // hust-cloud
 
  private:
   bool ok() const { return status().ok(); }
@@ -120,6 +124,8 @@ class BlockBasedTableBuilder : public TableBuilder {
   void WriteRangeDelBlock(MetaIndexBuilder* meta_index_builder);
   void WriteFooter(BlockHandle& metaindex_block_handle,
                    BlockHandle& index_block_handle);
+
+  void Set
 
   struct Rep;
   class BlockBasedTablePropertiesCollectorFactory;

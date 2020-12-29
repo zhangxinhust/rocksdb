@@ -1299,6 +1299,40 @@ Status CompactionJob::FinishCompactionOutputFile(
   } else {
     sub_compact->builder->Abandon();
   }
+
+  // hust-cloud
+  if (sub_compact->compaction->output_level() <= 1) {
+    std::string sst_name = sub_compact->outfile->file_name();
+    uint64_t file_number = TableFileNameToNumber(sst_name);
+    std::string meta_name = TableMetaFileName(dbname_, file_number);
+    std::unique_ptr<WritableFile> meta_file;
+    s = NewWritableFile(env_, meta_name, &meta_file, env_options_);
+    if (!s.ok()) {
+    ROCKS_LOG_ERROR(
+      db_options_.info_log,
+      "[%s] [JOB %d] FinishCompactionOutputFile for table #%" PRIu64
+      " fails at NewWritableFile with status %s",
+      sub_compact->compaction->column_family_data()->GetName().c_str(),
+      job_id_, file_number, s.ToString().c_str());
+    LogFlush(db_options_.info_log);
+    EventHelpers::LogAndNotifyTableFileCreationFinished(
+      event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(),
+      meta_name, job_id_, FileDescriptor(), TableProperties(),
+      TableFileCreationReason::kCompaction, s);
+    return s;
+    }
+    meta_file->SetIOPriority(Env::IO_LOW);
+    meta_file->SetWriteLifeTimeHint(write_hint_);
+
+    std::unique_ptr<WritableFileWriter> meta_file_writer;
+    const auto& listeners =
+    sub_compact->compaction->immutable_cf_options()->listeners;
+    meta_file_writer.reset(new WritableFileWriter(std::move(meta_file), meta_name, env_options_,
+                           env_, db_options_.statistics.get(), listeners));
+    sub_compact->builder->SetFileWriter(meta_file_writer);
+    s = sub_compact->builder->FinishMeta();
+  }
+
   const uint64_t current_bytes = sub_compact->builder->FileSize();
   if (s.ok()) {
     meta->fd.file_size = current_bytes;

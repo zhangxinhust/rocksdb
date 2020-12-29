@@ -99,6 +99,9 @@ Status BuildTable(
 
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
+  // hust-cloud
+  std::string meta_name = TableMetaFileName(dbname, meta->fd.GetNumber());
+
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
       ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
@@ -107,14 +110,14 @@ Status BuildTable(
 
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
     TableBuilder* builder;
-    std::unique_ptr<WritableFileWriter> file_writer;
+    std::unique_ptr<WritableFileWriter> file_writer, meta_file_writer;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
     CompressionOptions compression_opts_for_flush(compression_opts);
     compression_opts_for_flush.max_dict_bytes = 0;
     compression_opts_for_flush.zstd_max_train_bytes = 0;
     {
-      std::unique_ptr<WritableFile> file;
+      std::unique_ptr<WritableFile> file, meta_file; // hust-cloud
 #ifndef NDEBUG
       bool use_direct_writes = env_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
@@ -126,11 +129,26 @@ Status BuildTable(
             job_id, meta->fd, tp, reason, s);
         return s;
       }
+      // hust-cloud
+      s = NewWritableFile(env, meta_name, &meta_file, env_options);
+      if (!s.ok()) {
+        EventHelpers::LogAndNotifyTableFileCreationFinished(
+            event_logger, ioptions.listeners, dbname, column_family_name, meta_name,
+            job_id, meta->fd, tp, reason, s);
+        return s;
+      }
+
       file->SetIOPriority(io_priority);
       file->SetWriteLifeTimeHint(write_hint);
+      // hust-cloud
+      meta_file->SetIOPriority(io_priority);
+      meta_file->SetWriteLifeTimeHint(write_hint);
 
       file_writer.reset(
           new WritableFileWriter(std::move(file), fname, env_options, env,
+                                 ioptions.statistics, ioptions.listeners));
+      meta_file_writer.reset(
+          new WritableFileWriter(std::move(meta_file), meta_name, env_options, env,
                                  ioptions.statistics, ioptions.listeners));
       builder = NewTableBuilder(
           ioptions, mutable_cf_options, internal_comparator,
@@ -185,6 +203,12 @@ Status BuildTable(
       builder->Abandon();
     } else {
       s = builder->Finish();
+    }
+
+    // hust-cloud
+    if (s.ok() && !empty) {
+      builder->SetFileWriter(meta_file_writer);
+      s = builder->FinishMeta();
     }
 
     if (s.ok() && !empty) {

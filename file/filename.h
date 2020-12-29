@@ -62,6 +62,7 @@ extern std::string ArchivedLogFileName(const std::string& dbname,
                                        uint64_t num);
 
 extern std::string MakeTableFileName(const std::string& name, uint64_t number);
+extern std::string MakeTableFileName(const std::string& name, uint64_t number); // hust-cloud
 
 // Return the name of sstable with LevelDB suffix
 // created from RocksDB sstable suffixed name
@@ -76,6 +77,9 @@ extern uint64_t TableFileNameToNumber(const std::string& name);
 // "dbname".
 extern std::string TableFileName(const std::vector<DbPath>& db_paths,
                                  uint64_t number, uint32_t path_id);
+
+// hust-cloud
+extern std::string TableMetaFileName(const std::string& dbname, uint64_t number);
 
 // Sufficient buffer size for FormatFileNumber.
 const size_t kFormatFileNumberBufSize = 38;

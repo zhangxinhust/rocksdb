@@ -24,6 +24,7 @@ namespace rocksdb {
 static const std::string kRocksDbTFileExt = "sst";
 static const std::string kLevelDbTFileExt = "ldb";
 static const std::string kRocksDBBlobFileExt = "blob";
+static const std::string kRocksDbTMetaFileExt = "sstmeta"; // hust-cloud
 
 // Given a path, flatten the path name by replacing all chars not in
 // {[0-9,a-z,A-Z,-,_,.]} with _. And append '_LOG\0' at the end.
@@ -95,6 +96,11 @@ std::string MakeTableFileName(const std::string& path, uint64_t number) {
   return MakeFileName(path, number, kRocksDbTFileExt.c_str());
 }
 
+// hust-cloud
+std::string MakeTableMetaFileName(const std::string& path, uint64_t number) {
+  return MakeFileName(path, number, kRocksDbTMetaFileExt.c_str());
+}
+
 std::string Rocks2LevelTableFileName(const std::string& fullname) {
   assert(fullname.size() > kRocksDbTFileExt.size() + 1);
   if (fullname.size() <= kRocksDbTFileExt.size() + 1) {
@@ -125,6 +131,13 @@ std::string TableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
     path = db_paths[path_id].path;
   }
   return MakeTableFileName(path, number);
+}
+
+// hust-cloud
+std::string TableMetaFileName(const std::string& dbname, uint64_t number) {
+  assert(number > 0);
+  std::string path = dbname + "/meta";
+  return MakeTableMetaFileName(path, number);
 }
 
 void FormatFileNumber(uint64_t number, uint32_t path_id, char* out_buf,

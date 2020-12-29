@@ -1163,6 +1163,38 @@ Status BlockBasedTableBuilder::Finish() {
   return r->status;
 }
 
+// hust-cloud
+Status BlockBasedTableBuilder::FinishMeta() {
+  Rep* r = rep_;
+  // assert(r->state != Rep::State::kClosed);
+
+  // Write meta blocks, metaindex block and footer in the following order.
+  //    1. [meta block: filter]
+  //    2. [meta block: index]
+  //    3. [meta block: compression dictionary]
+  //    4. [meta block: range deletion tombstone]
+  //    5. [meta block: properties]
+  //    6. [metaindex block]
+  //    7. Footer
+  BlockHandle metaindex_block_handle, index_block_handle;
+  MetaIndexBuilder meta_index_builder;
+  WriteFilterBlock(&meta_index_builder);
+  WriteIndexBlock(&meta_index_builder, &index_block_handle);
+  WriteCompressionDictBlock(&meta_index_builder);
+  WriteRangeDelBlock(&meta_index_builder);
+  WritePropertiesBlock(&meta_index_builder);
+  if (ok()) {
+    // flush the meta index block
+    WriteRawBlock(meta_index_builder.Finish(), kNoCompression,
+                  &metaindex_block_handle);
+  }
+  if (ok()) {
+    WriteFooter(metaindex_block_handle, index_block_handle);
+  }
+  r->state = Rep::State::kClosed;
+  return r->status;
+}
+
 void BlockBasedTableBuilder::Abandon() {
   assert(rep_->state != Rep::State::kClosed);
   rep_->state = Rep::State::kClosed;
@@ -1192,6 +1224,11 @@ TableProperties BlockBasedTableBuilder::GetTableProperties() const {
     collector->Finish(&ret.user_collected_properties);
   }
   return ret;
+}
+
+// hust-cloud
+void BlockBasedTableBuilder::SetFileWriter(WritableFileWriter * meta_file) {
+  rep_->file = file;
 }
 
 const std::string BlockBasedTable::kFilterBlockPrefix = "filter.";
