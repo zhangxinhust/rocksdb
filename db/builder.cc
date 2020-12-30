@@ -100,7 +100,7 @@ Status BuildTable(
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
   // hust-cloud
-  std::string meta_name = TableMetaFileName(dbname, meta->fd.GetNumber());
+  std::string meta_name = TableMetaFileName(ioptions.meta_dir, meta->fd.GetNumber());
 
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
@@ -206,10 +206,12 @@ Status BuildTable(
     }
 
     // hust-cloud
+    WritableFileWriter* old_writer = builder->GetFileWriter();
     if (s.ok() && !empty) {
       builder->SetFileWriter(meta_file_writer.get());
       s = builder->FinishMeta();
     }
+    builder->SetFileWriter(old_writer);
 
     if (s.ok() && !empty) {
       uint64_t file_size = builder->FileSize();

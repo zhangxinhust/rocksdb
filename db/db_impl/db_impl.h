@@ -81,9 +81,9 @@ struct MemTableInfo;
 // Class to maintain directories for all database paths other than main one.
 class Directories {
  public:
-  Status SetDirectories(Env* env, const std::string& dbname,
-                        const std::string& wal_dir,
-                        const std::vector<DbPath>& data_paths);
+  // hust-cloud
+  Status SetDirectories(Env* env, const std::string& dbname, const std::string& wal_dir, 
+                                 const std::vector<DbPath>& data_paths, const std::string& meta_dir);
 
   Directory* GetDataDir(size_t path_id) const {
     assert(path_id < data_dirs_.size());
@@ -102,12 +102,20 @@ class Directories {
     return db_dir_.get();
   }
 
+  Directory* GetMetaDir()       {
+    if (meta_dir_) {
+      return meta_dir_.get();
+    }
+    return db_dir_.get();
+  }
+
   Directory* GetDbDir() { return db_dir_.get(); }
 
  private:
   std::unique_ptr<Directory> db_dir_;
   std::vector<std::unique_ptr<Directory>> data_dirs_;
   std::unique_ptr<Directory> wal_dir_;
+  std::unique_ptr<Directory> meta_dir_; // hust-cloud
 };
 
 // While DB is the public interface of RocksDB, and DBImpl is the actual
@@ -1534,6 +1542,8 @@ class DBImpl : public DB {
   uint64_t GetMaxTotalWalSize() const;
 
   Directory* GetDataDir(ColumnFamilyData* cfd, size_t path_id) const;
+
+  Directory* GetMetaDir(ColumnFamilyData* cfd); // hust-cloud
 
   Status CloseHelper();
 

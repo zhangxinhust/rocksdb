@@ -79,7 +79,7 @@ extern std::string TableFileName(const std::vector<DbPath>& db_paths,
                                  uint64_t number, uint32_t path_id);
 
 // hust-cloud
-extern std::string TableMetaFileName(const std::string& dbname, uint64_t number);
+extern std::string TableMetaFileName(const std::string& meta_name, uint64_t number);
 
 // Sufficient buffer size for FormatFileNumber.
 const size_t kFormatFileNumberBufSize = 38;

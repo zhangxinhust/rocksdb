@@ -165,6 +165,7 @@ class TableBuilder {
 
   // hust-cloud
   virtual void SetFileWriter(WritableFileWriter* file) {}
+  virtual WritableFileWriter* GetFileWriter() {return nullptr;}
 };
 
 }  // namespace rocksdb

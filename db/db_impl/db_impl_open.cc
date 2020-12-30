@@ -101,6 +101,11 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src) {
     result.wal_dir = result.wal_dir.substr(0, result.wal_dir.size() - 1);
   }
 
+  // hust-cloud
+  if (result.meta_dir.empty()) {
+    result.meta_dir = dbname.back() == '/' ? dbname + "meta" : dbname + "/meta";
+  }
+
   if (result.db_paths.size() == 0) {
     result.db_paths.emplace_back(dbname, std::numeric_limits<uint64_t>::max());
   }
@@ -294,15 +299,22 @@ Status DBImpl::CreateAndNewDirectory(Env* env, const std::string& dirname,
   return env->NewDirectory(dirname, directory);
 }
 
-Status Directories::SetDirectories(Env* env, const std::string& dbname,
-                                   const std::string& wal_dir,
-                                   const std::vector<DbPath>& data_paths) {
+// hust-cloud
+Status Directories::SetDirectories(Env* env, const std::string& dbname, const std::string& wal_dir,
+                                            const std::vector<DbPath>& data_paths, const std::string& meta_dir) {
   Status s = DBImpl::CreateAndNewDirectory(env, dbname, &db_dir_);
   if (!s.ok()) {
     return s;
   }
   if (!wal_dir.empty() && dbname != wal_dir) {
     s = DBImpl::CreateAndNewDirectory(env, wal_dir, &wal_dir_);
+    if (!s.ok()) {
+      return s;
+    }
+  }
+
+  if (!meta_dir.empty() && dbname != meta_dir) {
+    s = DBImpl::CreateAndNewDirectory(env, meta_dir, &meta_dir_);
     if (!s.ok()) {
       return s;
     }
@@ -336,7 +348,8 @@ Status DBImpl::Recover(
   if (!read_only) {
     Status s = directories_.SetDirectories(env_, dbname_,
                                            immutable_db_options_.wal_dir,
-                                           immutable_db_options_.db_paths);
+                                           immutable_db_options_.db_paths,
+                                           immutable_db_options_.meta_dir); // hust-cloud
     if (!s.ok()) {
       return s;
     }
@@ -411,7 +424,7 @@ Status DBImpl::Recover(
   }
   if (s.ok() && !read_only) {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
-      s = cfd->AddDirectories();
+      s = cfd->AddDirectories(immutable_db_options_.meta_dir); // hust-cloud
       if (!s.ok()) {
         return s;
       }

@@ -530,6 +530,14 @@ struct DBOptions {
   //   all log files in wal_dir and the dir itself is deleted
   std::string wal_dir = "";
 
+  // hust-cloud
+  // This specifies the absolute dir path for meta files of L0&L1 SST filels.
+  // If it is empty, the meta files will be set as dbname/meta
+  // If it is non empty, the meta files will be in kept the specified dir.
+  // When destroying the db,
+  //   all meta files in meta_dir and the dir itself is deleted
+  std::string meta_dir = "";
+
   // The periodicity when obsolete files get deleted. The default
   // value is 6 hours. The files that get out of scope by compaction
   // process will still get automatically delete on every compaction,

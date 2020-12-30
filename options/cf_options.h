@@ -123,6 +123,8 @@ struct ImmutableCFOptions {
 
   std::vector<DbPath> cf_paths;
 
+  std::string meta_dir; // hust-cloud
+
   std::shared_ptr<ConcurrentTaskLimiter> compaction_thread_limiter;
 
   std::shared_ptr<SstPartitionerFactory> sst_partitioner_factory;

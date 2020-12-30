@@ -71,7 +71,7 @@ class FlushJob {
            Directory* output_file_directory, CompressionType output_compression,
            Statistics* stats, EventLogger* event_logger, bool measure_io_stats,
            const bool sync_output_directory, const bool write_manifest,
-           Env::Priority thread_pri);
+           Env::Priority thread_pri, Directory* meta_directory); // hust-cloud
 
   ~FlushJob();
 
@@ -119,6 +119,7 @@ class FlushJob {
   LogBuffer* log_buffer_;
   Directory* db_directory_;
   Directory* output_file_directory_;
+  Directory* meta_directory_; // hust-cloud
   CompressionType output_compression_;
   Statistics* stats_;
   EventLogger* event_logger_;

@@ -134,10 +134,9 @@ std::string TableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
 }
 
 // hust-cloud
-std::string TableMetaFileName(const std::string& dbname, uint64_t number) {
+std::string TableMetaFileName(const std::string& meta_name, uint64_t number) {
   assert(number > 0);
-  std::string path = dbname + "/meta";
-  return MakeTableMetaFileName(path, number);
+  return MakeTableMetaFileName(meta_name, number);
 }
 
 void FormatFileNumber(uint64_t number, uint32_t path_id, char* out_buf,

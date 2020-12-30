@@ -1252,7 +1252,7 @@ Env::WriteLifeTimeHint ColumnFamilyData::CalculateSSTWriteHint(int level) {
                             static_cast<int>(Env::WLTH_MEDIUM));
 }
 
-Status ColumnFamilyData::AddDirectories() {
+Status ColumnFamilyData::AddDirectories(const std::string& meta_dir) {
   Status s;
   assert(data_dirs_.empty());
   for (auto& p : ioptions_.cf_paths) {
@@ -1265,6 +1265,14 @@ Status ColumnFamilyData::AddDirectories() {
     data_dirs_.emplace_back(path_directory.release());
   }
   assert(data_dirs_.size() == ioptions_.cf_paths.size());
+
+  // hust-cloud
+  s = DBImpl::CreateAndNewDirectory(ioptions_.env, meta_dir, &meta_dir_);
+  if (!s.ok()) {
+    return s;
+  }
+  assert(meta_dir_ != nullptr);
+
   return s;
 }
 
@@ -1275,6 +1283,11 @@ Directory* ColumnFamilyData::GetDataDir(size_t path_id) const {
 
   assert(path_id < data_dirs_.size());
   return data_dirs_[path_id].get();
+}
+
+// hust-cloud
+Directory* ColumnFamilyData::GetMetaDir()       {
+  return meta_dir_.get();
 }
 
 ColumnFamilySet::ColumnFamilySet(const std::string& dbname,

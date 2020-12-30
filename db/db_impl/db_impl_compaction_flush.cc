@@ -153,7 +153,8 @@ Status DBImpl::FlushMemTableToOutputFile(
       GetDataDir(cfd, 0U),
       GetCompressionFlush(*cfd->ioptions(), mutable_cf_options), stats_,
       &event_logger_, mutable_cf_options.report_bg_io_stats,
-      true /* sync_output_directory */, true /* write_manifest */, thread_pri);
+      true /* sync_output_directory */, true /* write_manifest */, thread_pri,
+      GetMetaDir(cfd)); // hust-cloud
 
   FileMetaData file_meta;
 
@@ -337,7 +338,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
         data_dir, GetCompressionFlush(*cfd->ioptions(), mutable_cf_options),
         stats_, &event_logger_, mutable_cf_options.report_bg_io_stats,
         false /* sync_output_directory */, false /* write_manifest */,
-        thread_pri));
+        thread_pri, GetMetaDir(cfd))); // hust-cloud
     jobs.back()->PickMemTable();
   }
 
@@ -415,6 +416,19 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
         Status error_status = dir->Fsync();
         if (!error_status.ok()) {
           s = error_status;
+          break;
+        }
+      }
+    }
+  }
+
+  // hust-cloud
+  if (s.ok()) {
+    for (const auto cfd : cfds) {
+      auto meta_dir = GetMetaDir(cfd);
+      if (meta_dir) {
+        s = meta_dir->Fsync();
+        if (!s.ok()) {
           break;
         }
       }
@@ -1000,7 +1014,7 @@ Status DBImpl::CompactFilesImpl(
       immutable_db_options_.max_subcompactions <= 1 &&
               c->mutable_cf_options()->snap_refresh_nanos > 0
           ? &fetch_callback
-          : nullptr);
+          : nullptr, GetMetaDir(c->column_family_data())); // hust-cloud
 
   // Creating a compaction influences the compaction score because the score
   // takes running compactions into account (by skipping files that are already
@@ -2747,7 +2761,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         immutable_db_options_.max_subcompactions <= 1 &&
                 c->mutable_cf_options()->snap_refresh_nanos > 0
             ? &fetch_callback
-            : nullptr);
+            : nullptr, GetMetaDir(c->column_family_data())); // hust-cloud
     compaction_job.Prepare();
 
     NotifyOnCompactionBegin(c->column_family_data(), c.get(), status,

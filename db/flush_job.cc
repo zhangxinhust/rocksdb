@@ -97,7 +97,7 @@ FlushJob::FlushJob(const std::string& dbname, ColumnFamilyData* cfd,
                    CompressionType output_compression, Statistics* stats,
                    EventLogger* event_logger, bool measure_io_stats,
                    const bool sync_output_directory, const bool write_manifest,
-                   Env::Priority thread_pri)
+                   Env::Priority thread_pri, Directory* meta_directory = nullptr) // hust-cloud
     : dbname_(dbname),
       cfd_(cfd),
       db_options_(db_options),
@@ -114,6 +114,7 @@ FlushJob::FlushJob(const std::string& dbname, ColumnFamilyData* cfd,
       log_buffer_(log_buffer),
       db_directory_(db_directory),
       output_file_directory_(output_file_directory),
+      meta_directory_(meta_directory), // hust-cloud
       output_compression_(output_compression),
       stats_(stats),
       event_logger_(event_logger),

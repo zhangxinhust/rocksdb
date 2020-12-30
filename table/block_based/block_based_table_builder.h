@@ -92,7 +92,9 @@ class BlockBasedTableBuilder : public TableBuilder {
   // Get table properties
   TableProperties GetTableProperties() const override;
 
-  void SetFileWriter(WritableFileWriter * file) override; // hust-cloud
+  // hust-cloud
+  void SetFileWriter(WritableFileWriter * file) override;
+  WritableFileWriter* GetFileWriter() override;
 
  private:
   bool ok() const { return status().ok(); }

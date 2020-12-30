@@ -75,7 +75,8 @@ class CompactionJob {
       std::shared_ptr<Cache> table_cache, EventLogger* event_logger,
       bool paranoid_file_checks, bool measure_io_stats,
       const std::string& dbname, CompactionJobStats* compaction_job_stats,
-      Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback);
+      Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback,
+      Directory* meta_directory = nullptr); // hust-cloud
 
   ~CompactionJob();
 
@@ -158,6 +159,7 @@ class CompactionJob {
   LogBuffer* log_buffer_;
   Directory* db_directory_;
   Directory* output_directory_;
+  Directory* meta_directory_; // hust-cloud
   Statistics* stats_;
   InstrumentedMutex* db_mutex_;
   ErrorHandler* db_error_handler_;

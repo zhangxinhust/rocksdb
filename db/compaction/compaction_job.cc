@@ -311,7 +311,8 @@ CompactionJob::CompactionJob(
     const SnapshotChecker* snapshot_checker, std::shared_ptr<Cache> table_cache,
     EventLogger* event_logger, bool paranoid_file_checks, bool measure_io_stats,
     const std::string& dbname, CompactionJobStats* compaction_job_stats,
-    Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback)
+    Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback, 
+    Directory* meta_directory) // hust-cloud
     : job_id_(job_id),
       compact_(new CompactionState(compaction)),
       compaction_job_stats_(compaction_job_stats),
@@ -328,6 +329,7 @@ CompactionJob::CompactionJob(
       log_buffer_(log_buffer),
       db_directory_(db_directory),
       output_directory_(output_directory),
+      meta_directory_(compaction->output_level() <= 1 ? meta_directory : nullptr), // hust-cloud
       stats_(stats),
       db_mutex_(db_mutex),
       db_error_handler_(db_error_handler),
@@ -619,6 +621,11 @@ Status CompactionJob::Run() {
 
   if (status.ok() && output_directory_) {
     status = output_directory_->Fsync();
+  }
+
+  // hust-cloud
+  if (status.ok() && meta_directory_) {
+    status = meta_directory_->Fsync();
   }
 
   if (status.ok()) {
@@ -1304,7 +1311,7 @@ Status CompactionJob::FinishCompactionOutputFile(
   if (sub_compact->compaction->output_level() <= 1) {
     std::string sst_name = sub_compact->outfile->file_name();
     uint64_t file_number = TableFileNameToNumber(sst_name);
-    std::string meta_name = TableMetaFileName(dbname_, file_number);
+    std::string meta_name = TableMetaFileName(db_options_.meta_dir, file_number);
     std::unique_ptr<WritableFile> meta_file;
     s = NewWritableFile(env_, meta_name, &meta_file, env_options_);
     if (!s.ok()) {
@@ -1329,8 +1336,10 @@ Status CompactionJob::FinishCompactionOutputFile(
     sub_compact->compaction->immutable_cf_options()->listeners;
     meta_file_writer.reset(new WritableFileWriter(std::move(meta_file), meta_name, env_options_,
                            env_, db_options_.statistics.get(), listeners));
+    WritableFileWriter* old_writer = sub_compact->builder->GetFileWriter();
     sub_compact->builder->SetFileWriter(meta_file_writer.get());
     s = sub_compact->builder->FinishMeta();
+    sub_compact->builder->SetFileWriter(old_writer);
   }
 
   const uint64_t current_bytes = sub_compact->builder->FileSize();

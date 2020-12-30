@@ -1231,6 +1231,10 @@ void BlockBasedTableBuilder::SetFileWriter(WritableFileWriter *file) {
   rep_->file = file;
 }
 
+WritableFileWriter* BlockBasedTableBuilder::GetFileWriter() {
+  return rep_->file;
+}
+
 const std::string BlockBasedTable::kFilterBlockPrefix = "filter.";
 const std::string BlockBasedTable::kFullFilterBlockPrefix = "fullfilter.";
 const std::string BlockBasedTable::kPartitionedFilterBlockPrefix =

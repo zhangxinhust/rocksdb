@@ -153,6 +153,15 @@ Status ExternalSstFileIngestionJob::Prepare(
       }
     }
   }
+  // hust-cloud
+  if (status.ok()) {
+    status = directories_->GetMetaDir()->Fsync();
+    if (!status.ok()) {
+      ROCKS_LOG_WARN(db_options_.info_log,
+                     "Failed to sync directory while ingest file: %s",
+                     status.ToString().c_str());
+    }
+  }
   TEST_SYNC_POINT("ExternalSstFileIngestionJob::AfterSyncDir");
 
   // TODO: The following is duplicated with Cleanup().

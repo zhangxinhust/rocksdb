@@ -888,6 +888,16 @@ Directory* DBImpl::GetDataDir(ColumnFamilyData* cfd, size_t path_id) const {
   return ret_dir;
 }
 
+// hust-cloud
+Directory* DBImpl::GetMetaDir(ColumnFamilyData* cfd) {
+  assert(cfd);
+  Directory* ret_dir = cfd->GetMetaDir();
+  if (ret_dir == nullptr) {
+    return directories_.GetMetaDir();
+  }
+  return ret_dir;
+}
+
 Status DBImpl::SetOptions(
     ColumnFamilyHandle* column_family,
     const std::unordered_map<std::string, std::string>& options_map) {
@@ -2104,7 +2114,7 @@ Status DBImpl::CreateColumnFamilyImpl(const ColumnFamilyOptions& cf_options,
       auto* cfd =
           versions_->GetColumnFamilySet()->GetColumnFamily(column_family_name);
       assert(cfd != nullptr);
-      s = cfd->AddDirectories();
+      s = cfd->AddDirectories(immutable_db_options_.meta_dir); // hust-cloud
     }
     if (s.ok()) {
       single_column_family_mode_ = false;
