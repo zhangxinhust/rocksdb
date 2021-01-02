@@ -211,6 +211,7 @@ Status BlockBasedTableFactory::NewTableReader(
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
     WritableFileWriter* file, bool meta_file) const {
+  /*
   if (meta_file) {
     auto table_builder = new BlockBasedMetaBuilder(
         table_builder_options.ioptions, table_builder_options.moptions,
@@ -227,6 +228,8 @@ TableBuilder* BlockBasedTableFactory::NewTableBuilder(
         table_builder_options.file_creation_time);
     return table_builder;
   }
+  */
+  (void)meta_file;
   auto table_builder = new BlockBasedTableBuilder(
       table_builder_options.ioptions, table_builder_options.moptions,
       table_options_, table_builder_options.internal_comparator,
