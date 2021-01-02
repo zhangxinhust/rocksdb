@@ -373,6 +373,7 @@ class BlockBasedTable : public TableReader {
   // May not make such a call if filter policy says that key is not present.
   friend class TableCache;
   friend class BlockBasedTableBuilder;
+  friend class BlockBasedMetaBuilder;
 
   // Create a index reader based on the index type stored in the table.
   // Optionally, user can pass a preloaded meta_index_iter for the index that

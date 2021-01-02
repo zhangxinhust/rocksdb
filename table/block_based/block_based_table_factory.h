@@ -24,6 +24,7 @@ namespace rocksdb {
 struct EnvOptions;
 
 class BlockBasedTableBuilder;
+class BlockBasedMetaBuilder;
 
 // A class used to track actual bytes written from the tail in the recent SST
 // file opens, and provide a suggestion for following open.

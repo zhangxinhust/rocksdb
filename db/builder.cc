@@ -30,6 +30,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/table.h"
 #include "table/block_based/block_based_table_builder.h"
+#include "table/block_based/block_based_meta_builder.h"
 #include "table/format.h"
 #include "table/internal_iterator.h"
 #include "test_util/sync_point.h"
@@ -113,7 +114,7 @@ Status BuildTable(
   TableProperties tp;
 
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
-    TableBuilder* builder, meta_builder = nullptr;
+    TableBuilder* builder, *meta_builder = nullptr;
     std::unique_ptr<WritableFileWriter> file_writer, meta_file_writer = nullptr;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.

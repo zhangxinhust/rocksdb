@@ -49,8 +49,7 @@ class BlockBasedMetaBuilder : public TableBuilder {
       const CompressionOptions& compression_opts, const bool skip_filters,
       const std::string& column_family_name, const uint64_t creation_time = 0,
       const uint64_t oldest_key_time = 0, const uint64_t target_file_size = 0,
-      const uint64_t file_creation_time = 0,
-      WritableFileWriter* meta_file = nullptr);
+      const uint64_t file_creation_time = 0);
 
   // REQUIRES: Either Finish() or Abandon() has been called.
   ~BlockBasedMetaBuilder();
@@ -85,7 +84,6 @@ class BlockBasedMetaBuilder : public TableBuilder {
   // Size of the file generated so far.  If invoked after a successful
   // Finish() call, returns the size of the final generated file.
   uint64_t FileSize() const override;
-  uint64_t MetaFileSize() const override;
 
   bool NeedCompact() const override;
 
@@ -102,28 +100,26 @@ class BlockBasedMetaBuilder : public TableBuilder {
 
   // Call block's Finish() method
   // and then write the compressed block contents to file.
-  void WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block,
-                        bool meta_to_cloud = false);
+  void WriteBlock(BlockBuilder* block, BlockHandle* handle, bool is_data_block);
 
   // Compress and write block content to the file.
   void WriteBlock(const Slice& block_contents, BlockHandle* handle,
-                  bool is_data_block, bool meta_to_cloud = false);
+                  bool is_data_block);
   // Directly write data to the file.
   void WriteRawBlock(const Slice& data, CompressionType, BlockHandle* handle,
-                     bool is_data_block = false, bool meta_to_cloud = false);
+                     bool is_data_block = false);
   Status InsertBlockInCache(const Slice& block_contents,
                             const CompressionType type,
                             const BlockHandle* handle);
 
-  void WriteFilterBlock(MetaIndexBuilder* meta_index_builder, bool meta_to_cloud = false);
+  void WriteFilterBlock(MetaIndexBuilder* meta_index_builder);
   void WriteIndexBlock(MetaIndexBuilder* meta_index_builder,
-                       BlockHandle* index_block_handle, bool meta_to_block = false);
-  void WritePropertiesBlock(MetaIndexBuilder* meta_index_builder, bool meta_to_cloud = false);
-  void WriteCompressionDictBlock(MetaIndexBuilder* meta_index_builder,
-                                                 bool meta_to_cloud = false);
-  void WriteRangeDelBlock(MetaIndexBuilder* meta_index_builder, bool meta_to_cloud = false);
+                       BlockHandle* index_block_handle);
+  void WritePropertiesBlock(MetaIndexBuilder* meta_index_builder);
+  void WriteCompressionDictBlock(MetaIndexBuilder* meta_index_builder);
+  void WriteRangeDelBlock(MetaIndexBuilder* meta_index_builder);
   void WriteFooter(BlockHandle& metaindex_block_handle,
-                   BlockHandle& index_block_handle, bool meta_to_cloud = false);
+                   BlockHandle& index_block_handle);
 
   struct Rep;
   class BlockBasedTablePropertiesCollectorFactory;
@@ -148,4 +144,3 @@ Slice CompressBlock(const Slice& raw, const CompressionInfo& info,
                     std::string* sampled_output_slow);
 
 }  // namespace rocksdb
-
