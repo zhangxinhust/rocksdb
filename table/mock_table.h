@@ -168,7 +168,7 @@ class MockTableFactory : public TableFactory {
   TableBuilder* NewTableBuilder(
       const TableBuilderOptions& table_builder_options,
       uint32_t column_familly_id, WritableFileWriter* file,
-      WritableFileWriter* meta_file = nullptr) const override;
+      bool meta_file = false) const override;
 
   // This function will directly create mock table instead of going through
   // MockTableBuilder. file_contents has to have a format of <internal_key,

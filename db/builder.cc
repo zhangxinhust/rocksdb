@@ -50,7 +50,7 @@ TableBuilder* NewTableBuilder(
     uint64_t sample_for_compression, const CompressionOptions& compression_opts,
     int level, const bool skip_filters, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time, WritableFileWriter* meta_file) {
+    const uint64_t file_creation_time, bool meta_file) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -113,7 +113,7 @@ Status BuildTable(
   TableProperties tp;
 
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
-    TableBuilder* builder;
+    TableBuilder* builder, meta_builder = nullptr;
     std::unique_ptr<WritableFileWriter> file_writer, meta_file_writer = nullptr;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
@@ -165,7 +165,16 @@ Status BuildTable(
           column_family_name, file_writer.get(), compression,
           sample_for_compression, compression_opts_for_flush, level,
           false /* skip_filters */, creation_time, oldest_key_time,
-          0 /*target_file_size*/, file_creation_time, meta_file_writer.get());
+          0 /*target_file_size*/, file_creation_time);
+      if (meta_to_cloud) {
+        meta_builder = NewTableBuilder(
+            ioptions, mutable_cf_options, internal_comparator,
+            int_tbl_prop_collector_factories, column_family_id,
+            column_family_name, meta_file_writer.get(), compression,
+            sample_for_compression, compression_opts_for_flush, level,
+            false /* skip_filters */, creation_time, oldest_key_time,
+            0 /*target_file_size*/, file_creation_time);
+      }
     }
 
     MergeHelper merge(env, internal_comparator.user_comparator(),
@@ -184,6 +193,9 @@ Status BuildTable(
       const Slice& key = c_iter.key();
       const Slice& value = c_iter.value();
       builder->Add(key, value);
+      if (meta_builder) {
+        meta_builder->Add(key, value);
+      }
       meta->UpdateBoundaries(key, c_iter.ikey().sequence);
 
       // TODO(noetzli): Update stats after flush, too.
@@ -200,6 +212,9 @@ Status BuildTable(
       auto tombstone = range_del_it->Tombstone();
       auto kv = tombstone.Serialize();
       builder->Add(kv.first.Encode(), kv.second);
+      if (meta_builder) {
+        meta_builder->Add(kv.first.Encode(), kv.second);
+      }
       meta->UpdateBoundariesForRange(kv.first, tombstone.SerializeEndKey(),
                                      tombstone.seq_, internal_comparator);
     }
@@ -210,14 +225,20 @@ Status BuildTable(
     s = c_iter.status();
     if (!s.ok() || empty) {
       builder->Abandon();
+      if (meta_builder) {
+        meta_builder->Abandon();
+      }
     } else {
       s = builder->Finish();
+      if (s.ok() && meta_builder) {
+        meta_builder->Finish();
+      }
     }
 
     if (s.ok() && !empty) {
       uint64_t file_size = builder->FileSize();
       meta->fd.file_size = file_size;
-      meta->fd.meta_file_size = builder->MetaFileSize();
+      meta->fd.meta_file_size = meta_builder->FileSize();
       meta->marked_for_compaction = builder->NeedCompact();
       assert(meta->fd.GetFileSize() > 0);
       tp = builder->GetTableProperties(); // refresh now that builder is finished
@@ -226,6 +247,9 @@ Status BuildTable(
       }
     }
     delete builder;
+    if (meta_builder) {
+      delete meta_builder;
+    }
 
     // Finish and check for file errors
     if (s.ok() && !empty) {

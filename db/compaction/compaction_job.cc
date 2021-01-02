@@ -128,6 +128,7 @@ struct CompactionJob::SubcompactionState {
   std::unique_ptr<WritableFileWriter> outfile;
   std::unique_ptr<WritableFileWriter> meta_outfile = nullptr;
   std::unique_ptr<TableBuilder> builder;
+  std::unique_ptr<TableBuilder> meta_builder = nullptr;
   Output* current_output() {
     if (outputs.empty()) {
       // This subcompaction's outptut could be empty if compaction was aborted
@@ -165,6 +166,7 @@ struct CompactionJob::SubcompactionState {
         outfile(nullptr),
         meta_outfile(nullptr),
         builder(nullptr),
+        meta_builder(nullptr),
         current_output_file_size(0),
         total_bytes(0),
         num_input_records(0),
@@ -187,6 +189,7 @@ struct CompactionJob::SubcompactionState {
     outfile = std::move(o.outfile);
     meta_outfile = std::move(o.meta_outfile);
     builder = std::move(o.builder);
+    meta_builder = std::move(o.meta_builder);
     current_output_file_size = std::move(o.current_output_file_size);
     total_bytes = std::move(o.total_bytes);
     num_input_records = std::move(o.num_input_records);
@@ -945,6 +948,9 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
     assert(sub_compact->builder != nullptr);
     assert(sub_compact->current_output() != nullptr);
     sub_compact->builder->Add(key, value);
+    if (sub_compact->meta_builder) {
+      sub_compact->meta_builder->Add(key, value);
+    }
     sub_compact->current_output_file_size = sub_compact->builder->FileSize();
     sub_compact->current_output()->meta.UpdateBoundaries(
         key, c_iter->ikey().sequence);
@@ -1129,6 +1135,7 @@ Status CompactionJob::FinishCompactionOutputFile(
   assert(sub_compact->outfile);
   assert(sub_compact->compaction->output_level() > 1 || sub_compact->meta_outfile);
   assert(sub_compact->builder != nullptr);
+  assert(sub_compact->compaction->output_level() > 1 || sub_compact->meta_builder);
   assert(sub_compact->current_output() != nullptr);
 
   uint64_t output_number = sub_compact->current_output()->meta.fd.GetNumber();
@@ -1237,6 +1244,9 @@ Status CompactionJob::FinishCompactionOutputFile(
       assert(lower_bound == nullptr ||
              ucmp->Compare(*lower_bound, kv.second) < 0);
       sub_compact->builder->Add(kv.first.Encode(), kv.second);
+      if (sub_compact->meta_builder) {
+        sub_compact->meta_builder->Add(kv.first.Encode(), kv.second);
+      }
       InternalKey smallest_candidate = std::move(kv.first);
       if (lower_bound != nullptr &&
           ucmp->Compare(smallest_candidate.user_key(), *lower_bound) <= 0) {
@@ -1306,14 +1316,20 @@ Status CompactionJob::FinishCompactionOutputFile(
   const uint64_t current_entries = sub_compact->builder->NumEntries();
   if (s.ok()) {
     s = sub_compact->builder->Finish();
+    if (s.ok() && sub_compact->meta_builder) {
+      s = sub_compact->meta_builder->Finish();
+    }
   } else {
     sub_compact->builder->Abandon();
+    if (sub_compact->meta_builder) {
+      sub_compact->meta_builder->Abandon();
+    }
   }
 
   const uint64_t current_bytes = sub_compact->builder->FileSize();
   if (s.ok()) {
     meta->fd.file_size = current_bytes;
-    meta->fd.meta_file_size = sub_compact->builder->MetaFileSize();
+    meta->fd.meta_file_size = sub_compact->meta_builder->FileSize();
   }
   sub_compact->current_output()->finished = true;
   sub_compact->total_bytes += current_bytes;
@@ -1405,6 +1421,7 @@ Status CompactionJob::FinishCompactionOutputFile(
 #endif
 
   sub_compact->builder.reset();
+  sub_compact->meta_builder.reset();
   sub_compact->current_output_file_size = 0;
   return s;
 }
@@ -1463,6 +1480,7 @@ Status CompactionJob::OpenCompactionOutputFile(
     SubcompactionState* sub_compact) {
   assert(sub_compact != nullptr);
   assert(sub_compact->builder == nullptr);
+  assert(sub_compact->meta_builder == nullptr);
   // no need to lock because VersionSet::next_file_number_ is atomic
   uint64_t file_number = versions_->NewFileNumber();
   std::string fname =
@@ -1561,7 +1579,19 @@ Status CompactionJob::OpenCompactionOutputFile(
       sub_compact->compaction->output_compression_opts(),
       sub_compact->compaction->output_level(), skip_filters, latest_key_time,
       0 /* oldest_key_time */, sub_compact->compaction->max_output_file_size(),
-      current_time, sub_compact->meta_outfile.get()));
+      current_time));
+  if (sub_compact->meta_outfile) {
+    sub_compact->meta_builder.reset(NewTableBuilder(
+          *cfd->ioptions(), *(sub_compact->compaction->mutable_cf_options()),
+          cfd->internal_comparator(), cfd->int_tbl_prop_collector_factories(),
+          cfd->GetID(), cfd->GetName(), sub_compact->meta_outfile.get(),
+          sub_compact->compaction->output_compression(),
+          0 /*sample_for_compression */,
+          sub_compact->compaction->output_compression_opts(),
+          sub_compact->compaction->output_level(), skip_filters, latest_key_time,
+          0 /* oldest_key_time */, sub_compact->compaction->max_output_file_size(),
+          current_time));
+  }
   LogFlush(db_options_.info_log);
   return s;
 }
@@ -1576,6 +1606,11 @@ void CompactionJob::CleanupCompaction() {
       sub_compact.builder.reset();
     } else {
       assert(!sub_status.ok() || sub_compact.outfile == nullptr);
+    }
+    if (sub_compact.meta_builder != nullptr) {
+      // May happen if we get a shutdown call in the middle of compaction
+      sub_compact.meta_builder->Abandon();
+      sub_compact.meta_builder.reset();
     }
     for (const auto& out : sub_compact.outputs) {
       // If this file was inserted into the table cache then remove

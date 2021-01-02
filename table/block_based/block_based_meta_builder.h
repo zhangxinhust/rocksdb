@@ -32,12 +32,12 @@ struct BlockBasedTableOptions;
 extern const uint64_t kBlockBasedTableMagicNumber;
 extern const uint64_t kLegacyBlockBasedTableMagicNumber;
 
-class BlockBasedTableBuilder : public TableBuilder {
+class BlockBasedMetaBuilder : public TableBuilder {
  public:
   // Create a builder that will store the contents of the table it is
   // building in *file.  Does not close the file.  It is up to the
   // caller to close the file after calling Finish().
-  BlockBasedTableBuilder(
+  BlockBasedMetaBuilder(
       const ImmutableCFOptions& ioptions, const MutableCFOptions& moptions,
       const BlockBasedTableOptions& table_options,
       const InternalKeyComparator& internal_comparator,
@@ -49,14 +49,15 @@ class BlockBasedTableBuilder : public TableBuilder {
       const CompressionOptions& compression_opts, const bool skip_filters,
       const std::string& column_family_name, const uint64_t creation_time = 0,
       const uint64_t oldest_key_time = 0, const uint64_t target_file_size = 0,
-      const uint64_t file_creation_time = 0);
+      const uint64_t file_creation_time = 0,
+      WritableFileWriter* meta_file = nullptr);
 
   // REQUIRES: Either Finish() or Abandon() has been called.
-  ~BlockBasedTableBuilder();
+  ~BlockBasedMetaBuilder();
 
   // No copying allowed
-  BlockBasedTableBuilder(const BlockBasedTableBuilder&) = delete;
-  BlockBasedTableBuilder& operator=(const BlockBasedTableBuilder&) = delete;
+  BlockBasedMetaBuilder(const BlockBasedMetaBuilder&) = delete;
+  BlockBasedMetaBuilder& operator=(const BlockBasedMetaBuilder&) = delete;
 
   // Add key,value to the table being constructed.
   // REQUIRES: key is after any previously added key according to comparator.
@@ -147,3 +148,4 @@ Slice CompressBlock(const Slice& raw, const CompressionInfo& info,
                     std::string* sampled_output_slow);
 
 }  // namespace rocksdb
+
