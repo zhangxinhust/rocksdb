@@ -27,6 +27,7 @@
 #include "rocksdb/utilities/ldb_cmd.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_builder.h"
+#include "table/block_based/block_based_meta_builder.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "table/block_based/block_builder.h"
 #include "table/format.h"

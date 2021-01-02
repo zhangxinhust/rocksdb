@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "table/block_based/block_based_table_builder.h"
+#include "table/block_based/block_based_meta_builder.h"
 
 #include <assert.h>
 #include <stdio.h>

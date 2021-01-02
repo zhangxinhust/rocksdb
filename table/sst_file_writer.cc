@@ -10,6 +10,7 @@
 #include "db/dbformat.h"
 #include "rocksdb/table.h"
 #include "table/block_based/block_based_table_builder.h"
+#include "table/block_based/block_based_meta_builder.h"
 #include "table/sst_file_writer_collectors.h"
 #include "test_util/sync_point.h"
 #include "util/file_reader_writer.h"

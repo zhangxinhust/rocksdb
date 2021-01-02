@@ -26,6 +26,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/write_batch.h"
 #include "table/block_based/block_based_table_builder.h"
+#include "table/block_based/block_based_meta_builder.h"
 #include "table/meta_blocks.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
