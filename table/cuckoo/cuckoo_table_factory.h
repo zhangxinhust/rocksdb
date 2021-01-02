@@ -66,7 +66,8 @@ class CuckooTableFactory : public TableFactory {
 
   TableBuilder* NewTableBuilder(
       const TableBuilderOptions& table_builder_options,
-      uint32_t column_family_id, WritableFileWriter* file) const override;
+      uint32_t column_family_id, WritableFileWriter* file,
+      WritableFileWriter* meta_file = nullptr) const override;
 
   // Sanitizes the specified DB Options.
   Status SanitizeOptions(

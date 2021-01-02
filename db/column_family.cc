@@ -224,7 +224,6 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
     result.num_levels = 3;
   }
 
-  // hust-cloud
   if (result.ttl == 0 && db_options.use_wal_stage) {
     result.ttl = 20;
   }
@@ -1266,7 +1265,6 @@ Status ColumnFamilyData::AddDirectories(const std::string& meta_dir) {
   }
   assert(data_dirs_.size() == ioptions_.cf_paths.size());
 
-  // hust-cloud
   s = DBImpl::CreateAndNewDirectory(ioptions_.env, meta_dir, &meta_dir_);
   if (!s.ok()) {
     return s;
@@ -1285,7 +1283,6 @@ Directory* ColumnFamilyData::GetDataDir(size_t path_id) const {
   return data_dirs_[path_id].get();
 }
 
-// hust-cloud
 Directory* ColumnFamilyData::GetMetaDir()       {
   return meta_dir_.get();
 }

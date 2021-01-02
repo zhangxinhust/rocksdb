@@ -126,6 +126,7 @@ struct CompactionJob::SubcompactionState {
   // State kept for output being generated
   std::vector<Output> outputs;
   std::unique_ptr<WritableFileWriter> outfile;
+  std::unique_ptr<WritableFileWriter> meta_outfile = nullptr;
   std::unique_ptr<TableBuilder> builder;
   Output* current_output() {
     if (outputs.empty()) {
@@ -162,6 +163,7 @@ struct CompactionJob::SubcompactionState {
         start(_start),
         end(_end),
         outfile(nullptr),
+        meta_outfile(nullptr),
         builder(nullptr),
         current_output_file_size(0),
         total_bytes(0),
@@ -183,6 +185,7 @@ struct CompactionJob::SubcompactionState {
     status = std::move(o.status);
     outputs = std::move(o.outputs);
     outfile = std::move(o.outfile);
+    meta_outfile = std::move(o.meta_outfile);
     builder = std::move(o.builder);
     current_output_file_size = std::move(o.current_output_file_size);
     total_bytes = std::move(o.total_bytes);
@@ -312,7 +315,7 @@ CompactionJob::CompactionJob(
     EventLogger* event_logger, bool paranoid_file_checks, bool measure_io_stats,
     const std::string& dbname, CompactionJobStats* compaction_job_stats,
     Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback, 
-    Directory* meta_directory) // hust-cloud
+    Directory* meta_output_directory)
     : job_id_(job_id),
       compact_(new CompactionState(compaction)),
       compaction_job_stats_(compaction_job_stats),
@@ -329,7 +332,7 @@ CompactionJob::CompactionJob(
       log_buffer_(log_buffer),
       db_directory_(db_directory),
       output_directory_(output_directory),
-      meta_directory_(compaction->output_level() <= 1 ? meta_directory : nullptr), // hust-cloud
+      meta_output_directory_(compaction->output_level() <= 1 ? meta_output_directory : nullptr),
       stats_(stats),
       db_mutex_(db_mutex),
       db_error_handler_(db_error_handler),
@@ -623,9 +626,8 @@ Status CompactionJob::Run() {
     status = output_directory_->Fsync();
   }
 
-  // hust-cloud
-  if (status.ok() && meta_directory_) {
-    status = meta_directory_->Fsync();
+  if (status.ok() && meta_output_directory_) {
+    status = meta_output_directory_->Fsync();
   }
 
   if (status.ok()) {
@@ -1125,6 +1127,7 @@ Status CompactionJob::FinishCompactionOutputFile(
       ThreadStatus::STAGE_COMPACTION_SYNC_FILE);
   assert(sub_compact != nullptr);
   assert(sub_compact->outfile);
+  assert(sub_compact->compaction->output_level() > 1 || sub_compact->meta_outfile);
   assert(sub_compact->builder != nullptr);
   assert(sub_compact->current_output() != nullptr);
 
@@ -1307,44 +1310,10 @@ Status CompactionJob::FinishCompactionOutputFile(
     sub_compact->builder->Abandon();
   }
 
-  // hust-cloud
-  if (sub_compact->compaction->output_level() <= 1) {
-    std::string sst_name = sub_compact->outfile->file_name();
-    uint64_t file_number = TableFileNameToNumber(sst_name);
-    std::string meta_name = TableMetaFileName(db_options_.meta_dir, file_number);
-    std::unique_ptr<WritableFile> meta_file;
-    s = NewWritableFile(env_, meta_name, &meta_file, env_options_);
-    if (!s.ok()) {
-    ROCKS_LOG_ERROR(
-      db_options_.info_log,
-      "[%s] [JOB %d] FinishCompactionOutputFile for table #%" PRIu64
-      " fails at NewWritableFile with status %s",
-      sub_compact->compaction->column_family_data()->GetName().c_str(),
-      job_id_, file_number, s.ToString().c_str());
-    LogFlush(db_options_.info_log);
-    EventHelpers::LogAndNotifyTableFileCreationFinished(
-      event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(),
-      meta_name, job_id_, FileDescriptor(), TableProperties(),
-      TableFileCreationReason::kCompaction, s);
-    return s;
-    }
-    meta_file->SetIOPriority(Env::IO_LOW);
-    meta_file->SetWriteLifeTimeHint(write_hint_);
-
-    std::unique_ptr<WritableFileWriter> meta_file_writer;
-    const auto& listeners =
-    sub_compact->compaction->immutable_cf_options()->listeners;
-    meta_file_writer.reset(new WritableFileWriter(std::move(meta_file), meta_name, env_options_,
-                           env_, db_options_.statistics.get(), listeners));
-    WritableFileWriter* old_writer = sub_compact->builder->GetFileWriter();
-    sub_compact->builder->SetFileWriter(meta_file_writer.get());
-    s = sub_compact->builder->FinishMeta();
-    sub_compact->builder->SetFileWriter(old_writer);
-  }
-
   const uint64_t current_bytes = sub_compact->builder->FileSize();
   if (s.ok()) {
     meta->fd.file_size = current_bytes;
+    meta->fd.meta_file_size = sub_compact->builder->MetaFileSize();
   }
   sub_compact->current_output()->finished = true;
   sub_compact->total_bytes += current_bytes;
@@ -1353,11 +1322,18 @@ Status CompactionJob::FinishCompactionOutputFile(
   if (s.ok()) {
     StopWatch sw(env_, stats_, COMPACTION_OUTFILE_SYNC_MICROS);
     s = sub_compact->outfile->Sync(db_options_.use_fsync);
+    if (s.ok() && sub_compact->meta_outfile) {
+      s = sub_compact->meta_outfile->Sync(db_options_.use_fsync);
+    }
   }
   if (s.ok()) {
     s = sub_compact->outfile->Close();
+    if (s.ok() && sub_compact->meta_outfile) {
+      s = sub_compact->meta_outfile->Close();
+    }
   }
   sub_compact->outfile.reset();
+  sub_compact->meta_outfile.reset();
 
   TableProperties tp;
   if (s.ok()) {
@@ -1372,6 +1348,10 @@ Status CompactionJob::FinishCompactionOutputFile(
         TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                       meta->fd.GetNumber(), meta->fd.GetPathId());
     env_->DeleteFile(fname);
+    if (sub_compact->compaction->output_level() <= 1) {
+      std::string meta_fname = TableMetaFileName(db_options_.meta_dir, meta->fd.GetNumber());
+      env_->DeleteFile(meta_fname);
+    }
 
     // Also need to remove the file from outputs, or it will be added to the
     // VersionEdit.
@@ -1488,6 +1468,11 @@ Status CompactionJob::OpenCompactionOutputFile(
   std::string fname =
       TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                     file_number, sub_compact->compaction->output_path_id());
+  bool meta_to_cloud = sub_compact->compaction->output_level() <= 1;
+  std::string meta_fname;
+  if (meta_to_cloud) {
+    meta_fname = TableMetaFileName(db_options_.meta_dir, file_number);
+  }
   // Fire events.
   ColumnFamilyData* cfd = sub_compact->compaction->column_family_data();
 #ifndef ROCKSDB_LITE
@@ -1496,14 +1481,18 @@ Status CompactionJob::OpenCompactionOutputFile(
       TableFileCreationReason::kCompaction);
 #endif  // !ROCKSDB_LITE
   // Make the output file
-  std::unique_ptr<WritableFile> writable_file;
+  std::unique_ptr<WritableFile> writable_file, meta_writable_file = nullptr;
 #ifndef NDEBUG
   bool syncpoint_arg = env_options_.use_direct_writes;
   TEST_SYNC_POINT_CALLBACK("CompactionJob::OpenCompactionOutputFile",
                            &syncpoint_arg);
 #endif
   Status s = NewWritableFile(env_, fname, &writable_file, env_options_);
-  if (!s.ok()) {
+  Status meta_s;
+  if (meta_to_cloud) {
+    meta_s  = NewWritableFile(env_, meta_fname, &meta_writable_file, env_options_);
+  }
+  if (!s.ok() || !meta_s.ok()) {
     ROCKS_LOG_ERROR(
         db_options_.info_log,
         "[%s] [JOB %d] OpenCompactionOutputFiles for table #%" PRIu64
@@ -1515,12 +1504,12 @@ Status CompactionJob::OpenCompactionOutputFile(
         event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(),
         fname, job_id_, FileDescriptor(), TableProperties(),
         TableFileCreationReason::kCompaction, s);
-    return s;
+    return !s.ok() ? s : meta_s;
   }
 
   SubcompactionState::Output out;
   out.meta.fd =
-      FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0);
+      FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0, 0);
   out.finished = false;
 
   sub_compact->outputs.push_back(out);
@@ -1533,6 +1522,13 @@ Status CompactionJob::OpenCompactionOutputFile(
   sub_compact->outfile.reset(
       new WritableFileWriter(std::move(writable_file), fname, env_options_,
                              env_, db_options_.statistics.get(), listeners));
+  if (meta_to_cloud) {
+    meta_writable_file->SetIOPriority(Env::IO_LOW);
+    meta_writable_file->SetWriteLifeTimeHint(write_hint_);
+    sub_compact->meta_outfile.reset(
+      new WritableFileWriter(std::move(meta_writable_file), meta_fname, env_options_,
+                             env_, db_options_.statistics.get(), listeners));
+  }
 
   // If the Column family flag is to only optimize filters for hits,
   // we can skip creating filters if this is the bottommost_level where
@@ -1565,7 +1561,7 @@ Status CompactionJob::OpenCompactionOutputFile(
       sub_compact->compaction->output_compression_opts(),
       sub_compact->compaction->output_level(), skip_filters, latest_key_time,
       0 /* oldest_key_time */, sub_compact->compaction->max_output_file_size(),
-      current_time));
+      current_time, sub_compact->meta_outfile.get()));
   LogFlush(db_options_.info_log);
   return s;
 }

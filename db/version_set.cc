@@ -749,7 +749,8 @@ Version::~Version() {
         uint32_t path_id = f->fd.GetPathId();
         assert(path_id < cfd_->ioptions()->cf_paths.size());
         vset_->obsolete_files_.push_back(
-            ObsoleteFileInfo(f, cfd_->ioptions()->cf_paths[path_id].path));
+            ObsoleteFileInfo(f, cfd_->ioptions()->cf_paths[path_id].path,
+                             level <= 1 ? vset_->db_options()->meta_dir : ""));
       }
     }
   }
@@ -2404,7 +2405,6 @@ void VersionStorageInfo::ComputeExpiredTtlFiles(
   }
   const uint64_t current_time = static_cast<uint64_t>(_current_time);
 
-  // hust-cloud
   if (ioptions.use_wal_stage) {
     for (auto f : files_[1]) { // L1 only
       if (!f->being_compacted && f->fd.table_reader != nullptr &&
@@ -4926,7 +4926,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
           edit.AddFile(level, f->fd.GetNumber(), f->fd.GetPathId(),
                        f->fd.GetFileSize(), f->smallest, f->largest,
                        f->fd.smallest_seqno, f->fd.largest_seqno,
-                       f->marked_for_compaction);
+                       f->marked_for_compaction, f->fd.GetMetaFileSize());
         }
       }
       edit.SetLogNumber(cfd->GetLogNumber());

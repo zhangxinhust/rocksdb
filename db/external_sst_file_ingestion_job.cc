@@ -153,7 +153,6 @@ Status ExternalSstFileIngestionJob::Prepare(
       }
     }
   }
-  // hust-cloud
   if (status.ok()) {
     status = directories_->GetMetaDir()->Fsync();
     if (!status.ok()) {

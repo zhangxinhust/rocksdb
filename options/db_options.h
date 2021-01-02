@@ -33,7 +33,7 @@ struct ImmutableDBOptions {
   std::vector<DbPath> db_paths;
   std::string db_log_dir;
   std::string wal_dir;
-  std::string meta_dir; // hust-cloud
+  std::string meta_dir;
   uint32_t max_subcompactions;
   size_t max_log_file_size;
   size_t log_file_time_to_roll;
@@ -43,7 +43,7 @@ struct ImmutableDBOptions {
   int table_cache_numshardbits;
   uint64_t wal_ttl_seconds;
   uint64_t wal_size_limit_mb;
-  bool use_wal_stage; // hust-cloud
+  bool use_wal_stage;
   size_t manifest_preallocation_size;
   bool allow_mmap_reads;
   bool allow_mmap_writes;

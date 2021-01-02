@@ -492,11 +492,11 @@ class ColumnFamilyData {
 
   Env::WriteLifeTimeHint CalculateSSTWriteHint(int level);
 
-  Status AddDirectories(const std::string& meta_dir); // hust-cloud
+  Status AddDirectories(const std::string& meta_dir);
 
   Directory* GetDataDir(size_t path_id) const;
 
-  Directory* GetMetaDir(); // hust-cloud
+  Directory* GetMetaDir();
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
 
@@ -588,7 +588,6 @@ class ColumnFamilyData {
   // Directories corresponding to cf_paths.
   std::vector<std::unique_ptr<Directory>> data_dirs_;
 
-  // hust-cloud
   std::unique_ptr<Directory> meta_dir_;
 };
 

@@ -39,7 +39,7 @@ ImmutableCFOptions::ImmutableCFOptions(const ImmutableDBOptions& db_options,
       statistics(db_options.statistics.get()),
       rate_limiter(db_options.rate_limiter.get()),
       info_log_level(db_options.info_log_level),
-      use_wal_stage(db_options.use_wal_stage), // hust-cloud
+      use_wal_stage(db_options.use_wal_stage),
       env(db_options.env),
       allow_mmap_reads(db_options.allow_mmap_reads),
       allow_mmap_writes(db_options.allow_mmap_writes),
@@ -74,7 +74,7 @@ ImmutableCFOptions::ImmutableCFOptions(const ImmutableDBOptions& db_options,
       memtable_insert_with_hint_prefix_extractor(
           cf_options.memtable_insert_with_hint_prefix_extractor.get()),
       cf_paths(cf_options.cf_paths),
-      meta_dir(db_options.meta_dir), // hust-cloud
+      meta_dir(db_options.meta_dir),
       compaction_thread_limiter(cf_options.compaction_thread_limiter),
       sst_partitioner_factory(cf_options.sst_partitioner_factory) {}
 

@@ -430,8 +430,8 @@ class Repairer {
           0 /* sample_for_compression */, CompressionOptions(), false,
           nullptr /* internal_stats */, TableFileCreationReason::kRecovery,
           nullptr /* event_logger */, 0 /* job_id */, Env::IO_HIGH,
-          nullptr /* table_properties */, -1 /* level */, current_time,
-          write_hint);
+          nullptr /* table_properties */, -1 /* level */, current_time, 0 /* oldest_key_time */,
+          write_hint, 0 /* file_creation_time */, true /* meta_to_cloud */);
       ROCKS_LOG_INFO(db_options_.info_log,
                      "Log #%" PRIu64 ": %d ops saved to Table #%" PRIu64 " %s",
                      log, counter, meta.fd.GetNumber(),
@@ -591,7 +591,8 @@ class Repairer {
         edit.AddFile(0, table->meta.fd.GetNumber(), table->meta.fd.GetPathId(),
                      table->meta.fd.GetFileSize(), table->meta.smallest,
                      table->meta.largest, table->min_sequence,
-                     table->max_sequence, table->meta.marked_for_compaction);
+                     table->max_sequence, table->meta.marked_for_compaction,
+                     table->meta.fd.GetMetaFileSize());
       }
       assert(next_file_number_ > 0);
       vset_.MarkFileNumberUsed(next_file_number_ - 1);

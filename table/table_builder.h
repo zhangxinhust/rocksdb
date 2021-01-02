@@ -140,9 +140,6 @@ class TableBuilder {
   // REQUIRES: Finish(), Abandon() have not been called
   virtual Status Finish() = 0;
 
-  // hust-cloud
-  virtual Status FinishMeta() { return Status::OK(); }
-
   // Indicate that the contents of this builder should be abandoned.
   // If the caller is not going to call Finish(), it must call Abandon()
   // before destroying this builder.
@@ -156,16 +153,14 @@ class TableBuilder {
   // Finish() call, returns the size of the final generated file.
   virtual uint64_t FileSize() const = 0;
 
+  virtual uint64_t MetaFileSize() const { return 0; };
+
   // If the user defined table properties collector suggest the file to
   // be further compacted.
   virtual bool NeedCompact() const { return false; }
 
   // Returns table properties
   virtual TableProperties GetTableProperties() const = 0;
-
-  // hust-cloud
-  virtual void SetFileWriter(WritableFileWriter* file) {}
-  virtual WritableFileWriter* GetFileWriter() {return nullptr;}
 };
 
 }  // namespace rocksdb

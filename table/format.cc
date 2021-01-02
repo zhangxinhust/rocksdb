@@ -288,7 +288,7 @@ Status ReadFooterFromFile(RandomAccessFileReader* file,
     return Status::Corruption("file is too short (" + ToString(file_size) +
                               " bytes) to be an "
                               "sstable: " +
-                              file->file_name());
+                              file->file_name() + " " + ToString(Footer::kMinEncodedLength));
   }
 
   char footer_space[Footer::kMaxEncodedLength];
@@ -312,7 +312,8 @@ Status ReadFooterFromFile(RandomAccessFileReader* file,
     return Status::Corruption("file is too short (" + ToString(file_size) +
                               " bytes) to be an "
                               "sstable" +
-                              file->file_name());
+                              file->file_name() + " " + ToString(Footer::kMinEncodedLength) +
+                              " " + ToString(footer_input.size()));
   }
 
   s = footer->DecodeFrom(&footer_input);

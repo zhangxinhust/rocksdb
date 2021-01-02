@@ -58,7 +58,7 @@ struct ImmutableCFOptions {
 
   InfoLogLevel info_log_level;
 
-  bool use_wal_stage; // hust-cloud
+  bool use_wal_stage;
 
   Env* env;
 
@@ -123,7 +123,7 @@ struct ImmutableCFOptions {
 
   std::vector<DbPath> cf_paths;
 
-  std::string meta_dir; // hust-cloud
+  std::string meta_dir;
 
   std::shared_ptr<ConcurrentTaskLimiter> compaction_thread_limiter;
 

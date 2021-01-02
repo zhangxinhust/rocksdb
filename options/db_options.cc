@@ -34,7 +34,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       db_paths(options.db_paths),
       db_log_dir(options.db_log_dir),
       wal_dir(options.wal_dir),
-      meta_dir(options.meta_dir), // hust-cloud
+      meta_dir(options.meta_dir),
       max_subcompactions(options.max_subcompactions),
       max_log_file_size(options.max_log_file_size),
       log_file_time_to_roll(options.log_file_time_to_roll),
@@ -44,7 +44,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       table_cache_numshardbits(options.table_cache_numshardbits),
       wal_ttl_seconds(options.WAL_ttl_seconds),
       wal_size_limit_mb(options.WAL_size_limit_MB),
-      use_wal_stage(options.use_wal_stage), // hust-cloud
+      use_wal_stage(options.use_wal_stage),
       manifest_preallocation_size(options.manifest_preallocation_size),
       allow_mmap_reads(options.allow_mmap_reads),
       allow_mmap_writes(options.allow_mmap_writes),

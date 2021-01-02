@@ -81,7 +81,6 @@ struct MemTableInfo;
 // Class to maintain directories for all database paths other than main one.
 class Directories {
  public:
-  // hust-cloud
   Status SetDirectories(Env* env, const std::string& dbname, const std::string& wal_dir, 
                                  const std::vector<DbPath>& data_paths, const std::string& meta_dir);
 
@@ -115,7 +114,7 @@ class Directories {
   std::unique_ptr<Directory> db_dir_;
   std::vector<std::unique_ptr<Directory>> data_dirs_;
   std::unique_ptr<Directory> wal_dir_;
-  std::unique_ptr<Directory> meta_dir_; // hust-cloud
+  std::unique_ptr<Directory> meta_dir_;
 };
 
 // While DB is the public interface of RocksDB, and DBImpl is the actual
@@ -560,7 +559,7 @@ class DBImpl : public DB {
   void FindObsoleteFiles(JobContext* job_context, bool force,
                          bool no_full_scan = false);
 
-  bool WALShouldPurge(uint64_t log_number); // hust-cloud
+  bool WALShouldPurge(uint64_t log_number);
 
   // Diffs the files listed in filenames and those that do not
   // belong to live files are possibly removed. Also, removes all the
@@ -1543,7 +1542,7 @@ class DBImpl : public DB {
 
   Directory* GetDataDir(ColumnFamilyData* cfd, size_t path_id) const;
 
-  Directory* GetMetaDir(ColumnFamilyData* cfd); // hust-cloud
+  Directory* GetMetaDir(ColumnFamilyData* cfd);
 
   Status CloseHelper();
 
@@ -1692,7 +1691,6 @@ class DBImpl : public DB {
   std::atomic<bool> cached_recoverable_state_empty_ = {true};
   std::atomic<uint64_t> total_log_size_;
 
-  // hust-cloud
   std::unordered_map<uint64_t, std::pair<SequenceNumber, SequenceNumber>> logs_seq_range_;
 
   // If this is non-empty, we need to delete these log files in background

@@ -101,7 +101,6 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src) {
     result.wal_dir = result.wal_dir.substr(0, result.wal_dir.size() - 1);
   }
 
-  // hust-cloud
   if (result.meta_dir.empty()) {
     result.meta_dir = dbname.back() == '/' ? dbname + "meta" : dbname + "/meta";
   }
@@ -299,7 +298,6 @@ Status DBImpl::CreateAndNewDirectory(Env* env, const std::string& dirname,
   return env->NewDirectory(dirname, directory);
 }
 
-// hust-cloud
 Status Directories::SetDirectories(Env* env, const std::string& dbname, const std::string& wal_dir,
                                             const std::vector<DbPath>& data_paths, const std::string& meta_dir) {
   Status s = DBImpl::CreateAndNewDirectory(env, dbname, &db_dir_);
@@ -349,7 +347,7 @@ Status DBImpl::Recover(
     Status s = directories_.SetDirectories(env_, dbname_,
                                            immutable_db_options_.wal_dir,
                                            immutable_db_options_.db_paths,
-                                           immutable_db_options_.meta_dir); // hust-cloud
+                                           immutable_db_options_.meta_dir);
     if (!s.ok()) {
       return s;
     }
@@ -424,7 +422,7 @@ Status DBImpl::Recover(
   }
   if (s.ok() && !read_only) {
     for (auto cfd : *versions_->GetColumnFamilySet()) {
-      s = cfd->AddDirectories(immutable_db_options_.meta_dir); // hust-cloud
+      s = cfd->AddDirectories(immutable_db_options_.meta_dir);
       if (!s.ok()) {
         return s;
       }
@@ -475,7 +473,7 @@ Status DBImpl::Recover(
       uint64_t number;
       FileType type;
       if (ParseFileName(filenames[i], &number, &type) && type == kLogFile) {
-        if (!immutable_db_options_.use_wal_stage && is_new_db) { // hust-cloud
+        if (!immutable_db_options_.use_wal_stage && is_new_db) {
           return Status::Corruption(
               "While creating a new Db, wal_dir contains "
               "existing log file: ",
@@ -699,7 +697,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
   for (auto log_number : log_numbers) {
-    if (!immutable_db_options_.use_wal_stage && // hust-cloud
+    if (!immutable_db_options_.use_wal_stage &&
         log_number < min_log_number) {
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
                      "Skipping log #%" PRIu64
@@ -774,7 +772,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     Slice record;
     WriteBatch batch;
     SequenceNumber sequence;
-    // hust-cloud
     SequenceNumber first_seqno = kDisableGlobalSequenceNumber;
 
     while (!stop_replay_by_wal_filter &&
@@ -788,7 +785,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
       WriteBatchInternal::SetContents(&batch, record);
       sequence = WriteBatchInternal::Sequence(&batch);
-      // hust-cloud
       if (first_seqno == kDisableGlobalSequenceNumber) {
         first_seqno = sequence;
       }
@@ -913,7 +909,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           cfd->Unref();
           // If this asserts, it means that InsertInto failed in
           // filtering updates to already-flushed column families
-          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number); // hust-cloud
+          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number);
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
@@ -930,7 +926,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         }
       }
     }
-    // hust-cloud
     if (immutable_db_options_.use_wal_stage &&
         first_seqno != kDisableGlobalSequenceNumber) {
       logs_seq_range_[log_number] = 
@@ -1061,7 +1056,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   }
 
   if (status.ok() && ((data_seen && !flushed) ||
-                      immutable_db_options_.use_wal_stage)) { // hust-cloud
+                      immutable_db_options_.use_wal_stage)) {
     status = RestoreAliveLogFiles(log_numbers);
   }
 
@@ -1078,7 +1073,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
   Status s;
   mutex_.AssertHeld();
   assert(immutable_db_options_.use_wal_stage ||
-    immutable_db_options_.avoid_flush_during_recovery); // hust-cloud
+    immutable_db_options_.avoid_flush_during_recovery);
   if (two_write_queues_) {
     log_write_mutex_.Lock();
   }
@@ -1133,7 +1128,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
   FileMetaData meta;
   auto pending_outputs_inserted_elem =
       CaptureCurrentFileNumberInPendingOutputs();
-  meta.fd = FileDescriptor(versions_->NewFileNumber(), 0, 0);
+  meta.fd = FileDescriptor(versions_->NewFileNumber(), 0, 0, 0);
   ReadOptions ro;
   ro.total_order_seek = true;
   Arena arena;
@@ -1185,7 +1180,8 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
           cfd->ioptions()->compression_opts, paranoid_file_checks,
           cfd->internal_stats(), TableFileCreationReason::kRecovery,
           &event_logger_, job_id, Env::IO_HIGH, nullptr /* table_properties */,
-          -1 /* level */, current_time, write_hint);
+          -1 /* level */, current_time, 0 /* oldest_key_time */, write_hint,
+          0 /* file_creation_time */, true /* meta_to_cloud */);
       LogFlush(immutable_db_options_.info_log);
       ROCKS_LOG_DEBUG(immutable_db_options_.info_log,
                       "[%s] [WriteLevel0TableForRecovery]"
@@ -1204,7 +1200,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
     edit->AddFile(level, meta.fd.GetNumber(), meta.fd.GetPathId(),
                   meta.fd.GetFileSize(), meta.smallest, meta.largest,
                   meta.fd.smallest_seqno, meta.fd.largest_seqno,
-                  meta.marked_for_compaction);
+                  meta.marked_for_compaction, meta.fd.GetMetaFileSize());
   }
 
   InternalStats::CompactionStats stats(CompactionReason::kFlush, 1);
@@ -1372,7 +1368,6 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       impl->logfile_number_ = new_log_number;
       assert(new_log != nullptr);
       impl->logs_.emplace_back(new_log_number, new_log);
-      // hust-cloud
       impl->logs_seq_range_[new_log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(impl->versions_->LastSequence(), kDisableGlobalSequenceNumber);
     }

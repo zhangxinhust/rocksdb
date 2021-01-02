@@ -545,7 +545,6 @@ Status DBImpl::CloseHelper() {
   }
   logs_.clear();
 
-  // hust-cloud
   if (immutable_db_options_.use_wal_stage) {
     logs_seq_range_.clear();
   }
@@ -888,7 +887,6 @@ Directory* DBImpl::GetDataDir(ColumnFamilyData* cfd, size_t path_id) const {
   return ret_dir;
 }
 
-// hust-cloud
 Directory* DBImpl::GetMetaDir(ColumnFamilyData* cfd) {
   assert(cfd);
   Directory* ret_dir = cfd->GetMetaDir();
@@ -2114,7 +2112,7 @@ Status DBImpl::CreateColumnFamilyImpl(const ColumnFamilyOptions& cf_options,
       auto* cfd =
           versions_->GetColumnFamilySet()->GetColumnFamily(column_family_name);
       assert(cfd != nullptr);
-      s = cfd->AddDirectories(immutable_db_options_.meta_dir); // hust-cloud
+      s = cfd->AddDirectories(immutable_db_options_.meta_dir);
     }
     if (s.ok()) {
       single_column_family_mode_ = false;
@@ -3106,7 +3104,6 @@ Status DBImpl::CheckConsistency() {
       s = Status::OK();
     }
     if (!s.ok()) {
-      // hust-cloud
       if (immutable_db_options_.use_wal_stage && md.level <= 1) {
         uint64_t number;
         FileType type;

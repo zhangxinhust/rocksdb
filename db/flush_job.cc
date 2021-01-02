@@ -97,7 +97,7 @@ FlushJob::FlushJob(const std::string& dbname, ColumnFamilyData* cfd,
                    CompressionType output_compression, Statistics* stats,
                    EventLogger* event_logger, bool measure_io_stats,
                    const bool sync_output_directory, const bool write_manifest,
-                   Env::Priority thread_pri, Directory* meta_directory = nullptr) // hust-cloud
+                   Env::Priority thread_pri, Directory* output_meta_file_directory = nullptr)
     : dbname_(dbname),
       cfd_(cfd),
       db_options_(db_options),
@@ -114,7 +114,7 @@ FlushJob::FlushJob(const std::string& dbname, ColumnFamilyData* cfd,
       log_buffer_(log_buffer),
       db_directory_(db_directory),
       output_file_directory_(output_file_directory),
-      meta_directory_(meta_directory), // hust-cloud
+      output_meta_file_directory_(output_meta_file_directory),
       output_compression_(output_compression),
       stats_(stats),
       event_logger_(event_logger),
@@ -378,7 +378,7 @@ Status FlushJob::WriteLevel0Table() {
           mutable_cf_options_.paranoid_file_checks, cfd_->internal_stats(),
           TableFileCreationReason::kFlush, event_logger_, job_context_->job_id,
           Env::IO_HIGH, &table_properties_, 0 /* level */, current_time,
-          oldest_key_time, write_hint, current_time);
+          oldest_key_time, write_hint, current_time, true /*meta_to_cloud*/);
       LogFlush(db_options_.info_log);
     }
     ROCKS_LOG_INFO(db_options_.info_log,
@@ -392,6 +392,9 @@ Status FlushJob::WriteLevel0Table() {
 
     if (s.ok() && output_file_directory_ != nullptr && sync_output_directory_) {
       s = output_file_directory_->Fsync();
+    }
+    if (s.ok() && output_meta_file_directory_ != nullptr && sync_output_directory_) {
+      s = output_meta_file_directory_->Fsync();
     }
     TEST_SYNC_POINT_CALLBACK("FlushJob::WriteLevel0Table", &mems_);
     db_mutex_->Lock();
@@ -409,7 +412,7 @@ Status FlushJob::WriteLevel0Table() {
     edit_->AddFile(0 /* level */, meta_.fd.GetNumber(), meta_.fd.GetPathId(),
                    meta_.fd.GetFileSize(), meta_.smallest, meta_.largest,
                    meta_.fd.smallest_seqno, meta_.fd.largest_seqno,
-                   meta_.marked_for_compaction);
+                   meta_.marked_for_compaction, meta_.fd.GetMetaFileSize());
   }
 #ifndef ROCKSDB_LITE
   // Piggyback FlushJobInfo on the first first flushed memtable.

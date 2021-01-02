@@ -50,7 +50,7 @@ TableBuilder* NewTableBuilder(
     uint64_t sample_for_compression, const CompressionOptions& compression_opts,
     int level, const bool skip_filters, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time) {
+    const uint64_t file_creation_time, WritableFileWriter* meta_file) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -61,7 +61,7 @@ TableBuilder* NewTableBuilder(
                           skip_filters, column_family_name, level,
                           creation_time, oldest_key_time, target_file_size,
                           file_creation_time),
-      column_family_id, file);
+      column_family_id, file, meta_file);
 }
 
 Status BuildTable(
@@ -82,7 +82,8 @@ Status BuildTable(
     TableFileCreationReason reason, EventLogger* event_logger, int job_id,
     const Env::IOPriority io_priority, TableProperties* table_properties,
     int level, const uint64_t creation_time, const uint64_t oldest_key_time,
-    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time) {
+    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time,
+    bool meta_to_cloud) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -90,6 +91,7 @@ Status BuildTable(
   const size_t kReportFlushIOStatsEvery = 1048576;
   Status s;
   meta->fd.file_size = 0;
+  meta->fd.meta_file_size = 0;
   iter->SeekToFirst();
   std::unique_ptr<CompactionRangeDelAggregator> range_del_agg(
       new CompactionRangeDelAggregator(&internal_comparator, snapshots));
@@ -99,8 +101,10 @@ Status BuildTable(
 
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
-  // hust-cloud
-  std::string meta_name = TableMetaFileName(ioptions.meta_dir, meta->fd.GetNumber());
+  std::string meta_fname;
+  if (meta_to_cloud) {
+    meta_fname = TableMetaFileName(ioptions.meta_dir, meta->fd.GetNumber());
+  }
 
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
@@ -110,14 +114,14 @@ Status BuildTable(
 
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
     TableBuilder* builder;
-    std::unique_ptr<WritableFileWriter> file_writer, meta_file_writer;
+    std::unique_ptr<WritableFileWriter> file_writer, meta_file_writer = nullptr;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
     CompressionOptions compression_opts_for_flush(compression_opts);
     compression_opts_for_flush.max_dict_bytes = 0;
     compression_opts_for_flush.zstd_max_train_bytes = 0;
     {
-      std::unique_ptr<WritableFile> file, meta_file; // hust-cloud
+      std::unique_ptr<WritableFile> file, meta_file = nullptr;
 #ifndef NDEBUG
       bool use_direct_writes = env_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
@@ -129,34 +133,39 @@ Status BuildTable(
             job_id, meta->fd, tp, reason, s);
         return s;
       }
-      // hust-cloud
-      s = NewWritableFile(env, meta_name, &meta_file, env_options);
-      if (!s.ok()) {
-        EventHelpers::LogAndNotifyTableFileCreationFinished(
-            event_logger, ioptions.listeners, dbname, column_family_name, meta_name,
-            job_id, meta->fd, tp, reason, s);
-        return s;
+
+      if (meta_to_cloud) {
+        s = NewWritableFile(env, meta_fname, &meta_file, env_options);
+        if (!s.ok()) {
+          EventHelpers::LogAndNotifyTableFileCreationFinished(
+              event_logger, ioptions.listeners, dbname, column_family_name, meta_fname,
+              job_id, meta->fd, tp, reason, s);
+          return s;
+        }
       }
 
       file->SetIOPriority(io_priority);
       file->SetWriteLifeTimeHint(write_hint);
-      // hust-cloud
-      meta_file->SetIOPriority(io_priority);
-      meta_file->SetWriteLifeTimeHint(write_hint);
+      if (meta_to_cloud) {
+        meta_file->SetIOPriority(io_priority);
+        meta_file->SetWriteLifeTimeHint(write_hint);
+      }
 
       file_writer.reset(
           new WritableFileWriter(std::move(file), fname, env_options, env,
                                  ioptions.statistics, ioptions.listeners));
-      meta_file_writer.reset(
-          new WritableFileWriter(std::move(meta_file), meta_name, env_options, env,
-                                 ioptions.statistics, ioptions.listeners));
+      if (meta_to_cloud) {
+        meta_file_writer.reset(
+            new WritableFileWriter(std::move(meta_file), meta_fname, env_options, env,
+                                   ioptions.statistics, ioptions.listeners));
+      }
       builder = NewTableBuilder(
           ioptions, mutable_cf_options, internal_comparator,
           int_tbl_prop_collector_factories, column_family_id,
           column_family_name, file_writer.get(), compression,
           sample_for_compression, compression_opts_for_flush, level,
           false /* skip_filters */, creation_time, oldest_key_time,
-          0 /*target_file_size*/, file_creation_time);
+          0 /*target_file_size*/, file_creation_time, meta_file_writer.get());
     }
 
     MergeHelper merge(env, internal_comparator.user_comparator(),
@@ -205,17 +214,10 @@ Status BuildTable(
       s = builder->Finish();
     }
 
-    // hust-cloud
-    WritableFileWriter* old_writer = builder->GetFileWriter();
-    if (s.ok() && !empty) {
-      builder->SetFileWriter(meta_file_writer.get());
-      s = builder->FinishMeta();
-    }
-    builder->SetFileWriter(old_writer);
-
     if (s.ok() && !empty) {
       uint64_t file_size = builder->FileSize();
       meta->fd.file_size = file_size;
+      meta->fd.meta_file_size = builder->MetaFileSize();
       meta->marked_for_compaction = builder->NeedCompact();
       assert(meta->fd.GetFileSize() > 0);
       tp = builder->GetTableProperties(); // refresh now that builder is finished
@@ -229,9 +231,15 @@ Status BuildTable(
     if (s.ok() && !empty) {
       StopWatch sw(env, ioptions.statistics, TABLE_SYNC_MICROS);
       s = file_writer->Sync(ioptions.use_fsync);
+      if (s.ok() && meta_to_cloud) {
+        s = meta_file_writer->Sync(ioptions.use_fsync);
+      }
     }
     if (s.ok() && !empty) {
       s = file_writer->Close();
+      if (s.ok() && meta_to_cloud) {
+        s = meta_file_writer->Close();
+      }
     }
 
     if (s.ok() && !empty) {
@@ -266,6 +274,9 @@ Status BuildTable(
 
   if (!s.ok() || meta->fd.GetFileSize() == 0) {
     env->DeleteFile(fname);
+    if (meta_to_cloud) {
+      env->DeleteFile(meta_fname);
+    }
   }
 
   // Output to event logger and fire events.

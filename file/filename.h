@@ -32,6 +32,8 @@ enum FileType {
   kLogFile,
   kDBLockFile,
   kTableFile,
+  kTableMetaFile,
+  kMetaDir,
   kDescriptorFile,
   kCurrentFile,
   kTempFile,
@@ -53,6 +55,7 @@ extern std::string BlobFileName(const std::string& dbname,
                                 const std::string& blob_dir, uint64_t number);
 
 static const std::string ARCHIVAL_DIR = "archive";
+static const std::string META_DIR = "meta";
 
 extern std::string ArchivalDirectory(const std::string& dbname);
 
@@ -62,7 +65,7 @@ extern std::string ArchivedLogFileName(const std::string& dbname,
                                        uint64_t num);
 
 extern std::string MakeTableFileName(const std::string& name, uint64_t number);
-extern std::string MakeTableFileName(const std::string& name, uint64_t number); // hust-cloud
+extern std::string MakeTableMetaFileName(const std::string& name, uint64_t number);
 
 // Return the name of sstable with LevelDB suffix
 // created from RocksDB sstable suffixed name
@@ -78,8 +81,7 @@ extern uint64_t TableFileNameToNumber(const std::string& name);
 extern std::string TableFileName(const std::vector<DbPath>& db_paths,
                                  uint64_t number, uint32_t path_id);
 
-// hust-cloud
-extern std::string TableMetaFileName(const std::string& meta_name, uint64_t number);
+extern std::string TableMetaFileName(const std::string& meta_dir, uint64_t number);
 
 // Sufficient buffer size for FormatFileNumber.
 const size_t kFormatFileNumberBufSize = 38;

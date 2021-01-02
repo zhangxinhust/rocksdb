@@ -24,7 +24,7 @@ namespace rocksdb {
 static const std::string kRocksDbTFileExt = "sst";
 static const std::string kLevelDbTFileExt = "ldb";
 static const std::string kRocksDBBlobFileExt = "blob";
-static const std::string kRocksDbTMetaFileExt = "sstmeta"; // hust-cloud
+static const std::string kRocksDbTMetaFileExt = "meta";
 
 // Given a path, flatten the path name by replacing all chars not in
 // {[0-9,a-z,A-Z,-,_,.]} with _. And append '_LOG\0' at the end.
@@ -96,7 +96,6 @@ std::string MakeTableFileName(const std::string& path, uint64_t number) {
   return MakeFileName(path, number, kRocksDbTFileExt.c_str());
 }
 
-// hust-cloud
 std::string MakeTableMetaFileName(const std::string& path, uint64_t number) {
   return MakeFileName(path, number, kRocksDbTMetaFileExt.c_str());
 }
@@ -133,10 +132,9 @@ std::string TableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
   return MakeTableFileName(path, number);
 }
 
-// hust-cloud
-std::string TableMetaFileName(const std::string& meta_name, uint64_t number) {
+std::string TableMetaFileName(const std::string& meta_dir, uint64_t number) {
   assert(number > 0);
-  return MakeTableMetaFileName(meta_name, number);
+  return MakeTableMetaFileName(meta_dir, number);
 }
 
 void FormatFileNumber(uint64_t number, uint32_t path_id, char* out_buf,
@@ -335,6 +333,14 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
         *log_type = kArchivedLogFile;
       }
       archive_dir_found = true;
+    } else if (rest.starts_with(META_DIR)) {
+      if (rest.size() <= META_DIR.size()) {
+        return false;
+      }
+      rest.remove_prefix(META_DIR.size() + 1); // Add 1 to remove / also
+      if (type) {
+        *type = kMetaDir;
+      }
     }
     uint64_t num;
     if (!ConsumeDecimalNumber(&rest, &num)) {
@@ -356,6 +362,8 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
     } else if (suffix == Slice(kRocksDbTFileExt) ||
                suffix == Slice(kLevelDbTFileExt)) {
       *type = kTableFile;
+    } else if (suffix == Slice(kRocksDbTMetaFileExt)) {
+      *type = kTableMetaFile;
     } else if (suffix == Slice(kRocksDBBlobFileExt)) {
       *type = kBlobFile;
     } else if (suffix == Slice(kTempFileNameSuffix)) {

@@ -530,7 +530,6 @@ struct DBOptions {
   //   all log files in wal_dir and the dir itself is deleted
   std::string wal_dir = "";
 
-  // hust-cloud
   // This specifies the absolute dir path for meta files of L0&L1 SST filels.
   // If it is empty, the meta files will be set as dbname/meta
   // If it is non empty, the meta files will be in kept the specified dir.
@@ -662,7 +661,6 @@ struct DBOptions {
   uint64_t WAL_ttl_seconds = 0;
   uint64_t WAL_size_limit_MB = 0;
 
-  // hust-cloud
   // Keep the wal file before all the data compacted to L2.
   // Default: false
   bool use_wal_stage = false;
