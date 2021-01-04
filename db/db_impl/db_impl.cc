@@ -545,7 +545,6 @@ Status DBImpl::CloseHelper() {
   }
   logs_.clear();
 
-  // hust-cloud
   if (immutable_db_options_.use_wal_stage) {
     logs_seq_range_.clear();
   }
@@ -3096,7 +3095,6 @@ Status DBImpl::CheckConsistency() {
       s = Status::OK();
     }
     if (!s.ok()) {
-      // hust-cloud
       if (immutable_db_options_.use_wal_stage && md.level <= 1) {
         uint64_t number;
         FileType type;

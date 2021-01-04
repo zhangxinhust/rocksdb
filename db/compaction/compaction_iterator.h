@@ -99,8 +99,6 @@ class CompactionIterator {
     virtual bool preserve_deletes() const {
       return compaction_->immutable_cf_options()->preserve_deletes;
     }
-
-    // hust-cloud
     virtual const ImmutableCFOptions* immutable_cf_options() const {
       return compaction_->immutable_cf_options();
     }

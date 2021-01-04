@@ -58,7 +58,7 @@ struct ImmutableCFOptions {
 
   InfoLogLevel info_log_level;
 
-  bool use_wal_stage; // hust-cloud
+  bool use_wal_stage;
 
   Env* env;
 

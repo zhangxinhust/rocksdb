@@ -462,7 +462,7 @@ Status DBImpl::Recover(
       uint64_t number;
       FileType type;
       if (ParseFileName(filenames[i], &number, &type) && type == kLogFile) {
-        if (!immutable_db_options_.use_wal_stage && is_new_db) { // hust-cloud
+        if (!immutable_db_options_.use_wal_stage && is_new_db) {
           return Status::Corruption(
               "While creating a new Db, wal_dir contains "
               "existing log file: ",
@@ -686,7 +686,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
   for (auto log_number : log_numbers) {
-    if (!immutable_db_options_.use_wal_stage && // hust-cloud
+    if (!immutable_db_options_.use_wal_stage &&
         log_number < min_log_number) {
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
                      "Skipping log #%" PRIu64
@@ -761,7 +761,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     Slice record;
     WriteBatch batch;
     SequenceNumber sequence;
-    // hust-cloud
     SequenceNumber first_seqno = kDisableGlobalSequenceNumber;
 
     while (!stop_replay_by_wal_filter &&
@@ -775,7 +774,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
       }
       WriteBatchInternal::SetContents(&batch, record);
       sequence = WriteBatchInternal::Sequence(&batch);
-      // hust-cloud
       if (first_seqno == kDisableGlobalSequenceNumber) {
         first_seqno = sequence;
       }
@@ -900,7 +898,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
           cfd->Unref();
           // If this asserts, it means that InsertInto failed in
           // filtering updates to already-flushed column families
-          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number); // hust-cloud
+          assert(immutable_db_options_.use_wal_stage || cfd->GetLogNumber() <= log_number);
           auto iter = version_edits.find(cfd->GetID());
           assert(iter != version_edits.end());
           VersionEdit* edit = &iter->second;
@@ -917,7 +915,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
         }
       }
     }
-    // hust-cloud
     if (immutable_db_options_.use_wal_stage &&
         first_seqno != kDisableGlobalSequenceNumber) {
       logs_seq_range_[log_number] = 
@@ -1048,7 +1045,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   }
 
   if (status.ok() && ((data_seen && !flushed) ||
-                      immutable_db_options_.use_wal_stage)) { // hust-cloud
+                      immutable_db_options_.use_wal_stage)) {
     status = RestoreAliveLogFiles(log_numbers);
   }
 
@@ -1065,7 +1062,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& log_numbers) {
   Status s;
   mutex_.AssertHeld();
   assert(immutable_db_options_.use_wal_stage ||
-    immutable_db_options_.avoid_flush_during_recovery); // hust-cloud
+    immutable_db_options_.avoid_flush_during_recovery);
   if (two_write_queues_) {
     log_write_mutex_.Lock();
   }
@@ -1359,7 +1356,6 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       impl->logfile_number_ = new_log_number;
       assert(new_log != nullptr);
       impl->logs_.emplace_back(new_log_number, new_log);
-      // hust-cloud
       impl->logs_seq_range_[new_log_number] = 
         std::pair<SequenceNumber, SequenceNumber>(impl->versions_->LastSequence(), kDisableGlobalSequenceNumber);
     }

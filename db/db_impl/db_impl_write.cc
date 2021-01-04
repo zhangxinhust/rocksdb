@@ -1832,7 +1832,6 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
       }
     }
     if (s.ok()) {
-      // hust-cloud
       if (immutable_db_options_.use_wal_stage) {
         SequenceNumber seq = versions_->LastSequence();
         logs_seq_range_[new_log_number] = 
