@@ -39,6 +39,23 @@ Reader::Reader(std::shared_ptr<Logger> info_log,
       log_number_(log_num),
       recycled_(false) {}
 
+/*
+Reader::Reader(const Reader& reader) {
+  info_log_ = reader.info_log_;
+  file_ = reader.file_;
+  reporter_ = reader.reporter_;
+  checksum_ = reader.checksum_;
+  backing_store_ = reader.backing_store_;
+  buffer_ = reader.buffer_;
+  eof_ = reader.eof_;
+  read_error_ = reader.read_error_;
+  eof_offset_ = reader.eof_offset_;
+  last_record_offset_ = reader.last_record_offset_;
+  end_of_buffer_offset_ = reader.end_of_buffer_offset_;
+  log_number_ = reader.log_number_;
+  recycled_ = reader.recycled_;
+}
+*/
 Reader::~Reader() {
   delete[] backing_store_;
 }

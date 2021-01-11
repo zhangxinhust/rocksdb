@@ -33,6 +33,7 @@ enum TableReaderCaller : char {
   // A list of callers that are either not interesting for analysis or are
   // calling from a test environment, e.g., unit test, benchmark, etc.
   kUncategorized = 14,
+  kFastRecovery = 15,
   // All callers should be added before kMaxBlockCacheLookupCaller.
   kMaxBlockCacheLookupCaller
 };

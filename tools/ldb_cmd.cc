@@ -26,6 +26,7 @@
 #include "table/scoped_arena_iterator.h"
 #include "tools/ldb_cmd_impl.h"
 #include "tools/sst_dump_tool_imp.h"
+#include "tools/recovery_tool_imp.h"
 #include "util/cast_util.h"
 #include "util/coding.h"
 #include "util/stderr_logger.h"

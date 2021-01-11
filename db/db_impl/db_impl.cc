@@ -89,6 +89,7 @@
 #include "table/two_level_iterator.h"
 #include "test_util/sync_point.h"
 #include "tools/sst_dump_tool_imp.h"
+#include "tools/recovery_tool_imp.h"
 #include "util/autovector.h"
 #include "util/build_version.h"
 #include "util/coding.h"
@@ -2233,6 +2234,10 @@ Status DBImpl::DropColumnFamilyImpl(ColumnFamilyHandle* column_family) {
   }
 
   return s;
+}
+
+VersionSet* DBImpl::GetVersionSet() {
+  return versions_.get();
 }
 
 bool DBImpl::KeyMayExist(const ReadOptions& read_options,

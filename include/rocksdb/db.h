@@ -54,6 +54,7 @@ class Env;
 class EventListener;
 class StatsHistoryIterator;
 class TraceWriter;
+class VersionSet;
 #ifdef ROCKSDB_LITE
 class CompactionJobInfo;
 #endif
@@ -133,7 +134,7 @@ class DB {
   // Stores nullptr in *dbptr and returns a non-OK status on error.
   // Caller should delete *dbptr when it is no longer needed.
   static Status Open(const Options& options, const std::string& name,
-                     DB** dbptr);
+                     DB** dbptr, bool skip_wal = false);
 
   // Open the database for read only. All DB interfaces
   // that modify data, like put/delete, will return error.
@@ -224,7 +225,7 @@ class DB {
   // DestroyColumnFamilyHandle() with all the handles.
   static Status Open(const DBOptions& db_options, const std::string& name,
                      const std::vector<ColumnFamilyDescriptor>& column_families,
-                     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr);
+                     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr, bool skip_wal = false);
 
   virtual Status Resume() { return Status::NotSupported(); }
 
@@ -295,6 +296,8 @@ class DB {
   // deletes the column family handle by default. Use this method to
   // close column family instead of deleting column family handle directly
   virtual Status DestroyColumnFamilyHandle(ColumnFamilyHandle* column_family);
+
+  virtual VersionSet* GetVersionSet() {return nullptr;}
 
   // Set the database entry for "key" to "value".
   // If "key" already exists, it will be overwritten.

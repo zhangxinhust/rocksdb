@@ -604,6 +604,7 @@ endif
 
 TOOLS = \
 	sst_dump \
+	recovery \
 	db_sanity_test \
 	db_stress \
 	write_stress \
@@ -1562,6 +1563,9 @@ write_unprepared_transaction_test: utilities/transactions/write_unprepared_trans
 	$(AM_LINK)
 
 sst_dump: tools/sst_dump.o $(LIBOBJECTS)
+	$(AM_LINK)
+
+recovery: tools/recovery.o $(LIBOBJECTS)
 	$(AM_LINK)
 
 blob_dump: tools/blob_dump.o $(LIBOBJECTS)

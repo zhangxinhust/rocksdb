@@ -269,6 +269,7 @@ class ColumnFamilyData {
 
   // thread-safe
   uint32_t GetID() const { return id_; }
+  uint32_t&& GetIDRR()     { return std::move(id_); }
   // thread-safe
   const std::string& GetName() const { return name_; }
 

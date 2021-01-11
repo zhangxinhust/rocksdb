@@ -28,7 +28,8 @@ DBImplSecondary::~DBImplSecondary() {}
 Status DBImplSecondary::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     bool /*readonly*/, bool /*error_if_log_file_exist*/,
-    bool /*error_if_data_exists_in_logs*/) {
+    bool /*error_if_data_exists_in_logs*/,
+    bool /*skip_wal*/) {
   mutex_.AssertHeld();
 
   JobContext job_context(0);

@@ -150,9 +150,10 @@ class Reader {
   void ReportDrop(size_t bytes, const Status& reason);
 
  private:
-  // No copying allowed
+  // No Copying allowed
   Reader(const Reader&);
   void operator=(const Reader&);
+
 };
 
 class FragmentBufferedReader : public Reader {

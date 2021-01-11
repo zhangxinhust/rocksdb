@@ -203,6 +203,8 @@ class DBImpl : public DB {
   virtual Status DropColumnFamilies(
       const std::vector<ColumnFamilyHandle*>& column_families) override;
 
+  virtual VersionSet* GetVersionSet() override;
+
   // Returns false if key doesn't exist in the database and true if it may.
   // If value_found is not passed in as null, then return the value if found in
   // memory. On return, if value was found, then value_found will be set to true
@@ -771,8 +773,8 @@ class DBImpl : public DB {
   static Status Open(const DBOptions& db_options, const std::string& name,
                      const std::vector<ColumnFamilyDescriptor>& column_families,
                      std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
-                     const bool seq_per_batch, const bool batch_per_txn);
-
+                     const bool seq_per_batch, const bool batch_per_txn,
+                     bool skip_wal = false);
 
   static Status CreateAndNewDirectory(Env* env, const std::string& dirname,
                                       std::unique_ptr<Directory>* directory);
@@ -1076,7 +1078,7 @@ class DBImpl : public DB {
   virtual Status Recover(
       const std::vector<ColumnFamilyDescriptor>& column_families,
       bool read_only = false, bool error_if_log_file_exist = false,
-      bool error_if_data_exists_in_logs = false);
+      bool error_if_data_exists_in_logs = false, bool skip_wal = false);
 
  private:
   friend class DB;

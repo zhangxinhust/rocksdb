@@ -66,9 +66,16 @@ struct FileDescriptor {
   uint64_t GetNumber() const {
     return packed_number_and_path_id & kFileNumberMask;
   }
+  uint64_t&& GetNumberRR() const {
+    return std::move(packed_number_and_path_id & kFileNumberMask);
+  }
   uint32_t GetPathId() const {
     return static_cast<uint32_t>(
         packed_number_and_path_id / (kFileNumberMask + 1));
+  }
+  uint32_t&& GetPathIdRR() const {
+    return std::move(static_cast<uint32_t>(
+        packed_number_and_path_id / (kFileNumberMask + 1)));
   }
   uint64_t GetFileSize() const { return file_size; }
 };

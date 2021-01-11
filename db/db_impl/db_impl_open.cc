@@ -328,7 +328,7 @@ Status Directories::SetDirectories(Env* env, const std::string& dbname,
 
 Status DBImpl::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families, bool read_only,
-    bool error_if_log_file_exist, bool error_if_data_exists_in_logs) {
+    bool error_if_log_file_exist, bool error_if_data_exists_in_logs, bool skip_wal) {
   mutex_.AssertHeld();
 
   bool is_new_db = false;
@@ -494,7 +494,7 @@ Status DBImpl::Recover(
       }
     }
 
-    if (!logs.empty()) {
+    if (!logs.empty() && !skip_wal) {
       // Recover in the order in which the logs were generated
       std::sort(logs.begin(), logs.end());
       s = RecoverLogFiles(logs, &next_sequence, read_only);
@@ -1202,7 +1202,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
   return s;
 }
 
-Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
+Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr, bool skip_wal) {
   DBOptions db_options(options);
   ColumnFamilyOptions cf_options(options);
   std::vector<ColumnFamilyDescriptor> column_families;
@@ -1213,7 +1213,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
         ColumnFamilyDescriptor(kPersistentStatsColumnFamilyName, cf_options));
   }
   std::vector<ColumnFamilyHandle*> handles;
-  Status s = DB::Open(db_options, dbname, column_families, &handles, dbptr);
+  Status s = DB::Open(db_options, dbname, column_families, &handles, dbptr, skip_wal);
   if (s.ok()) {
     if (db_options.persist_stats_to_disk) {
       assert(handles.size() == 2);
@@ -1232,11 +1232,11 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
 
 Status DB::Open(const DBOptions& db_options, const std::string& dbname,
                 const std::vector<ColumnFamilyDescriptor>& column_families,
-                std::vector<ColumnFamilyHandle*>* handles, DB** dbptr) {
+                std::vector<ColumnFamilyHandle*>* handles, DB** dbptr, bool skip_wal) {
   const bool kSeqPerBatch = true;
   const bool kBatchPerTxn = true;
   return DBImpl::Open(db_options, dbname, column_families, handles, dbptr,
-                      !kSeqPerBatch, kBatchPerTxn);
+                      !kSeqPerBatch, kBatchPerTxn, skip_wal);
 }
 
 Status DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
@@ -1281,7 +1281,7 @@ Status DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
 Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
                     const std::vector<ColumnFamilyDescriptor>& column_families,
                     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
-                    const bool seq_per_batch, const bool batch_per_txn) {
+                    const bool seq_per_batch, const bool batch_per_txn, bool skip_wal) {
   Status s = SanitizeOptionsByTable(db_options, column_families);
   if (!s.ok()) {
     return s;
@@ -1343,7 +1343,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
 
   impl->mutex_.Lock();
   // Handles create_if_missing, error_if_exists
-  s = impl->Recover(column_families);
+  s = impl->Recover(column_families, false, false, false, skip_wal);
   if (s.ok()) {
     uint64_t new_log_number = impl->versions_->NewFileNumber();
     log::Writer* new_log = nullptr;
