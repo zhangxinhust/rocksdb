@@ -81,7 +81,7 @@ CuckooTableBuilder::CuckooTableBuilder(
   properties_.column_family_name = column_family_name;
 }
 
-void CuckooTableBuilder::Add(const Slice& key, const Slice& value) {
+void CuckooTableBuilder::Add(const Slice& key, const Slice& value, bool out_of_order) {
   if (num_entries_ >= kMaxVectorIdx - 1) {
     status_ = Status::NotSupported("Number of keys in a file must be < 2^32-1");
     return;

@@ -494,10 +494,10 @@ Status DBImpl::Recover(
       }
     }
 
-    if (!logs.empty() && !skip_wal) {
+    if (!logs.empty()) {
       // Recover in the order in which the logs were generated
       std::sort(logs.begin(), logs.end());
-      s = RecoverLogFiles(logs, &next_sequence, read_only);
+      s = RecoverLogFiles(logs, &next_sequence, read_only, skip_wal);
       if (!s.ok()) {
         // Clear memtables if recovery failed
         for (auto cfd : *versions_->GetColumnFamilySet()) {
@@ -627,7 +627,7 @@ Status DBImpl::InitPersistStatsColumnFamily() {
 
 // REQUIRES: log_numbers are sorted in ascending order
 Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
-                               SequenceNumber* next_sequence, bool read_only) {
+                               SequenceNumber* next_sequence, bool read_only, bool skip_wal) {
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -686,6 +686,12 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
   uint64_t corrupted_log_number = kMaxSequenceNumber;
   uint64_t min_log_number = MinLogNumberToKeep();
   for (auto log_number : log_numbers) {
+    if (skip_wal) {
+      logs_seq_range_[log_number] = std::pair<SequenceNumber, SequenceNumber>(
+                                    kDisableGlobalSequenceNumber,
+                                    kDisableGlobalSequenceNumber);
+      continue;
+    }
     if (!immutable_db_options_.use_wal_stage &&
         log_number < min_log_number) {
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
@@ -1044,8 +1050,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     }
   }
 
-  if (status.ok() && ((data_seen && !flushed) ||
-                      immutable_db_options_.use_wal_stage)) {
+  if (skip_wal || (status.ok() && ((data_seen && !flushed) ||
+                      immutable_db_options_.use_wal_stage))) {
     status = RestoreAliveLogFiles(log_numbers);
   }
 

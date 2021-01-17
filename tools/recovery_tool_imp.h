@@ -28,7 +28,7 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
 class FastRecovery {
  public:
   explicit FastRecovery(const Options& options, const std::string& file_name,
-                         const std::string& output_dir, int num_column_families = 3);
+                         const std::string& output_dir, uint32_t num_column_families = 3);
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -45,15 +45,17 @@ class FastRecovery {
   };
 
   Status OpenDB();
+  void CloseDB();
   Status Recover();
   Status PrepareLogReaders(std::vector<log::Reader*>& log_readers);
   Status BuildTableFromWals(TableBuilder* builder, InternalIterator* iter,
-                                       std::vector<log::Reader*> log_readers, uint32_t cf_id);
+                                       uint32_t cf_id, uint64_t sst_number);
   Status ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
                                        std::set<std::string>& all_keys,
                                        std::set<std::string>& keys_found,
                                        uint32_t cf_id);
   Status GetTableReader(const std::string& file_path, std::unique_ptr<TableReader> *table_reader);
+  Status GetLogReader(uint64_t log_number, log::Reader** log_reader);
 
   DB* GetDB() {
     return db_;

@@ -4064,6 +4064,10 @@ class Benchmark {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
       exit(1);
     }
+
+    for (ColumnFamilyHandle* cf : db->cfh) {
+      fprintf(stdout, "ColumnFamilyHandle %s, %u.\n", cf->GetName().c_str(), cf->GetID());
+    }
   }
 
   enum WriteMode {

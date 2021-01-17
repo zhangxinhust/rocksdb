@@ -115,7 +115,7 @@ PlainTableBuilder::PlainTableBuilder(
 PlainTableBuilder::~PlainTableBuilder() {
 }
 
-void PlainTableBuilder::Add(const Slice& key, const Slice& value) {
+void PlainTableBuilder::Add(const Slice& key, const Slice& value, bool out_of_order) {
   // temp buffer for metadata bytes between key and value.
   char meta_bytes_buf[6];
   size_t meta_bytes_buf_size = 0;
