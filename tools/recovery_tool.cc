@@ -52,6 +52,7 @@ extern const uint64_t kLegacyPlainTableMagicNumber;
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id) {
   fprintf(stdout, "RecoverTableFile begin %lu++++++++++.\n", meta->fd.GetNumber());
   Status s;
+  uint64_t start = recoverer->ioptions_.env->NowMicros();
 
   uint64_t sst_number = meta->fd.GetNumber();
   uint32_t path_id = meta->fd.GetPathId();
@@ -61,7 +62,7 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
   std::unique_ptr<TableReader> table_reader;
   s = recoverer->GetTableReader(sst_name, &table_reader);
   if (!s.ok()) {
-    fprintf(stderr, "GetTableReader : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "GetTableReader : %s.\n", s.ToString().c_str());
     return s;
   }
 
@@ -100,10 +101,17 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
   std::unique_ptr<InternalIterator> iter(table_reader->NewIterator(
       ReadOptions(), recoverer->mcfoptions_.prefix_extractor.get(), /*arena=*/nullptr,
       /*skip_filters=*/false, TableReaderCaller::kFastRecovery));
+
+  uint64_t prepare_end = recoverer->ioptions_.env->NowMicros();
   s = recoverer->BuildTableFromWals(table_builder.get(), iter.get(), 
                                     cf_id, sst_number);
+  uint64_t end = recoverer->ioptions_.env->NowMicros();
+  fprintf(stdout, "SST %lu last %lu s, prepare %lu s, BuildTableFromWals %lu s.\n",
+                  meta->fd.GetNumber(), (end - start) / 1000000,
+                  (prepare_end - start) / 1000000,
+                  (end - prepare_end) / 1000000);
   if (!s.ok()) {
-    fprintf(stderr, "BuildTableFromWals : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "BuildTableFromWals : %s.\n", s.ToString().c_str());
   }
   return s;
 }
@@ -130,12 +138,12 @@ FastRecovery::FastRecovery(const Options& options, const std::string& dbname,
 Status FastRecovery::OpenDB() {
   Status s = DB::Open(options_, dbname_, column_families_, &handles_, &db_, true/*skip_wal*/);
   if (!s.ok()) {
-    fprintf(stderr, "DB::Open : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "DB::Open : %s.\n", s.ToString().c_str());
     return s;
   }
   s = DBImpl::CreateAndNewDirectory(ioptions_.env, output_path_, &output_dir_);
   if (!s.ok()) {
-    fprintf(stderr, "CreateAndNewDirectory : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "CreateAndNewDirectory : %s.\n", s.ToString().c_str());
     return s;
   }
 
@@ -143,7 +151,7 @@ Status FastRecovery::OpenDB() {
   std::vector<std::string> filenames;
   s = ioptions_.env->GetChildren(ioptions_.wal_dir, &filenames);
   if (!s.ok()) {
-    fprintf(stderr, "GetChildren of path[%s] : %s.\n", ioptions_.wal_dir.c_str(), s.ToString().c_str());
+    fprintf(stdout, "GetChildren of path[%s] : %s.\n", ioptions_.wal_dir.c_str(), s.ToString().c_str());
     return s;
   }
   for (size_t i = 0; i < filenames.size(); i++) {
@@ -152,7 +160,7 @@ Status FastRecovery::OpenDB() {
     if (ParseFileName(filenames[i], &number, &type) && type == kLogFile) {
       logs_number_.push_back(number);
     } else {
-      fprintf(stderr, "ParseFileName %s: type: %d.\n", filenames[i].c_str(), int(type));
+      fprintf(stdout, "ParseFileName %s: type: %d.\n", filenames[i].c_str(), int(type));
     }
   }
   sort(logs_number_.begin(), logs_number_.end(), std::greater<uint64_t>());
@@ -172,11 +180,12 @@ void FastRecovery::CloseDB() {
 Status FastRecovery::Recover() {
   Status s;
   std::vector<std::future<Status> > statuses;
+  uint32_t thread_count = 0;
 
   for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
     fprintf(stdout, "In cf %s--------------------------.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized()) {
-      fprintf(stderr, "Column family %s skipped in recovery.\n", cfd->GetName().c_str());
+      fprintf(stdout, "Column family %s skipped in recovery.\n", cfd->GetName().c_str());
       continue;
     }
     assert(cfd->NumberLevels() > 1);
@@ -190,6 +199,20 @@ Status FastRecovery::Recover() {
       fprintf(stdout, "Add SST %lu in L0.\n", file->fd.GetNumber());
       statuses.emplace_back(std::async(std::launch::async, RecoverTableFile,
                                        this, &_file, cfd->GetID()));
+      thread_count++;
+      
+      if (thread_count >= 10) {
+        fprintf(stdout, "statuses size: %lu.\n", statuses.size());
+        thread_count = 0;
+        for (auto & status : statuses) {
+          Status ret_status = status.get();
+          if (!ret_status.ok()) {
+            fprintf(stdout, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
+          }
+        }
+        statuses.clear();
+      }
+      
     }
     for (FileMetaData* file : level1_files) {
       if (!file) {continue;}
@@ -197,15 +220,32 @@ Status FastRecovery::Recover() {
       fprintf(stdout, "Add SST %lu in L1.\n", file->fd.GetNumber());
       statuses.emplace_back(std::async(std::launch::async, RecoverTableFile,
                                        this, &_file, cfd->GetID()));
+      thread_count++;
+      
+      if (thread_count >= 10) {
+        fprintf(stdout, "statuses size: %lu.\n", statuses.size());
+        thread_count = 0;
+        for (auto & status : statuses) {
+          Status ret_status = status.get();
+          if (!ret_status.ok()) {
+            fprintf(stdout, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
+          }
+        }
+        statuses.clear();
+      }
+      
     }
   }
   fprintf(stdout, "statuses size: %lu.\n", statuses.size());
+  thread_count = 0;
   for (auto & status : statuses) {
     Status ret_status = status.get();
     if (!ret_status.ok()) {
-      fprintf(stderr, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
+      fprintf(stdout, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
     }
   }
+  statuses.clear();
+
   if (output_dir_) {
     s = output_dir_->Fsync();
   }
@@ -269,6 +309,8 @@ Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator*
   }
   fprintf(stdout, "BuildTableFromWals %lu begin*****.\n", sst_number);
   Status s;
+  uint64_t read_last = 0, parseadd_last = 0, parse_last = 0, add_last = 0, find_last = 0;
+  uint64_t start = ioptions_.env->NowMicros();
   std::set<std::string> all_keys;
   uint64_t keys_count = 0, keys_missed_iter = 0, keys_missed_wals = 0;
   for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
@@ -281,34 +323,55 @@ Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator*
     all_keys.insert(user_key);
     //fprintf(stdout, "%s-%s  ", user_key.c_str(), iter->key().ToString().c_str());
   }
-  fprintf(stdout, "%lu / %lu keys in SST %lu.\n", all_keys.size(), keys_count, sst_number);
+  uint64_t scan_sst_end = ioptions_.env->NowMicros();
+  fprintf(stdout, "%lu / %lu keys in SST %lu, %lu ms to scan them.\n",
+                  all_keys.size(), keys_count, sst_number,
+                  (scan_sst_end - start) / 1000);
 
   for (uint32_t i = 0; i < logs_number_.size(); i++) {
+    uint64_t wal_start = ioptions_.env->NowMicros();
     uint64_t log_number = logs_number_[i];
     log::Reader *reader = nullptr;
     s = GetLogReader(log_number, &reader);
+    uint64_t get_reader_end = ioptions_.env->NowMicros();
     if (!s.ok()) {
-      fprintf(stderr, "GetLogReader : %s.\n", s.ToString().c_str());
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
       continue;
     }
     if (!reader) {
-      fprintf(stderr, "log %lu skipped since log Reader null.\n", log_number);
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
       continue;
     }
     //fprintf(stdout, "No.%u reader log number: %lu.\n", i, log_number);
     std::string scratch;
     Slice record;
     WriteBatch batch;
+    SequenceNumber sequence;
     std::set<std::string> keys_found;
-    //fprintf(stdout, "Before readrecord.\n");
-    while (reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode) && s.ok()) {
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      uint64_t read_begin = ioptions_.env->NowMicros();
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        break;
+      }
+      uint64_t read_end = ioptions_.env->NowMicros();
+      read_last += read_end - read_begin;
       if (record.size() < WriteBatchInternal::kHeader) {
         continue;
       }
       WriteBatchInternal::SetContents(&batch, record);
-      s = ParseBatchAndAddKV(record, builder, all_keys, keys_found, cf_id);
+      sequence = WriteBatchInternal::Sequence(&batch);
+
+      uint64_t parse_begin = ioptions_.env->NowMicros();
+      s = ParseBatchAndAddKV(record, builder, all_keys, keys_found, cf_id, sequence,
+                             parse_last, add_last, find_last);
+      uint64_t parse_end = ioptions_.env->NowMicros();
+      parseadd_last += parse_end - parse_begin;
       if (!s.ok()) {
-        fprintf(stderr, "ParseBatchAndAddKV : %s.\n", s.ToString().c_str());
+        fprintf(stdout, "ParseBatchAndAddKV : %s.\n", s.ToString().c_str());
       }
     }
     //fprintf(stdout, "keys_found in log %lu: %lu.\n", log_number, keys_found.size());
@@ -318,33 +381,86 @@ Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator*
     if (all_keys.empty()) { break; }
     delete reader;
     reader = nullptr;
+    uint64_t wal_end = ioptions_.env->NowMicros();
+    //fprintf(stdout, "wal %lu last %lu s.\n", log_number,
+    //                (wal_end - wal_start) / 1000000);
   }
   keys_missed_wals = all_keys.size();
-  fprintf(stdout, "%lu SST Total keys: %lu, invalid iters: %lu, missed keys in wal: %lu\n",
-                  sst_number, keys_count, keys_missed_iter, keys_missed_wals);
+  uint64_t wals_end = ioptions_.env->NowMicros();
+  fprintf(stdout, "%lu SST Total keys: %lu, invalid iters: %lu, missed keys in wal: %lu,"
+                  " %lu s to recover, \n",
+                  sst_number, keys_count, keys_missed_iter, keys_missed_wals,
+                  (wals_end - scan_sst_end) / 1000000);
 
-  //fprintf(stdout, "Before finish.\n");
   s = builder->Finish();
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "BuildTableFromWals last %lu s, Finish last %lu s, read %lu s, parseadd %lu s"
+                  " parse: %lu s, add: %lu s, find: %lu s.\n",
+                  (end - start) / 1000000,
+                  (end - wals_end) / 1000000,
+                  read_last / 1000000, parseadd_last / 1000000,
+                  parse_last / 1000000, add_last / 1000000,
+                  find_last / 1000000);
   if (!s.ok()) {
-    fprintf(stderr, "Finish : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "Finish : %s.\n", s.ToString().c_str());
   }
   fprintf(stdout, "BuildTableFromWals %lu end*****.\n", sst_number);
   return s;
 }
 
+Status FastRecovery::TestReadLatency() {
+  Status s;
+  uint64_t start = ioptions_.env->NowMicros();
+  uint64_t entry_count = 0;
+
+  for (uint32_t i = 0; i < logs_number_.size(); i++) {
+    uint64_t wal_start = ioptions_.env->NowMicros();
+    uint64_t log_number = logs_number_[i];
+    log::Reader *reader = nullptr;
+    s = GetLogReader(log_number, &reader);
+    uint64_t get_reader_end = ioptions_.env->NowMicros();
+    if (!s.ok()) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      continue;
+    }
+    if (!reader) {
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      uint64_t read_begin = ioptions_.env->NowMicros();
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        fprintf(stdout, "ReadRecord fail %lu.\n", log_number);
+        break;
+      }
+      entry_count++;
+    }
+  }
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "TestReadLatency %lu s to read %lu wals, entries: %lu.\n",
+                  (end - start) / 1000000, logs_number_.size(), entry_count);
+  return s;
+}
+
+
 Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
                                                    std::set<std::string>& all_keys,
                                                    std::set<std::string>& keys_found,
-                                                   uint32_t cf_id) {
+                                                   uint32_t cf_id,
+                                                   SequenceNumber sequence,
+                                                   uint64_t& parse_last,
+                                                   uint64_t& add_last,
+                                                   uint64_t& find_last) {
   //fprintf(stdout, "ParseBatchAndAddKV begin\n");
   if (record.size() < WriteBatchInternal::kHeader) {
     return Status::Corruption("malformed WriteBatch (too small)");
   }
-
-  WriteBatch batch;
-  SequenceNumber sequence;
-  WriteBatchInternal::SetContents(&batch, record);
-  sequence = WriteBatchInternal::Sequence(&batch);
 
   record.remove_prefix(WriteBatchInternal::kHeader);
   Slice key, value, blob, xid;
@@ -358,7 +474,9 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
   char tag = 0;
   uint32_t column_family = 0;  // default
   bool last_was_try_again = false;
-  while (((s.ok() && !record.empty()) || UNLIKELY(s.IsTryAgain()))) {
+  uint64_t begin = ioptions_.env->NowMicros();
+  uint64_t tmp_add_last = 0;
+  while ( (s.ok() && !record.empty()) || UNLIKELY(s.IsTryAgain()) ) {
     if (LIKELY(!s.IsTryAgain())) {
       last_was_try_again = false;
       tag = 0;
@@ -372,13 +490,15 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
       if (column_family != cf_id) {
         return Status::OK();
       }
+      uint64_t find_begin = ioptions_.env->NowMicros();
       std::string user_key = key.ToString();
-      //fprintf(stdout, "%s  ", user_key.c_str());
       if (all_keys.count(user_key)) {
         if (!keys_found.count(user_key)) {
           keys_found.insert(user_key);
         }
+        find_last += ioptions_.env->NowMicros() - find_begin;
       } else {
+        find_last += ioptions_.env->NowMicros() - find_begin;
         continue;
       }
     } else {
@@ -393,6 +513,7 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
       s = Status::OK();
     }
 
+    uint64_t add_begin = ioptions_.env->NowMicros();
     InternalKey ikey;
     switch (tag) {
       case kTypeColumnFamilyValue: // If cf mismatch, it will not get here.
@@ -475,7 +596,12 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
       default:
         return Status::Corruption("unknown WriteBatch tag");
     }
+    uint64_t add_end = ioptions_.env->NowMicros();
+    tmp_add_last += add_end - add_begin;
   }
+  uint64_t end = ioptions_.env->NowMicros();
+  parse_last += end - begin - tmp_add_last;
+  add_last += tmp_add_last;
   (void)empty_batch;
   (void)found;
   return s;
@@ -630,19 +756,20 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
     return -1;
   }
 
-  sleep(120);
+  recoverer.TestReadLatency();
+  return 0;
 
-  time_t t_begin;
-  time(&t_begin);
+  sleep(10);
+
+  uint64_t t_begin = recoverer.ioptions_.env->NowMicros();
   fprintf(stdout, "Before recover.\n");
   s = recoverer.Recover();
   fprintf(stdout, "After recover.\n");
-  time_t t_end;
-  time(&t_end);
+  uint64_t t_end = recoverer.ioptions_.env->NowMicros();
   if (!s.ok()) {
-    fprintf(stderr, "Recover : %s.\n", s.ToString().c_str());
+    fprintf(stdout, "Recover : %s.\n", s.ToString().c_str());
   }
-  fprintf(stdout, "Recover last %lu s.\n", t_end - t_begin);
+  fprintf(stdout, "Recover last %lu s.\n", (t_end - t_begin) / 1000000);
 
   recoverer.CloseDB();
 

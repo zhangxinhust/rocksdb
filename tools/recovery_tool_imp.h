@@ -47,13 +47,18 @@ class FastRecovery {
   Status OpenDB();
   void CloseDB();
   Status Recover();
+  Status TestReadLatency();
   Status PrepareLogReaders(std::vector<log::Reader*>& log_readers);
   Status BuildTableFromWals(TableBuilder* builder, InternalIterator* iter,
                                        uint32_t cf_id, uint64_t sst_number);
   Status ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
                                        std::set<std::string>& all_keys,
                                        std::set<std::string>& keys_found,
-                                       uint32_t cf_id);
+                                       uint32_t cf_id,
+                                       SequenceNumber sequence,
+                                       uint64_t& parse_last,
+                                       uint64_t& add_last,
+                                       uint64_t& find_last);
   Status GetTableReader(const std::string& file_path, std::unique_ptr<TableReader> *table_reader);
   Status GetLogReader(uint64_t log_number, log::Reader** log_reader);
 
