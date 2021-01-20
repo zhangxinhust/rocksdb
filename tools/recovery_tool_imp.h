@@ -23,6 +23,7 @@ class Status;
 class FastRecovery;
 struct FileMetaData;
 
+Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id);
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id);
 
 struct ValueSeqType {
@@ -78,6 +79,7 @@ class FastRecovery {
                                        uint64_t& find_last);
   Status ParseBatchAndAddToMap(Slice& record,
                                             SequenceNumber sequence,
+                                            uint32_t cf_id,
                                             uint64_t& construct_last,
                                             uint64_t& map_last);
   Status GetTableReader(const std::string& file_path, std::unique_ptr<TableReader> *table_reader);

@@ -51,6 +51,68 @@ extern const uint64_t kLegacyBlockBasedTableMagicNumber;
 extern const uint64_t kPlainTableMagicNumber;
 extern const uint64_t kLegacyPlainTableMagicNumber;
 
+Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id) {
+  fprintf(stdout, "ReadCfWalToBuffer begin.\n");
+  Status s;
+  uint64_t start = recoverer->ioptions_.env->NowMicros();
+  uint64_t parse_add_last = 0, construct_last = 0, map_last = 0;
+  uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
+
+  for (uint32_t i = 0; i < recoverer->logs_number_.size(); i++) {
+    uint64_t log_number = recoverer->logs_number_[i];
+    log::Reader *reader = nullptr;
+    s = recoverer->GetLogReader(log_number, &reader);
+    if (!s.ok() || !reader) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      reader_failed++;
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    WriteBatch batch;
+    SequenceNumber sequence;
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      if (!reader->ReadRecord(&record, &scratch, recoverer->ioptions_.wal_recovery_mode)) {
+        break;
+      }
+      total_entry++;
+      if (record.size() < WriteBatchInternal::kHeader) {
+        short_entry++;
+        continue;
+      }
+      WriteBatchInternal::SetContents(&batch, record);
+      sequence = WriteBatchInternal::Sequence(&batch);
+
+      uint64_t parse_start = recoverer->ioptions_.env->NowMicros();
+      s = recoverer->ParseBatchAndAddToMap(record, sequence, cf_id, construct_last, map_last);
+      uint64_t parse_end = recoverer->ioptions_.env->NowMicros();
+      parse_add_last += parse_end - parse_start;
+      if (!s.ok()) {
+        parse_failed++;
+        fprintf(stdout, "ParseBatchAndAddToMap : %s.\n", s.ToString().c_str());
+      }
+    }
+    delete reader;
+    reader = nullptr;
+  }
+
+  uint64_t end = recoverer->ioptions_.env->NowMicros();
+  fprintf(stdout, "ReadWalsToBuffer last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+                  (end - start) / 1000000,
+                  parse_add_last / 1000000,
+                  construct_last / 1000000,
+                  map_last / 1000000);
+  fprintf(stdout, "total: %lu, map: %lu, short: %lu, reader fail: %lu, parse fail: %lu\n",
+                  total_entry, recoverer->k2v[cf_id].size(), short_entry, reader_failed, parse_failed);
+  return s;
+}
+
+
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id) {
   fprintf(stdout, "RecoverTableFile begin %lu++++++++++.\n", meta->fd.GetNumber());
   Status s;
@@ -198,18 +260,41 @@ Status FastRecovery::OpenDB() {
 
 Status FastRecovery::Recover() {
   Status s;
-  s = ReadWalsToBuffer();
-  if (!s.ok()) {
-    fprintf(stdout, "ReadWalsToBuffer : %s.\n", s.ToString().c_str());
-  }
-
   std::vector<std::future<Status> > statuses;
+
+  // Read wals to buffer
+  for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
+    fprintf(stdout, "Read wal of cf %s to buffer-------.\n", cfd->GetName().c_str());
+    if (cfd->IsDropped() || !cfd->initialized()) {
+      fprintf(stdout, "Column family %s skipped.\n", cfd->GetName().c_str());
+      continue;
+    }
+    statuses.emplace_back(std::async(std::launch::async, ReadCfWalToBuffer,
+                                     this, cfd->GetID()));
+  }
+  for (auto & status : statuses) {
+    Status ret_status = status.get();
+    if (!ret_status.ok()) {
+      fprintf(stdout, "Status returned by wal thread: %s.\n", ret_status.ToString().c_str());
+    }
+  }
+  statuses.clear();
+
+  uint64_t map_count = 0;
+  for (auto &kv : k2v) {
+    map_count += kv.size();
+    fprintf(stdout, "k2v size: %lu\n", kv.size());
+  }
+  fprintf(stdout, "Total kvs in map: %lu.\n", map_count);
+
+
+  // Recover SST with the kvs in buffer
   uint32_t thread_count = 0;
 
   for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
-    fprintf(stdout, "In cf %s--------------------------.\n", cfd->GetName().c_str());
+    fprintf(stdout, "Recover SSTs of cf %s----------------------.\n", cfd->GetName().c_str());
     if (cfd->IsDropped() || !cfd->initialized()) {
-      fprintf(stdout, "Column family %s skipped in recovery.\n", cfd->GetName().c_str());
+      fprintf(stdout, "Column family %s skipped.\n", cfd->GetName().c_str());
       continue;
     }
     assert(cfd->NumberLevels() > 1);
@@ -250,7 +335,7 @@ Status FastRecovery::Recover() {
   for (auto & status : statuses) {
     Status ret_status = status.get();
     if (!ret_status.ok()) {
-      fprintf(stdout, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
+      fprintf(stdout, "Status returned by SST thread: %s.\n", ret_status.ToString().c_str());
     }
   }
   statuses.clear();
@@ -261,73 +346,9 @@ Status FastRecovery::Recover() {
   return s;
 }
 
-Status FastRecovery::ReadWalsToBuffer() {
-  fprintf(stdout, "ReadWalsToBuffer begin.\n");
-  Status s;
-  uint64_t start = ioptions_.env->NowMicros(), parse_add_last = 0, construct_last = 0, map_last = 0;
-  uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
-
-  for (uint32_t i = 0; i < logs_number_.size(); i++) {
-    uint64_t log_number = logs_number_[i];
-    log::Reader *reader = nullptr;
-    s = GetLogReader(log_number, &reader);
-    if (!s.ok() || !reader) {
-      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
-      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
-      reader_failed++;
-      continue;
-    }
-    std::string scratch;
-    Slice record;
-    WriteBatch batch;
-    SequenceNumber sequence;
-    while (true) {
-      if (!s.ok()) {
-        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
-        break;
-      }
-      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
-        break;
-      }
-      total_entry++;
-      if (record.size() < WriteBatchInternal::kHeader) {
-        short_entry++;
-        continue;
-      }
-      WriteBatchInternal::SetContents(&batch, record);
-      sequence = WriteBatchInternal::Sequence(&batch);
-
-      uint64_t parse_start = ioptions_.env->NowMicros();
-      s = ParseBatchAndAddToMap(record, sequence, construct_last, map_last);
-      uint64_t parse_end = ioptions_.env->NowMicros();
-      parse_add_last += parse_end - parse_start;
-      if (!s.ok()) {
-        parse_failed++;
-        fprintf(stdout, "ParseBatchAndAddToMap : %s.\n", s.ToString().c_str());
-      }
-    }
-    delete reader;
-    reader = nullptr;
-  }
-
-  uint64_t end = ioptions_.env->NowMicros();
-  fprintf(stdout, "ReadWalsToBuffer last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
-                  (end - start) / 1000000,
-                  parse_add_last / 1000000,
-                  construct_last / 1000000,
-                  map_last / 1000000);
-  uint64_t map_count = 0;
-  for (auto &kv : k2v) {
-    map_count += kv.size();
-    fprintf(stdout, "k2v size: %lu\n", kv.size());
-  }
-  fprintf(stdout, "total: %lu, map: %lu, short: %lu, reader fail: %lu, parse fail: %lu\n",
-                  total_entry, map_count, short_entry, reader_failed, parse_failed);
-  return s;
-}
-
 Status FastRecovery::ParseBatchAndAddToMap(Slice& record, 
                                                         SequenceNumber sequence,
+                                                        uint32_t cf_id,
                                                         uint64_t& construct_last,
                                                         uint64_t& map_last) {
   //fprintf(stdout, "ParseBatchAndAddToMap begin\n");
@@ -350,12 +371,12 @@ Status FastRecovery::ParseBatchAndAddToMap(Slice& record,
       last_was_try_again = false;
       tag = 0;
       column_family = 0;  // default
-
       s = ReadRecordFromWriteBatch(&record, &tag, &column_family, &key, &value,
                                    &blob, &xid);
       if (!s.ok()) {
         return s;
       }
+      if (column_family != cf_id) {continue;}
     } else {
       assert(s.IsTryAgain());
       assert(!last_was_try_again); // to detect infinite loop bugs
@@ -472,6 +493,71 @@ void FastRecovery::CloseDB() {
 }
 
 /*
+Status FastRecovery::ReadWalsToBuffer() {
+  fprintf(stdout, "ReadWalsToBuffer begin.\n");
+  Status s;
+  uint64_t start = ioptions_.env->NowMicros(), parse_add_last = 0, construct_last = 0, map_last = 0;
+  uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
+
+  for (uint32_t i = 0; i < logs_number_.size(); i++) {
+    uint64_t log_number = logs_number_[i];
+    log::Reader *reader = nullptr;
+    s = GetLogReader(log_number, &reader);
+    if (!s.ok() || !reader) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      reader_failed++;
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    WriteBatch batch;
+    SequenceNumber sequence;
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        break;
+      }
+      total_entry++;
+      if (record.size() < WriteBatchInternal::kHeader) {
+        short_entry++;
+        continue;
+      }
+      WriteBatchInternal::SetContents(&batch, record);
+      sequence = WriteBatchInternal::Sequence(&batch);
+
+      uint64_t parse_start = ioptions_.env->NowMicros();
+      s = ParseBatchAndAddToMap(record, sequence, construct_last, map_last);
+      uint64_t parse_end = ioptions_.env->NowMicros();
+      parse_add_last += parse_end - parse_start;
+      if (!s.ok()) {
+        parse_failed++;
+        fprintf(stdout, "ParseBatchAndAddToMap : %s.\n", s.ToString().c_str());
+      }
+    }
+    delete reader;
+    reader = nullptr;
+  }
+
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "ReadWalsToBuffer last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+                  (end - start) / 1000000,
+                  parse_add_last / 1000000,
+                  construct_last / 1000000,
+                  map_last / 1000000);
+  uint64_t map_count = 0;
+  for (auto &kv : k2v) {
+    map_count += kv.size();
+    fprintf(stdout, "k2v size: %lu\n", kv.size());
+  }
+  fprintf(stdout, "total: %lu, map: %lu, short: %lu, reader fail: %lu, parse fail: %lu\n",
+                  total_entry, map_count, short_entry, reader_failed, parse_failed);
+  return s;
+}
+
 Status FastRecovery::TestReadLatency() {
   Status s;
   uint64_t start = ioptions_.env->NowMicros();
