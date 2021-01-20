@@ -44,6 +44,8 @@
 #include "port/port.h"
 
 namespace rocksdb {
+class FastRecovery;
+struct ValueSeqType;
 extern const uint64_t kBlockBasedTableMagicNumber;
 extern const uint64_t kLegacyBlockBasedTableMagicNumber;
 extern const uint64_t kPlainTableMagicNumber;
@@ -102,17 +104,41 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
       ReadOptions(), recoverer->mcfoptions_.prefix_extractor.get(), /*arena=*/nullptr,
       /*skip_filters=*/false, TableReaderCaller::kFastRecovery));
 
-  uint64_t prepare_end = recoverer->ioptions_.env->NowMicros();
-  s = recoverer->BuildTableFromWals(table_builder.get(), iter.get(), 
-                                    cf_id, sst_number);
-  uint64_t end = recoverer->ioptions_.env->NowMicros();
-  fprintf(stdout, "SST %lu last %lu s, prepare %lu s, BuildTableFromWals %lu s.\n",
-                  meta->fd.GetNumber(), (end - start) / 1000000,
-                  (prepare_end - start) / 1000000,
-                  (end - prepare_end) / 1000000);
-  if (!s.ok()) {
-    fprintf(stdout, "BuildTableFromWals : %s.\n", s.ToString().c_str());
+  uint64_t total_keys = 0, iter_miss_keys = 0, wal_miss_keys = 0;
+  for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+    total_keys++;
+    if (!iter->status().ok()) {
+      iter_miss_keys++;
+      continue;
+    }
+    std::string user_key = ExtractUserKey(iter->key()).ToString();
+    if (!recoverer->k2v[cf_id].count(user_key)) {
+      wal_miss_keys++;
+      continue;
+    }
+
+    // 到底是用SST还是wal里的seq和type？
+    // 元数据里面的key有没有存seq呢？如果没有，那么不能用SST的
+    // 可是wal里面的seq会不一样，会不会让builder Add出错？
+    SequenceNumber sequence;
+    ValueType type;
+    uint64_t pack = ExtractInternalKeyFooter(iter->key());
+    UnPackSequenceAndType(pack, &sequence, &type);
+    ValueSeqType &vst =  recoverer->k2v[cf_id][user_key];
+
+    InternalKey ikey;
+    ikey.Set(user_key, sequence, type);
+    //table_builder->Add(ikey.Encode(), value, true);??true
+    table_builder->Add(iter->key(), vst.value);
   }
+  s = table_builder->Finish();
+  if (!s.ok()) {
+    fprintf(stdout, "Finish : %s.\n", s.ToString().c_str());
+  }
+  uint64_t end = recoverer->ioptions_.env->NowMicros();
+  fprintf(stdout, "SST %lu last %lu s, total: %lu, iter miss: %lu, wal miss: %lu.\n",
+                  meta->fd.GetNumber(), (end - start) / 1000000,
+                  total_keys, iter_miss_keys, wal_miss_keys);
   return s;
 }
 
@@ -126,6 +152,8 @@ FastRecovery::FastRecovery(const Options& options, const std::string& dbname,
       icfoptions_(options),
       mcfoptions_(ColumnFamilyOptions(options_)),
       internal_comparator_(BytewiseComparator()) {
+  k2v = std::vector<std::unordered_map<std::string, ValueSeqType> >(num_column_families, 
+                                                          std::unordered_map<std::string, ValueSeqType>());
   for (size_t i = 0; i < num_column_families_; i++) {
     column_families_.push_back(ColumnFamilyDescriptor(
       ColumnFamilyName(i), ColumnFamilyOptions(options)));
@@ -163,22 +191,18 @@ Status FastRecovery::OpenDB() {
       fprintf(stdout, "ParseFileName %s: type: %d.\n", filenames[i].c_str(), int(type));
     }
   }
-  sort(logs_number_.begin(), logs_number_.end(), std::greater<uint64_t>());
+  sort(logs_number_.begin(), logs_number_.end(), std::less<uint64_t>()); // older file first
   fprintf(stdout, "logs_number_ size: %lu.\n", logs_number_.size());
   return s;
 }
 
-void FastRecovery::CloseDB() {
-  for (auto handle : handles_) {
-    delete handle;
-  }
-  handles_.clear();
-  db_->Close();
-  delete db_;
-}
-
 Status FastRecovery::Recover() {
   Status s;
+  s = ReadWalsToBuffer();
+  if (!s.ok()) {
+    fprintf(stdout, "ReadWalsToBuffer : %s.\n", s.ToString().c_str());
+  }
+
   std::vector<std::future<Status> > statuses;
   uint32_t thread_count = 0;
 
@@ -189,39 +213,24 @@ Status FastRecovery::Recover() {
       continue;
     }
     assert(cfd->NumberLevels() > 1);
-    const std::vector<FileMetaData*>& level0_files = cfd->current()->storage_info()->LevelFiles(0);
-    const std::vector<FileMetaData*>& level1_files = cfd->current()->storage_info()->LevelFiles(1);
-    fprintf(stdout, "Level0 size: %lu, Level1 size: %lu.\n", level0_files.size(), level1_files.size());
-    // fprintf(stdout, "Before add files into thread.\n");
-    for (FileMetaData* file : level0_files) {
-      if (!file) {continue;}
-      FileMetaData _file = *file;
-      fprintf(stdout, "Add SST %lu in L0.\n", file->fd.GetNumber());
-      statuses.emplace_back(std::async(std::launch::async, RecoverTableFile,
-                                       this, &_file, cfd->GetID()));
-      thread_count++;
-      
-      if (thread_count >= 10) {
-        fprintf(stdout, "statuses size: %lu.\n", statuses.size());
-        thread_count = 0;
-        for (auto & status : statuses) {
-          Status ret_status = status.get();
-          if (!ret_status.ok()) {
-            fprintf(stdout, "Status returned by thread: %s.\n", ret_status.ToString().c_str());
-          }
-        }
-        statuses.clear();
-      }
-      
+    std::vector<FileMetaData*> files = cfd->current()->storage_info()->LevelFiles(0);
+    uint64_t l0_size = files.size(), l1_size = cfd->current()->storage_info()->LevelFiles(1).size();
+    for (auto file : cfd->current()->storage_info()->LevelFiles(1)) {
+      files.push_back(file);
     }
-    for (FileMetaData* file : level1_files) {
+    fprintf(stdout, "Level0 size: %lu, Level1 size: %lu.\n", l0_size, l1_size);
+
+    for (uint64_t i = 0; i < files.size(); i++) {
+      FileMetaData* file = files[i];
       if (!file) {continue;}
-      FileMetaData _file = *file;
-      fprintf(stdout, "Add SST %lu in L1.\n", file->fd.GetNumber());
+      //FileMetaData _file = *file;
+      fprintf(stdout, "Add SST %lu in L%lu.\n",
+                      file->fd.GetNumber(),
+                      i < l0_size ? 0ul : 1ul);
       statuses.emplace_back(std::async(std::launch::async, RecoverTableFile,
-                                       this, &_file, cfd->GetID()));
+                                       this, file, cfd->GetID()));
       thread_count++;
-      
+      /*
       if (thread_count >= 10) {
         fprintf(stdout, "statuses size: %lu.\n", statuses.size());
         thread_count = 0;
@@ -233,7 +242,7 @@ Status FastRecovery::Recover() {
         }
         statuses.clear();
       }
-      
+      */
     }
   }
   fprintf(stdout, "statuses size: %lu.\n", statuses.size());
@@ -252,56 +261,401 @@ Status FastRecovery::Recover() {
   return s;
 }
 
-Status FastRecovery::PrepareLogReaders(std::vector<log::Reader*>& log_readers) {
-  Status s, ret;
-  //fprintf(stdout, "PrepareLogReaders begin.\n");
+Status FastRecovery::ReadWalsToBuffer() {
+  fprintf(stdout, "ReadWalsToBuffer begin.\n");
+  Status s;
+  uint64_t start = ioptions_.env->NowMicros(), parse_add_last = 0, construct_last = 0, map_last = 0;
+  uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
+
   for (uint32_t i = 0; i < logs_number_.size(); i++) {
     uint64_t log_number = logs_number_[i];
-    // Open the log file
-    std::string fname = LogFileName(ioptions_.wal_dir, log_number);
-    std::unique_ptr<SequentialFileReader> file_reader;
-    {
-      std::unique_ptr<SequentialFile> file;
-      s = ioptions_.env->NewSequentialFile(fname, &file,
-                                       ioptions_.env->OptimizeForLogRead(soptions_));
+    log::Reader *reader = nullptr;
+    s = GetLogReader(log_number, &reader);
+    if (!s.ok() || !reader) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      reader_failed++;
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    WriteBatch batch;
+    SequenceNumber sequence;
+    while (true) {
       if (!s.ok()) {
-        // Fail with one log file, but that's ok.
-        // Try next one.
-        ret = s;
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        break;
+      }
+      total_entry++;
+      if (record.size() < WriteBatchInternal::kHeader) {
+        short_entry++;
         continue;
       }
-      file_reader.reset(new SequentialFileReader(
-          std::move(file), fname, ioptions_.log_readahead_size));
-    }
+      WriteBatchInternal::SetContents(&batch, record);
+      sequence = WriteBatchInternal::Sequence(&batch);
 
-    // Create the log reader.
-    LogReporter reporter;
-    reporter.env = ioptions_.env;
-    reporter.info_log = ioptions_.info_log.get();
-    reporter.fname = fname.c_str();
-    if (!ioptions_.paranoid_checks ||
-        ioptions_.wal_recovery_mode ==
-            WALRecoveryMode::kSkipAnyCorruptedRecords) {
-      reporter.status = nullptr;
-    } else {
-      reporter.status = &s;
+      uint64_t parse_start = ioptions_.env->NowMicros();
+      s = ParseBatchAndAddToMap(record, sequence, construct_last, map_last);
+      uint64_t parse_end = ioptions_.env->NowMicros();
+      parse_add_last += parse_end - parse_start;
+      if (!s.ok()) {
+        parse_failed++;
+        fprintf(stdout, "ParseBatchAndAddToMap : %s.\n", s.ToString().c_str());
+      }
     }
-    // We intentially make log::Reader do checksumming even if
-    // paranoid_checks==false so that corruptions cause entire commits
-    // to be skipped instead of propagating bad information (like overly
-    // large sequence numbers).
-    log::Reader reader(ioptions_.info_log, std::move(file_reader),
-                             &reporter, true /*checksum*/, log_number);
-    log_readers[i] = &reader;
+    delete reader;
+    reader = nullptr;
   }
-  for (uint32_t i = 0; i < log_readers.size(); i++) {
-    if (log_readers[i] == nullptr) {continue;}
-    fprintf(stdout, "No.%u log number: %lu.  ", i, log_readers[i]->GetLogNumber());
+
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "ReadWalsToBuffer last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+                  (end - start) / 1000000,
+                  parse_add_last / 1000000,
+                  construct_last / 1000000,
+                  map_last / 1000000);
+  uint64_t map_count = 0;
+  for (auto &kv : k2v) {
+    map_count += kv.size();
+    fprintf(stdout, "k2v size: %lu\n", kv.size());
   }
-  fprintf(stdout, "\n");
-  return ret;
+  fprintf(stdout, "total: %lu, map: %lu, short: %lu, reader fail: %lu, parse fail: %lu\n",
+                  total_entry, map_count, short_entry, reader_failed, parse_failed);
+  return s;
 }
 
+Status FastRecovery::ParseBatchAndAddToMap(Slice& record, 
+                                                        SequenceNumber sequence,
+                                                        uint64_t& construct_last,
+                                                        uint64_t& map_last) {
+  //fprintf(stdout, "ParseBatchAndAddToMap begin\n");
+  if (record.size() < WriteBatchInternal::kHeader) {
+    return Status::Corruption("malformed WriteBatch (too small)");
+  }
+
+  record.remove_prefix(WriteBatchInternal::kHeader);
+  Slice key, value, blob, xid;
+  // Sometimes a sub-batch starts with a Noop. We want to exclude such Noops as
+  // the batch boundary symbols otherwise we would mis-count the number of
+  // batches. We do that by checking whether the accumulated batch is empty
+  // before seeing the next Noop.
+  Status s;
+  char tag = 0;
+  uint32_t column_family = 0;  // default
+  bool last_was_try_again = false;
+  while ( (s.ok() && !record.empty()) || UNLIKELY(s.IsTryAgain()) ) {
+    if (LIKELY(!s.IsTryAgain())) {
+      last_was_try_again = false;
+      tag = 0;
+      column_family = 0;  // default
+
+      s = ReadRecordFromWriteBatch(&record, &tag, &column_family, &key, &value,
+                                   &blob, &xid);
+      if (!s.ok()) {
+        return s;
+      }
+    } else {
+      assert(s.IsTryAgain());
+      assert(!last_was_try_again); // to detect infinite loop bugs
+      if (UNLIKELY(last_was_try_again)) {
+        return Status::Corruption(
+            "two consecutive TryAgain in WriteBatch handler; this is either a "
+            "software bug or data corruption.");
+      }
+      last_was_try_again = true;
+      s = Status::OK();
+    }
+
+    std::string user_value = value.ToString();
+    uint64_t construct_start = ioptions_.env->NowMicros();
+    ValueSeqType vst;
+    vst.value = user_value;
+    vst.sequence = sequence;
+    vst.type = ValueType(tag);
+    uint64_t construct_end = ioptions_.env->NowMicros();
+    construct_last += construct_end - construct_start;
+    k2v[column_family][key.ToString()] = vst;
+    uint64_t map_end = ioptions_.env->NowMicros();
+    map_last += map_end - construct_end;
+  }
+  return s;
+}
+
+Status FastRecovery::GetTableReader(const std::string& file_path, 
+                                             std::unique_ptr<TableReader> *table_reader) {
+  std::unique_ptr<RandomAccessFile> file;
+  std::unique_ptr<RandomAccessFileReader> file_reader;
+  uint64_t file_size = 0;
+  Status s = options_.env->NewRandomAccessFile(file_path, &file, soptions_);
+  if (s.ok()) {
+    s = options_.env->GetFileSize(file_path, &file_size);
+  } else {
+    return s;
+  }
+  file_reader.reset(new RandomAccessFileReader(std::move(file), file_path));
+
+  // We need to turn off pre-fetching of index and filter nodes for
+  // BlockBasedTable
+  if (BlockBasedTableFactory::kName == options_.table_factory->Name()) {
+    return options_.table_factory->NewTableReader(
+        TableReaderOptions(icfoptions_, mcfoptions_.prefix_extractor.get(),
+                           soptions_, internal_comparator_),
+        std::move(file_reader), file_size, table_reader, /*enable_prefetch=*/false);
+  }
+  // For all other factory implementation
+  return options_.table_factory->NewTableReader(
+      TableReaderOptions(icfoptions_, mcfoptions_.prefix_extractor.get(), soptions_,
+                         internal_comparator_),
+      std::move(file_reader), file_size, table_reader);
+}
+
+Status FastRecovery::GetLogReader(uint64_t log_number, log::Reader** log_reader) {
+  Status s;
+  // Open the log file
+  std::string fname = LogFileName(ioptions_.wal_dir, log_number);
+  std::unique_ptr<SequentialFileReader> file_reader;
+  {
+    std::unique_ptr<SequentialFile> file;
+    s = ioptions_.env->NewSequentialFile(fname, &file,
+                                         ioptions_.env->OptimizeForLogRead(soptions_));
+    if (!s.ok()) {
+      return s;
+    }
+    file_reader.reset(new SequentialFileReader(
+        std::move(file), fname, ioptions_.log_readahead_size));
+  }
+   // Create the log reader.
+  LogReporter reporter;
+  reporter.env = ioptions_.env;
+  reporter.info_log = ioptions_.info_log.get();
+  reporter.fname = fname.c_str();
+  if (!ioptions_.paranoid_checks ||
+      ioptions_.wal_recovery_mode ==
+          WALRecoveryMode::kSkipAnyCorruptedRecords) {
+    reporter.status = nullptr;
+  } else {
+    reporter.status = &s;
+  }
+  // We intentially make log::Reader do checksumming even if
+  // paranoid_checks==false so that corruptions cause entire commits
+  // to be skipped instead of propagating bad information (like overly
+  // large sequence numbers).
+  *log_reader = new log::Reader(ioptions_.info_log, std::move(file_reader),
+                                &reporter, true /*checksum*/, log_number);
+  return s;
+}
+
+std::string FastRecovery::ColumnFamilyName(size_t i) {
+  if (i == 0) {
+    return rocksdb::kDefaultColumnFamilyName;
+  } else {
+    char name[100];
+    snprintf(name, sizeof(name), "column_family_name_%06zu", i);
+    return std::string(name);
+  }
+}
+
+void FastRecovery::CloseDB() {
+  for (auto handle : handles_) {
+    delete handle;
+  }
+  handles_.clear();
+  db_->Close();
+  delete db_;
+  logs_number_.clear();
+  k2v.clear();
+  //if (output_dir_) {
+  //  delete output_dir_.get();
+  //}
+}
+
+/*
+Status FastRecovery::TestReadLatency() {
+  Status s;
+  uint64_t start = ioptions_.env->NowMicros();
+  uint64_t entry_count = 0;
+
+  for (uint32_t i = 0; i < logs_number_.size(); i++) {
+    uint64_t wal_start = ioptions_.env->NowMicros();
+    uint64_t log_number = logs_number_[i];
+    log::Reader *reader = nullptr;
+    s = GetLogReader(log_number, &reader);
+    uint64_t get_reader_end = ioptions_.env->NowMicros();
+    if (!s.ok()) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      continue;
+    }
+    if (!reader) {
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      uint64_t read_begin = ioptions_.env->NowMicros();
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        fprintf(stdout, "ReadRecord fail %lu.\n", log_number);
+        break;
+      }
+      entry_count++;
+    }
+  }
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "TestReadLatency %lu s to read %lu wals, entries: %lu.\n",
+                  (end - start) / 1000000, logs_number_.size(), entry_count);
+  return s;
+}
+
+Status FastRecovery::TestReadAndParseLatency() {
+  Status s;
+  uint64_t start = ioptions_.env->NowMicros();
+  uint64_t entry_count = 0, kv_count = 0, retry_count = 0, short_count = 0;
+  uint64_t loop_count = 0, print_count = 0, non_ok_count = 0;
+
+  for (uint32_t i = 0; i < logs_number_.size(); i++) {
+    uint64_t log_number = logs_number_[i];
+    log::Reader *reader = nullptr;
+    s = GetLogReader(log_number, &reader);
+    uint64_t get_reader_end = ioptions_.env->NowMicros();
+    if (!s.ok()) {
+      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
+      continue;
+    }
+    if (!reader) {
+      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
+      continue;
+    }
+    std::string scratch;
+    Slice record;
+    while (true) {
+      if (!s.ok()) {
+        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
+        break;
+      }
+      uint64_t read_begin = ioptions_.env->NowMicros();
+      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
+        fprintf(stdout, "ReadRecord non-ok %lu.\n", log_number);
+        break;
+      }
+      entry_count++;
+      if (record.size() < WriteBatchInternal::kHeader) {
+        short_count++;
+        continue;
+      }
+
+      record.remove_prefix(WriteBatchInternal::kHeader);
+      Slice key, value, blob, xid;
+      // Sometimes a sub-batch starts with a Noop. We want to exclude such Noops as
+      // the batch boundary symbols otherwise we would mis-count the number of
+      // batches. We do that by checking whether the accumulated batch is empty
+      // before seeing the next Noop.
+      char tag = 0;
+      uint32_t column_family = 0;  // default
+       bool last_was_try_again = false;
+      while ( (s.ok() && !record.empty()) || UNLIKELY(s.IsTryAgain()) ) {
+        if (LIKELY(!s.IsTryAgain())) {
+          last_was_try_again = false;
+          tag = 0;
+          column_family = 0;  // default
+          s = ReadRecordFromWriteBatch(&record, &tag, &column_family, &key, &value,
+                                       &blob, &xid);
+          kv_count++;
+          if (!s.ok()) {
+            non_ok_count++;
+          } else if (print_count < 2) {
+            print_count++;
+            fprintf(stdout, "key %lu:\n%s\n"
+                            "value %lu:\n%s.\n",
+                            key.ToString().length(), key.ToString().c_str(),
+                            value.ToString().length(), value.ToString().c_str());
+          }
+        } else {
+          retry_count++;
+          assert(s.IsTryAgain());
+          assert(!last_was_try_again); // to detect infinite loop bugs
+          if (UNLIKELY(last_was_try_again)) {
+            loop_count++;
+            return Status::Corruption(
+                "two consecutive TryAgain in WriteBatch handler; this is either a "
+                "software bug or data corruption.");
+          }
+          last_was_try_again = true;
+          s = Status::OK();
+        }
+      }
+    }
+  }
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "TestReadAndParseLatency %lu s to read and parse %lu wals,"
+                  " entries: %lu, kvs: %lu, retry: %lu, loop: %lu, short: %lu, non-ok: %lu.\n",
+                  (end - start) / 1000000, logs_number_.size(),
+                  entry_count, kv_count, retry_count, loop_count,
+                  short_count, non_ok_count);
+  return s;
+}
+
+Status FastRecovery::TestSstKV() {
+  Status s;
+
+  for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
+    if (cfd->IsDropped() || !cfd->initialized()) {
+      continue;
+    }
+    const std::vector<FileMetaData*>& level0_files = cfd->current()->storage_info()->LevelFiles(0);
+    for (FileMetaData* file : level0_files) {
+      if (!file) {continue;}
+      uint64_t sst_number = file->fd.GetNumber();
+      uint32_t path_id = file->fd.GetPathId();
+      std::string sst_name = TableFileName(ioptions_.db_paths, sst_number, path_id);
+      
+      // SST reader
+      std::unique_ptr<TableReader> table_reader;
+      s = GetTableReader(sst_name, &table_reader);
+      if (!s.ok()) {
+        fprintf(stdout, "GetTableReader : %s.\n", s.ToString().c_str());
+        continue;
+      }
+
+      // Scan all the keys in SST
+      std::unique_ptr<InternalIterator> iter(table_reader->NewIterator(
+          ReadOptions(), mcfoptions_.prefix_extractor.get(), nullptr,
+          false, TableReaderCaller::kFastRecovery));
+
+      uint64_t print_count = 0;
+      for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+        if (!iter->status().ok()) {
+          continue;
+        }
+        if (print_count > 1) {continue;}
+        print_count++;
+        std::string user_key = ExtractUserKey(iter->key()).ToString(true);
+        fprintf(stdout, "original length: %lu, user length: %lu, "
+                        "original key: %s.\n"
+                        "key: %s.\n"
+                        "value length: %lu.\n"
+                        "value: %s\n",
+                        iter->key().ToString().length(),
+                        user_key.length(),
+                        iter->key().ToString().c_str(),
+                        user_key.c_str(),
+                        iter->value().ToString().length(),
+                        iter->value().ToString().c_str());
+      }
+      break;
+    }
+    break;
+  }
+  return s;
+}
+*/
+
+/*
 Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator* iter,
                                                    uint32_t cf_id, uint64_t sst_number) {
   if (!builder || !iter) {
@@ -408,46 +762,55 @@ Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator*
   return s;
 }
 
-Status FastRecovery::TestReadLatency() {
-  Status s;
-  uint64_t start = ioptions_.env->NowMicros();
-  uint64_t entry_count = 0;
-
+Status FastRecovery::PrepareLogReaders(std::vector<log::Reader*>& log_readers) {
+  Status s, ret;
+  //fprintf(stdout, "PrepareLogReaders begin.\n");
   for (uint32_t i = 0; i < logs_number_.size(); i++) {
-    uint64_t wal_start = ioptions_.env->NowMicros();
     uint64_t log_number = logs_number_[i];
-    log::Reader *reader = nullptr;
-    s = GetLogReader(log_number, &reader);
-    uint64_t get_reader_end = ioptions_.env->NowMicros();
-    if (!s.ok()) {
-      fprintf(stdout, "GetLogReader : %s.\n", s.ToString().c_str());
-      continue;
-    }
-    if (!reader) {
-      fprintf(stdout, "log %lu skipped since log Reader null.\n", log_number);
-      continue;
-    }
-    std::string scratch;
-    Slice record;
-    while (true) {
+    // Open the log file
+    std::string fname = LogFileName(ioptions_.wal_dir, log_number);
+    std::unique_ptr<SequentialFileReader> file_reader;
+    {
+      std::unique_ptr<SequentialFile> file;
+      s = ioptions_.env->NewSequentialFile(fname, &file,
+                                       ioptions_.env->OptimizeForLogRead(soptions_));
       if (!s.ok()) {
-        fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
-        break;
+        // Fail with one log file, but that's ok.
+        // Try next one.
+        ret = s;
+        continue;
       }
-      uint64_t read_begin = ioptions_.env->NowMicros();
-      if (!reader->ReadRecord(&record, &scratch, ioptions_.wal_recovery_mode)) {
-        fprintf(stdout, "ReadRecord fail %lu.\n", log_number);
-        break;
-      }
-      entry_count++;
+      file_reader.reset(new SequentialFileReader(
+          std::move(file), fname, ioptions_.log_readahead_size));
     }
-  }
-  uint64_t end = ioptions_.env->NowMicros();
-  fprintf(stdout, "TestReadLatency %lu s to read %lu wals, entries: %lu.\n",
-                  (end - start) / 1000000, logs_number_.size(), entry_count);
-  return s;
-}
 
+    // Create the log reader.
+    LogReporter reporter;
+    reporter.env = ioptions_.env;
+    reporter.info_log = ioptions_.info_log.get();
+    reporter.fname = fname.c_str();
+    if (!ioptions_.paranoid_checks ||
+        ioptions_.wal_recovery_mode ==
+            WALRecoveryMode::kSkipAnyCorruptedRecords) {
+      reporter.status = nullptr;
+    } else {
+      reporter.status = &s;
+    }
+    // We intentially make log::Reader do checksumming even if
+    // paranoid_checks==false so that corruptions cause entire commits
+    // to be skipped instead of propagating bad information (like overly
+    // large sequence numbers).
+    log::Reader reader(ioptions_.info_log, std::move(file_reader),
+                             &reporter, true, log_number);
+    log_readers[i] = &reader;
+  }
+  for (uint32_t i = 0; i < log_readers.size(); i++) {
+    if (log_readers[i] == nullptr) {continue;}
+    fprintf(stdout, "No.%u log number: %lu.  ", i, log_readers[i]->GetLogNumber());
+  }
+  fprintf(stdout, "\n");
+  return ret;
+}
 
 Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
                                                    std::set<std::string>& all_keys,
@@ -607,79 +970,7 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
   return s;
 }
 
-Status FastRecovery::GetTableReader(const std::string& file_path, 
-                                             std::unique_ptr<TableReader> *table_reader) {
-  std::unique_ptr<RandomAccessFile> file;
-  std::unique_ptr<RandomAccessFileReader> file_reader;
-  uint64_t file_size = 0;
-  Status s = options_.env->NewRandomAccessFile(file_path, &file, soptions_);
-  if (s.ok()) {
-    s = options_.env->GetFileSize(file_path, &file_size);
-  } else {
-    return s;
-  }
-  file_reader.reset(new RandomAccessFileReader(std::move(file), file_path));
-
-  // We need to turn off pre-fetching of index and filter nodes for
-  // BlockBasedTable
-  if (BlockBasedTableFactory::kName == options_.table_factory->Name()) {
-    return options_.table_factory->NewTableReader(
-        TableReaderOptions(icfoptions_, mcfoptions_.prefix_extractor.get(),
-                           soptions_, internal_comparator_),
-        std::move(file_reader), file_size, table_reader, /*enable_prefetch=*/false);
-  }
-  // For all other factory implementation
-  return options_.table_factory->NewTableReader(
-      TableReaderOptions(icfoptions_, mcfoptions_.prefix_extractor.get(), soptions_,
-                         internal_comparator_),
-      std::move(file_reader), file_size, table_reader);
-}
-
-std::string FastRecovery::ColumnFamilyName(size_t i) {
-  if (i == 0) {
-    return rocksdb::kDefaultColumnFamilyName;
-  } else {
-    char name[100];
-    snprintf(name, sizeof(name), "column_family_name_%06zu", i);
-    return std::string(name);
-  }
-}
-
-Status FastRecovery::GetLogReader(uint64_t log_number, log::Reader** log_reader) {
-  Status s;
-  // Open the log file
-  std::string fname = LogFileName(ioptions_.wal_dir, log_number);
-  std::unique_ptr<SequentialFileReader> file_reader;
-  {
-    std::unique_ptr<SequentialFile> file;
-    s = ioptions_.env->NewSequentialFile(fname, &file,
-                                         ioptions_.env->OptimizeForLogRead(soptions_));
-    if (!s.ok()) {
-      return s;
-    }
-    file_reader.reset(new SequentialFileReader(
-        std::move(file), fname, ioptions_.log_readahead_size));
-  }
-   // Create the log reader.
-  LogReporter reporter;
-  reporter.env = ioptions_.env;
-  reporter.info_log = ioptions_.info_log.get();
-  reporter.fname = fname.c_str();
-  if (!ioptions_.paranoid_checks ||
-      ioptions_.wal_recovery_mode ==
-          WALRecoveryMode::kSkipAnyCorruptedRecords) {
-    reporter.status = nullptr;
-  } else {
-    reporter.status = &s;
-  }
-  // We intentially make log::Reader do checksumming even if
-  // paranoid_checks==false so that corruptions cause entire commits
-  // to be skipped instead of propagating bad information (like overly
-  // large sequence numbers).
-  *log_reader = new log::Reader(ioptions_.info_log, std::move(file_reader),
-                                &reporter, true /*checksum*/, log_number);
-  return s;
-}
+*/
 
 int RecoveryTool::Run(int argc, char** argv, Options options) {
   std::string dbname;
@@ -756,10 +1047,7 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
     return -1;
   }
 
-  recoverer.TestReadLatency();
-  return 0;
-
-  sleep(10);
+  //sleep(10);
 
   uint64_t t_begin = recoverer.ioptions_.env->NowMicros();
   fprintf(stdout, "Before recover.\n");

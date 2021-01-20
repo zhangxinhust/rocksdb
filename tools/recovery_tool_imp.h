@@ -25,10 +25,23 @@ struct FileMetaData;
 
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id);
 
+struct ValueSeqType {
+  std::string value;
+  SequenceNumber sequence;
+  ValueType type;
+  ValueSeqType() 
+    : value(""), sequence(0), type(kTypeDeletion) {}
+  ValueSeqType(std::string& v, SequenceNumber& seq, ValueType t) 
+    : value(v), sequence(seq), type(t) {}
+  //ValueSeqType(std::string& v, SequenceNumber seq, ValueType t) 
+  //  : value(v), sequence(seq), type(t) {}
+};
+
 class FastRecovery {
  public:
   explicit FastRecovery(const Options& options, const std::string& file_name,
                          const std::string& output_dir, uint32_t num_column_families = 3);
+
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -47,7 +60,11 @@ class FastRecovery {
   Status OpenDB();
   void CloseDB();
   Status Recover();
+  Status ReadWalsToBuffer();
   Status TestReadLatency();
+  Status TestReadAndParseLatency();
+  Status TestSstKV();
+
   Status PrepareLogReaders(std::vector<log::Reader*>& log_readers);
   Status BuildTableFromWals(TableBuilder* builder, InternalIterator* iter,
                                        uint32_t cf_id, uint64_t sst_number);
@@ -59,6 +76,10 @@ class FastRecovery {
                                        uint64_t& parse_last,
                                        uint64_t& add_last,
                                        uint64_t& find_last);
+  Status ParseBatchAndAddToMap(Slice& record,
+                                            SequenceNumber sequence,
+                                            uint64_t& construct_last,
+                                            uint64_t& map_last);
   Status GetTableReader(const std::string& file_path, std::unique_ptr<TableReader> *table_reader);
   Status GetLogReader(uint64_t log_number, log::Reader** log_reader);
 
@@ -87,6 +108,8 @@ class FastRecovery {
   InternalKeyComparator internal_comparator_;
 
   std::vector<uint64_t> logs_number_;
+
+  std::vector<std::unordered_map<std::string, ValueSeqType> > k2v; // map key to value for every cf
 };
 
 }  // namespace rocksdb

@@ -499,7 +499,7 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value, bool out_
   if (!ok()) return;
   ValueType value_type = ExtractValueType(key);
   if (IsValueType(value_type)) {
-    if (!out_of_order && r->props.num_entries > r->props.num_range_deletions) {
+    if (r->props.num_entries > r->props.num_range_deletions) {
       if (r->internal_comparator.Compare(key, Slice(r->last_key)) <= 0) {
         // We were about to insert keys out of order. Abort.
         ROCKS_LOG_ERROR(r->ioptions.info_log,
