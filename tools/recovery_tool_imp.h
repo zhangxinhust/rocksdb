@@ -23,7 +23,9 @@ class Status;
 class FastRecovery;
 struct FileMetaData;
 
-Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id);
+//Status ReadCfWalsToBuffer(FastRecovery* recoverer, uint32_t cf_id);
+Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
+                                       uint32_t left, uint32_t right, uint32_t sub_id);
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id);
 
 struct ValueSeqType {
@@ -80,6 +82,7 @@ class FastRecovery {
   Status ParseBatchAndAddToMap(Slice& record,
                                             SequenceNumber sequence,
                                             uint32_t cf_id,
+                                            uint32_t sub_id,
                                             uint64_t& construct_last,
                                             uint64_t& map_last);
   Status GetTableReader(const std::string& file_path, std::unique_ptr<TableReader> *table_reader);
@@ -111,7 +114,7 @@ class FastRecovery {
 
   std::vector<uint64_t> logs_number_;
 
-  std::vector<std::unordered_map<std::string, ValueSeqType> > k2v; // map key to value for every cf
+  std::vector<std::vector<std::unordered_map<std::string, ValueSeqType> > > k2v; // map key to value for every cf
 };
 
 }  // namespace rocksdb

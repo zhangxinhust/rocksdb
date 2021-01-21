@@ -51,14 +51,15 @@ extern const uint64_t kLegacyBlockBasedTableMagicNumber;
 extern const uint64_t kPlainTableMagicNumber;
 extern const uint64_t kLegacyPlainTableMagicNumber;
 
-Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id) {
-  fprintf(stdout, "ReadCfWalToBuffer begin.\n");
+Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
+                                       uint32_t left, uint32_t right, uint32_t sub_id) {
+  fprintf(stdout, "ReadCfWalsToSubBuffer begin.\n");
   Status s;
   uint64_t start = recoverer->ioptions_.env->NowMicros();
   uint64_t parse_add_last = 0, construct_last = 0, map_last = 0;
   uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
 
-  for (uint32_t i = 0; i < recoverer->logs_number_.size(); i++) {
+  for (uint32_t i = left; i < right; i++) {
     uint64_t log_number = recoverer->logs_number_[i];
     log::Reader *reader = nullptr;
     s = recoverer->GetLogReader(log_number, &reader);
@@ -89,7 +90,7 @@ Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id) {
       sequence = WriteBatchInternal::Sequence(&batch);
 
       uint64_t parse_start = recoverer->ioptions_.env->NowMicros();
-      s = recoverer->ParseBatchAndAddToMap(record, sequence, cf_id, construct_last, map_last);
+      s = recoverer->ParseBatchAndAddToMap(record, sequence, cf_id, sub_id, construct_last, map_last);
       uint64_t parse_end = recoverer->ioptions_.env->NowMicros();
       parse_add_last += parse_end - parse_start;
       if (!s.ok()) {
@@ -102,7 +103,8 @@ Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id) {
   }
 
   uint64_t end = recoverer->ioptions_.env->NowMicros();
-  fprintf(stdout, "ReadWalsToBuffer last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+  fprintf(stdout, "ReadCfWalsToSubBuffer cf %u, sub id %u, len %u, last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+                  cf_id, sub_id, right - left,
                   (end - start) / 1000000,
                   parse_add_last / 1000000,
                   construct_last / 1000000,
@@ -111,7 +113,6 @@ Status ReadCfWalToBuffer(FastRecovery* recoverer, uint32_t cf_id) {
                   total_entry, recoverer->k2v[cf_id].size(), short_entry, reader_failed, parse_failed);
   return s;
 }
-
 
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id) {
   fprintf(stdout, "RecoverTableFile begin %lu++++++++++.\n", meta->fd.GetNumber());
@@ -174,7 +175,13 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
       continue;
     }
     std::string user_key = ExtractUserKey(iter->key()).ToString();
-    if (!recoverer->k2v[cf_id].count(user_key)) {
+    int32_t sub_id = recoverer->k2v[cf_id].size() - 1;
+    for (; sub_id >= 0; sub_id--) {
+      if (recoverer->k2v[cf_id][sub_id].count(user_key)) {
+        break;
+      }
+    }
+    if (sub_id < 0) {
       wal_miss_keys++;
       continue;
     }
@@ -186,11 +193,11 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
     ValueType type;
     uint64_t pack = ExtractInternalKeyFooter(iter->key());
     UnPackSequenceAndType(pack, &sequence, &type);
-    ValueSeqType &vst =  recoverer->k2v[cf_id][user_key];
+    ValueSeqType &vst =  recoverer->k2v[cf_id][sub_id][user_key];
 
     InternalKey ikey;
     ikey.Set(user_key, sequence, type);
-    //table_builder->Add(ikey.Encode(), value, true);??true
+    //table_builder->Add(ikey.Encode(), value);
     table_builder->Add(iter->key(), vst.value);
   }
   s = table_builder->Finish();
@@ -214,8 +221,8 @@ FastRecovery::FastRecovery(const Options& options, const std::string& dbname,
       icfoptions_(options),
       mcfoptions_(ColumnFamilyOptions(options_)),
       internal_comparator_(BytewiseComparator()) {
-  k2v = std::vector<std::unordered_map<std::string, ValueSeqType> >(num_column_families, 
-                                                          std::unordered_map<std::string, ValueSeqType>());
+  k2v = std::vector<std::vector<std::unordered_map<std::string, ValueSeqType> > >(num_column_families, 
+                                        std::vector<std::unordered_map<std::string, ValueSeqType> >());
   for (size_t i = 0; i < num_column_families_; i++) {
     column_families_.push_back(ColumnFamilyDescriptor(
       ColumnFamilyName(i), ColumnFamilyOptions(options)));
@@ -262,6 +269,9 @@ Status FastRecovery::Recover() {
   Status s;
   std::vector<std::future<Status> > statuses;
 
+  uint64_t start = ioptions_.env->NowMicros();
+  uint32_t num_map = 1, sub_wals_len = logs_number_.size() / num_map;
+
   // Read wals to buffer
   for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
     fprintf(stdout, "Read wal of cf %s to buffer-------.\n", cfd->GetName().c_str());
@@ -269,8 +279,14 @@ Status FastRecovery::Recover() {
       fprintf(stdout, "Column family %s skipped.\n", cfd->GetName().c_str());
       continue;
     }
-    statuses.emplace_back(std::async(std::launch::async, ReadCfWalToBuffer,
-                                     this, cfd->GetID()));
+    k2v[cfd->GetID()] = std::vector<std::unordered_map<std::string, ValueSeqType> >(
+                              num_map, std::unordered_map<std::string, ValueSeqType>());
+    for (uint32_t i = 0; i < num_map; i++) {
+      uint32_t left = i * sub_wals_len;
+      uint32_t right = i < num_map - 1 ? (i + 1) * sub_wals_len : logs_number_.size();
+      statuses.emplace_back(std::async(std::launch::async, ReadCfWalsToSubBuffer,
+                                         this, cfd->GetID(), left, right, i));
+    }
   }
   for (auto & status : statuses) {
     Status ret_status = status.get();
@@ -279,6 +295,9 @@ Status FastRecovery::Recover() {
     }
   }
   statuses.clear();
+  uint64_t end = ioptions_.env->NowMicros();
+  fprintf(stdout, "Wal to buffer last %lu s\n",
+                  (end - start) / 1000000);
 
   uint64_t map_count = 0;
   for (auto &kv : k2v) {
@@ -286,6 +305,7 @@ Status FastRecovery::Recover() {
     fprintf(stdout, "k2v size: %lu\n", kv.size());
   }
   fprintf(stdout, "Total kvs in map: %lu.\n", map_count);
+
 
 
   // Recover SST with the kvs in buffer
@@ -349,6 +369,7 @@ Status FastRecovery::Recover() {
 Status FastRecovery::ParseBatchAndAddToMap(Slice& record, 
                                                         SequenceNumber sequence,
                                                         uint32_t cf_id,
+                                                        uint32_t sub_id,
                                                         uint64_t& construct_last,
                                                         uint64_t& map_last) {
   //fprintf(stdout, "ParseBatchAndAddToMap begin\n");
@@ -397,7 +418,7 @@ Status FastRecovery::ParseBatchAndAddToMap(Slice& record,
     vst.type = ValueType(tag);
     uint64_t construct_end = ioptions_.env->NowMicros();
     construct_last += construct_end - construct_start;
-    k2v[column_family][key.ToString()] = vst;
+    k2v[column_family][sub_id][key.ToString()] = vst;
     uint64_t map_end = ioptions_.env->NowMicros();
     map_last += map_end - construct_end;
   }
@@ -492,6 +513,7 @@ void FastRecovery::CloseDB() {
   //}
 }
 
+// -------------------------------------------------------------------------------
 /*
 Status FastRecovery::ReadWalsToBuffer() {
   fprintf(stdout, "ReadWalsToBuffer begin.\n");
@@ -557,7 +579,7 @@ Status FastRecovery::ReadWalsToBuffer() {
                   total_entry, map_count, short_entry, reader_failed, parse_failed);
   return s;
 }
-
+*/
 Status FastRecovery::TestReadLatency() {
   Status s;
   uint64_t start = ioptions_.env->NowMicros();
@@ -739,9 +761,7 @@ Status FastRecovery::TestSstKV() {
   }
   return s;
 }
-*/
 
-/*
 Status FastRecovery::BuildTableFromWals(TableBuilder* builder, InternalIterator* iter,
                                                    uint32_t cf_id, uint64_t sst_number) {
   if (!builder || !iter) {
@@ -1055,8 +1075,8 @@ Status FastRecovery::ParseBatchAndAddKV(Slice& record, TableBuilder* builder,
   (void)found;
   return s;
 }
+//--------------------------------------------------------------------------
 
-*/
 
 int RecoveryTool::Run(int argc, char** argv, Options options) {
   std::string dbname;
@@ -1132,6 +1152,9 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
     fprintf(stdout, "Open db failed: %s.\n", s.ToString().c_str());
     return -1;
   }
+
+  //recoverer.TestReadLatency();
+  //return 0;
 
   //sleep(10);
 
