@@ -1,3 +1,13 @@
+## 分支说明
+6.4.tikv：PingCAP基于Facebook的6.4.6修改的
+shk-hust-cloud：shk的多路径方案，基于6.4.tikv
+hust-cloud：wal基本方案，基于6.4.tikv
+hust-cloud-test：hust-cloud的测试代码，用于XP的论文最终测试
+wal-test：基于hust-cloud的测试代码，会发生段错误
+fast-recover：将元数据写到云上，准备用于快速恢复方案，但还有bug，已经启用
+recovery_tool：快速恢复方案
+fch-meta-v6.4.6：fch将元数据和数据库分开写的方案
+
 ## RocksDB: A Persistent Key-Value Store for Flash and RAM Storage
 
 [![Linux/Mac Build Status](https://travis-ci.org/facebook/rocksdb.svg?branch=master)](https://travis-ci.org/facebook/rocksdb)
