@@ -13,7 +13,7 @@ fast-recover：将元数据写到云上，准备用于快速恢复方案，但�
 
 recovery_tool：快速恢复方案
 
-fch-meta-v6.4.6：fch将元数据和数据库分开写的方案
+fch-meta-v6.4.6：fch将元数据和数据块分开写的方案
 
 ## RocksDB: A Persistent Key-Value Store for Flash and RAM Storage
 
