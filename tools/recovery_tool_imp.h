@@ -60,7 +60,7 @@ class FastRecovery {
     }
   };
 
-  Status OpenDB();
+  Status OpenDB(bool fast_recovery = true);
   void CloseDB();
   Status Recover();
   Status ReadWalsToBuffer();

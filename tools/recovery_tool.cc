@@ -232,8 +232,10 @@ FastRecovery::FastRecovery(const Options& options, const std::string& dbname,
           ioptions_.db_paths[0].path.c_str(), ioptions_.db_paths[1].path.c_str());
 }
 
-Status FastRecovery::OpenDB() {
-  Status s = DB::Open(options_, dbname_, column_families_, &handles_, &db_, true/*skip_wal*/);
+Status FastRecovery::OpenDB(bool fast_recovery) {
+  uint64_t time_before_open = options_.env->NowMicros();
+  Status s = DB::Open(options_, dbname_, column_families_, &handles_, &db_, fast_recovery/*skip_wal*/);
+  fprintf(stdout, "DB::Open last %lu s.\n", (options_.env->NowMicros() - time_before_open) / 1000000);
   if (!s.ok()) {
     fprintf(stdout, "DB::Open : %s.\n", s.ToString().c_str());
     return s;
@@ -1088,6 +1090,8 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
   const std::string default_waldir = "/home/zhangxin/test-rocksdb/";
   const std::string default_path0 = "/data2/zhangxin/ssd/path0/";
   const std::string default_path1 = "/data2/zhangxin/ssd/path1/";
+  bool test = false;
+  bool default_recovery = false;
   for (int i = 1; i < argc; i++) {
     if (strncmp(argv[i], "--dbname=", 9) == 0) {
       dbname = argv[i] + 9;
@@ -1099,6 +1103,10 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
       path0 = argv[i] + 8;
     } else if (strncmp(argv[i], "--path1=", 8) == 0) {
       path1 = argv[i] + 8;
+    } else if (strncmp(argv[i], "--test", 6) == 0) {
+      test = true;
+    } else if (strncmp(argv[i], "--default_recovery", 18) == 0) {
+      default_recovery = true;
     }
   }
 
@@ -1147,14 +1155,23 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
 
   rocksdb::FastRecovery recoverer(options, dbname, output_dir, num_column_families);
 
-  Status s = recoverer.OpenDB();
+  if (default_recovery) {
+    fprintf(stdout, "Default recovery.\n");
+    Status s = recoverer.OpenDB(false); // dont skip wals
+    return 0;
+  }
+
+  Status s = recoverer.OpenDB(true);
   if (!s.ok()) {
     fprintf(stdout, "Open db failed: %s.\n", s.ToString().c_str());
     return -1;
   }
 
-  //recoverer.TestReadLatency();
-  //return 0;
+  if (test) {
+    recoverer.TestReadLatency();
+    recoverer.TestReadAndParseLatency();
+    return 0;
+  }
 
   //sleep(10);
 
