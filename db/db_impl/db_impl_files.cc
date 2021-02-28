@@ -163,7 +163,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     }
 
     // Add log files in wal_dir
-    // TODO: false if wal_dir ends with "/" while dbname_ not, vice versa
+    // hust-cloud TODO: false if wal_dir ends with "/" while dbname_ not, vice versa
     if (immutable_db_options_.wal_dir != dbname_) {
       std::vector<std::string> log_files;
       env_->GetChildren(immutable_db_options_.wal_dir,
@@ -231,7 +231,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       }
       job_context->size_log_to_delete += earliest.size;
       total_log_size_ -= earliest.size;
-
       if (two_write_queues_) {
         log_write_mutex_.Lock();
       }

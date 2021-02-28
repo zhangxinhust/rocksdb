@@ -760,8 +760,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
     std::string scratch;
     Slice record;
     WriteBatch batch;
+	// hust-cloud
     SequenceNumber sequence;
-    // hust-cloud
     SequenceNumber first_seqno = kDisableGlobalSequenceNumber;
 
     while (!stop_replay_by_wal_filter &&
