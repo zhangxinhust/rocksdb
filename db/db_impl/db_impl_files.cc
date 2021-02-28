@@ -149,7 +149,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
           continue;
         }
 
-        // hust-cloud
         if (immutable_db_options_.use_wal_stage && type == kLogFile) {
           if (!WALShouldPurge(number)) {
             continue;
@@ -169,7 +168,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
       env_->GetChildren(immutable_db_options_.wal_dir,
                         &log_files);  // Ignore errors
       for (const std::string& log_file : log_files) {
-        // hust-cloud
         if (immutable_db_options_.use_wal_stage) {
           uint64_t number;
           FileType type;
@@ -207,7 +205,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
     // find newly obsoleted log files
     while (alive_log_files_.begin()->number < min_log_number) {
       auto& earliest = *alive_log_files_.begin();
-      // hust-cloud
       if (immutable_db_options_.use_wal_stage) {
         if (!WALShouldPurge(earliest.number)) {
           break;
@@ -270,7 +267,6 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
   logs_to_free_.clear();
 }
 
-// hust-cloud
 bool DBImpl::WALShouldPurge(uint64_t log_number) {
   assert(immutable_db_options_.use_wal_stage);
   mutex_.AssertHeld();

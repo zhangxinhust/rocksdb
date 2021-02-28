@@ -259,7 +259,6 @@ DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
 DEFINE_int64(batch_size, 1, "Batch size");
 
-// hust-cloud
 DEFINE_bool(use_wal_stage, false, "Stage wals for Rocksdb-Cloud");
 DEFINE_string(db_paths, "", "The path for L0 and L1");
 DEFINE_string(db_paths2, "", "The path for L2 and upper levels");
@@ -3455,8 +3454,6 @@ class Benchmark {
     options.use_direct_reads = FLAGS_use_direct_reads;
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
-
-    // hust-cloud
     options.use_wal_stage = FLAGS_use_wal_stage;
     if (FLAGS_db_paths.length() && FLAGS_db_paths2.length()) {
       if (FLAGS_db_paths[FLAGS_db_paths.length()-1] != '/') {

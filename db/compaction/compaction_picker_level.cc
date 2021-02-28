@@ -95,7 +95,7 @@ class LevelCompactionBuilder {
 
   void PickExpiredTtlFiles();
 
-  void PickL1ExpiredTtlFiles(); // hust-cloud
+  void PickL1ExpiredTtlFiles();
 
   void PickFilesMarkedForPeriodicCompaction();
 
@@ -162,7 +162,6 @@ void LevelCompactionBuilder::PickExpiredTtlFiles() {
   start_level_inputs_.files.clear();
 }
 
-// hust-cloud
 void LevelCompactionBuilder::PickL1ExpiredTtlFiles() {
   assert(ioptions_.use_wal_stage);
   assert(mutable_cf_options_.ttl > 0);
@@ -228,7 +227,6 @@ void LevelCompactionBuilder::PickFilesMarkedForPeriodicCompaction() {
 }
 
 void LevelCompactionBuilder::SetupInitialFiles() {
-  // hust-cloud
   // TTL Compaction has the highest priority
   if (ioptions_.use_wal_stage) {
     PickL1ExpiredTtlFiles();
@@ -324,7 +322,6 @@ void LevelCompactionBuilder::SetupInitialFiles() {
     }
   }
 
-  // hust-cloud
   // TTL Compaction
   if (!ioptions_.use_wal_stage && start_level_inputs_.empty()) {
     PickExpiredTtlFiles();
