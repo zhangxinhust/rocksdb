@@ -56,7 +56,7 @@ Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
   fprintf(stdout, "ReadCfWalsToSubBuffer begin.\n");
   Status s;
   uint64_t start = recoverer->ioptions_.env->NowMicros();
-  uint64_t parse_add_last = 0, construct_last = 0, map_last = 0;
+  uint64_t read_last = 0, parse_add_last = 0, construct_last = 0, map_last = 0;
   uint64_t total_entry = 0, short_entry, reader_failed = 0, parse_failed = 0;
 
   for (uint32_t i = left; i < right; i++) {
@@ -78,9 +78,12 @@ Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
         fprintf(stdout, "ReadRecord break : %s.\n", s.ToString().c_str());
         break;
       }
+      uint64_t read_start = recoverer->ioptions_.env->NowMicros();
       if (!reader->ReadRecord(&record, &scratch, recoverer->ioptions_.wal_recovery_mode)) {
         break;
       }
+      uint64_t read_end = recoverer->ioptions_.env->NowMicros();
+      read_last += read_end - read_start;
       total_entry++;
       if (record.size() < WriteBatchInternal::kHeader) {
         short_entry++;
@@ -89,10 +92,9 @@ Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
       WriteBatchInternal::SetContents(&batch, record);
       sequence = WriteBatchInternal::Sequence(&batch);
 
-      uint64_t parse_start = recoverer->ioptions_.env->NowMicros();
       s = recoverer->ParseBatchAndAddToMap(record, sequence, cf_id, sub_id, construct_last, map_last);
       uint64_t parse_end = recoverer->ioptions_.env->NowMicros();
-      parse_add_last += parse_end - parse_start;
+      parse_add_last += parse_end - read_end;
       if (!s.ok()) {
         parse_failed++;
         fprintf(stdout, "ParseBatchAndAddToMap : %s.\n", s.ToString().c_str());
@@ -103,9 +105,10 @@ Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
   }
 
   uint64_t end = recoverer->ioptions_.env->NowMicros();
-  fprintf(stdout, "ReadCfWalsToSubBuffer cf %u, sub id %u, len %u, last %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
+  fprintf(stdout, "ReadCfWalsToSubBuffer cf %u, sub id %u, len %u, last %lu s, read: %lu s, parse add: %lu s, construct: %lu, map: %lu\n",
                   cf_id, sub_id, right - left,
                   (end - start) / 1000000,
+                  read_last / 1000000,
                   parse_add_last / 1000000,
                   construct_last / 1000000,
                   map_last / 1000000);
@@ -117,6 +120,7 @@ Status ReadCfWalsToSubBuffer(FastRecovery* recoverer, uint32_t cf_id,
 Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uint32_t cf_id) {
   fprintf(stdout, "RecoverTableFile begin %lu++++++++++.\n", meta->fd.GetNumber());
   Status s;
+  uint64_t hash_last = 0, write_last = 0;
   uint64_t start = recoverer->ioptions_.env->NowMicros();
 
   uint64_t sst_number = meta->fd.GetNumber();
@@ -175,12 +179,15 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
       continue;
     }
     std::string user_key = ExtractUserKey(iter->key()).ToString();
+    uint64_t hash_begin = recoverer->ioptions_.env->NowMicros();
     int32_t sub_id = recoverer->k2v[cf_id].size() - 1;
     for (; sub_id >= 0; sub_id--) {
       if (recoverer->k2v[cf_id][sub_id].count(user_key)) {
         break;
       }
     }
+    uint64_t hash_end = recoverer->ioptions_.env->NowMicros();
+    hash_last += hash_end - hash_begin;
     if (sub_id < 0) {
       wal_miss_keys++;
       continue;
@@ -199,23 +206,26 @@ Status RecoverTableFile(FastRecovery* recoverer ,FileMetaData*         meta, uin
     ikey.Set(user_key, sequence, type);
     //table_builder->Add(ikey.Encode(), value);
     table_builder->Add(iter->key(), vst.value);
+    uint64_t write_end = recoverer->ioptions_.env->NowMicros();
+    write_last += write_end - hash_end;
   }
   s = table_builder->Finish();
   if (!s.ok()) {
     fprintf(stdout, "Finish : %s.\n", s.ToString().c_str());
   }
   uint64_t end = recoverer->ioptions_.env->NowMicros();
-  fprintf(stdout, "SST %lu last %lu s, total: %lu, iter miss: %lu, wal miss: %lu.\n",
-                  meta->fd.GetNumber(), (end - start) / 1000000,
+  fprintf(stdout, "SST %lu last %lu ms, hash: %lu ms, write: %lu ms, total: %lu, iter miss: %lu, wal miss: %lu.\n",
+                  meta->fd.GetNumber(), (end - start) / 1000, hash_last / 1000, write_last / 1000,
                   total_keys, iter_miss_keys, wal_miss_keys);
   return s;
 }
 
 FastRecovery::FastRecovery(const Options& options, const std::string& dbname,
-    const std::string& output_path, uint32_t num_column_families)
+    const std::string& output_path, uint32_t num_column_families, uint32_t num_map)
     : dbname_(dbname),
       output_path_(output_path),
       num_column_families_(num_column_families),
+      num_map_(num_map),
       options_(options),
       ioptions_(options),
       icfoptions_(options),
@@ -240,6 +250,26 @@ Status FastRecovery::OpenDB(bool fast_recovery) {
     fprintf(stdout, "DB::Open : %s.\n", s.ToString().c_str());
     return s;
   }
+  if (!fast_recovery) {
+    fprintf(stdout, "sleep 120s.\n\n");
+    sleep(120);
+    std::string stats;
+    for (uint32_t i = 0; i < num_column_families_; i++) {
+      if (!db_->GetProperty(handles_[i], "rocksdb.stats", &stats)) {
+        stats = "(rocksdb.stats failed)";
+      }
+      fprintf(stdout, "\n%s\n", stats.c_str());
+      if (!db_->GetProperty(handles_[i], "rocksdb.levelstats", &stats)) {
+        stats = "(rocksdb.levelstats failed)";
+      }
+      fprintf(stdout, "\n%s\n", stats.c_str());
+      if (!db_->GetProperty(handles_[i], "rocksdb.sstables", &stats)) {
+        stats = "(rocksdb.sstables failed)";
+      }
+      fprintf(stdout, "\n%s\n", stats.c_str());
+    }
+  }
+
   s = DBImpl::CreateAndNewDirectory(ioptions_.env, output_path_, &output_dir_);
   if (!s.ok()) {
     fprintf(stdout, "CreateAndNewDirectory : %s.\n", s.ToString().c_str());
@@ -272,7 +302,7 @@ Status FastRecovery::Recover() {
   std::vector<std::future<Status> > statuses;
 
   uint64_t start = ioptions_.env->NowMicros();
-  uint32_t num_map = 1, sub_wals_len = logs_number_.size() / num_map;
+  uint32_t sub_wals_len = logs_number_.size() / num_map_;
 
   // Read wals to buffer
   for (ColumnFamilyData* cfd : *db_->GetVersionSet()->GetColumnFamilySet()) {
@@ -282,10 +312,10 @@ Status FastRecovery::Recover() {
       continue;
     }
     k2v[cfd->GetID()] = std::vector<std::unordered_map<std::string, ValueSeqType> >(
-                              num_map, std::unordered_map<std::string, ValueSeqType>());
-    for (uint32_t i = 0; i < num_map; i++) {
+                              num_map_, std::unordered_map<std::string, ValueSeqType>());
+    for (uint32_t i = 0; i < num_map_; i++) {
       uint32_t left = i * sub_wals_len;
-      uint32_t right = i < num_map - 1 ? (i + 1) * sub_wals_len : logs_number_.size();
+      uint32_t right = i < num_map_ - 1 ? (i + 1) * sub_wals_len : logs_number_.size();
       statuses.emplace_back(std::async(std::launch::async, ReadCfWalsToSubBuffer,
                                          this, cfd->GetID(), left, right, i));
     }
@@ -502,6 +532,23 @@ std::string FastRecovery::ColumnFamilyName(size_t i) {
 }
 
 void FastRecovery::CloseDB() {
+  std::string stats;
+  for (uint32_t i = 0; i < num_column_families_; i++) {
+    if (!db_->GetProperty(handles_[i], "rocksdb.stats", &stats)) {
+      stats = "(rocksdb.stats failed)";
+    }
+    fprintf(stdout, "\n%s\n", stats.c_str());
+    if (!db_->GetProperty(handles_[i], "rocksdb.levelstats", &stats)) {
+      stats = "(rocksdb.levelstats failed)";
+    }
+    fprintf(stdout, "\n%s\n", stats.c_str());
+    if (!db_->GetProperty(handles_[i], "rocksdb.sstables", &stats)) {
+      stats = "(rocksdb.sstables failed)";
+    }
+    fprintf(stdout, "\n%s\n", stats.c_str());
+  }
+
+
   for (auto handle : handles_) {
     delete handle;
   }
@@ -588,7 +635,7 @@ Status FastRecovery::TestReadLatency() {
   uint64_t entry_count = 0;
 
   for (uint32_t i = 0; i < logs_number_.size(); i++) {
-    uint64_t wal_start = ioptions_.env->NowMicros();
+    // uint64_t wal_start = ioptions_.env->NowMicros();
     uint64_t log_number = logs_number_[i];
     log::Reader *reader = nullptr;
     s = GetLogReader(log_number, &reader);
@@ -625,6 +672,7 @@ Status FastRecovery::TestReadLatency() {
 Status FastRecovery::TestReadAndParseLatency() {
   Status s;
   uint64_t start = ioptions_.env->NowMicros();
+  uint64_t read_lat = 0, parse_lat = 0;
   uint64_t entry_count = 0, kv_count = 0, retry_count = 0, short_count = 0;
   uint64_t loop_count = 0, print_count = 0, non_ok_count = 0;
 
@@ -653,6 +701,8 @@ Status FastRecovery::TestReadAndParseLatency() {
         fprintf(stdout, "ReadRecord non-ok %lu.\n", log_number);
         break;
       }
+      uint64_t read_end = ioptions_.env->NowMicros();
+      read_lat += read_end - read_begin;
       entry_count++;
       if (record.size() < WriteBatchInternal::kHeader) {
         short_count++;
@@ -699,12 +749,13 @@ Status FastRecovery::TestReadAndParseLatency() {
           s = Status::OK();
         }
       }
+      parse_lat += ioptions_.env->NowMicros() - read_end;
     }
   }
   uint64_t end = ioptions_.env->NowMicros();
-  fprintf(stdout, "TestReadAndParseLatency %lu s to read and parse %lu wals,"
+  fprintf(stdout, "TestReadAndParseLatency %lu s to read and parse %lu wals, read %lu s, parse %lu s,"
                   " entries: %lu, kvs: %lu, retry: %lu, loop: %lu, short: %lu, non-ok: %lu.\n",
-                  (end - start) / 1000000, logs_number_.size(),
+                  (end - start) / 1000000, logs_number_.size(), read_lat / 1000000, parse_lat / 1000000,
                   entry_count, kv_count, retry_count, loop_count,
                   short_count, non_ok_count);
   return s;
@@ -1089,9 +1140,11 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
   const std::string default_dbname = "/home/zhangxin/test-rocksdb/";
   const std::string default_waldir = "/home/zhangxin/test-rocksdb/";
   const std::string default_path0 = "/data2/zhangxin/ssd/path0/";
-  const std::string default_path1 = "/data2/zhangxin/ssd/path1/";
-  bool test = false;
+  const std::string default_path1 = "/home/zhangxin/hdd/path1/";
+  bool test_read = false, test_parse = false;
   bool default_recovery = false;
+  uint32_t num_map = 1;
+  uint32_t num_column_families = 3;
   for (int i = 1; i < argc; i++) {
     if (strncmp(argv[i], "--dbname=", 9) == 0) {
       dbname = argv[i] + 9;
@@ -1103,10 +1156,19 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
       path0 = argv[i] + 8;
     } else if (strncmp(argv[i], "--path1=", 8) == 0) {
       path1 = argv[i] + 8;
-    } else if (strncmp(argv[i], "--test", 6) == 0) {
-      test = true;
+    } else if (strncmp(argv[i], "--test_read", 11) == 0) {
+      test_read = true;
+    } else if (strncmp(argv[i], "--test_parse", 12) == 0) {
+      test_parse = true;
     } else if (strncmp(argv[i], "--default_recovery", 18) == 0) {
       default_recovery = true;
+      fprintf(stdout, "default_recovery: %d.\n", default_recovery);
+    } else if (strncmp(argv[i], "--num_map=", 10) == 0) {
+      num_map = static_cast<uint32_t>(std::stoul(argv[i] + 10));
+      fprintf(stdout, "num_map: %u.\n", num_map);
+    } else if (strncmp(argv[i], "--num_cf=", 9) == 0) {
+      num_column_families = static_cast<uint32_t>(std::stoul(argv[i] + 9));
+      fprintf(stdout, "num_cf: %u.\n", num_column_families);
     }
   }
 
@@ -1115,11 +1177,6 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
   }
   if (wal_dir.length() == 0) {
     wal_dir = dbname;
-  }
-  if (output_dir.length() == 0) {
-    output_dir = dbname[dbname.length() - 1] == '/' ?
-                                                dbname + "data_recovered" :
-                                                dbname + "/data_recovered";
   }
   if (path0.length() == 0) {
     path0 = default_path0;
@@ -1133,12 +1190,14 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
   if (path1[path1.length() - 1] != '/') {
     path1 += '/';
   }
+  if (output_dir.length() == 0) {
+    output_dir = path0 + "new_path0";
+  }
 
   fprintf(stdout, "dbname: %s, wal_dir: %s, path0: %s, path1: %s, output_dir: %s.\n",
           dbname.c_str(), wal_dir.c_str(), path0.c_str(), path1.c_str(), output_dir.c_str());
 
   // Options要与db_bench运行时的参数保持一致
-  uint32_t num_column_families = 3;
   options.max_background_jobs = 8;
   options.max_bytes_for_level_base = 512l * 1024 * 1024;
   options.write_buffer_size = 128l * 1024 * 1024;
@@ -1147,13 +1206,14 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
   options.use_wal_stage = true;
   options.create_if_missing = true;
   options.create_missing_column_families = true;
-  options.disable_auto_compactions = true;
+  options.disable_auto_compactions = !default_recovery;
+  fprintf(stdout, "options.disable_auto_compactions: %d.\n", options.disable_auto_compactions);
   options.wal_dir = wal_dir;
   options.db_paths = std::vector<DbPath>();
   options.db_paths.push_back(DbPath(path0, 2l * options.max_bytes_for_level_base));
   options.db_paths.push_back(DbPath(path1, 100l * options.max_bytes_for_level_base));
 
-  rocksdb::FastRecovery recoverer(options, dbname, output_dir, num_column_families);
+  rocksdb::FastRecovery recoverer(options, dbname, output_dir, num_column_families, num_map);
 
   if (default_recovery) {
     fprintf(stdout, "Default recovery.\n");
@@ -1167,8 +1227,11 @@ int RecoveryTool::Run(int argc, char** argv, Options options) {
     return -1;
   }
 
-  if (test) {
+  if (test_read) {
     recoverer.TestReadLatency();
+    return 0;
+  }
+  if (test_parse) {
     recoverer.TestReadAndParseLatency();
     return 0;
   }

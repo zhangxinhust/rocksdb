@@ -43,7 +43,8 @@ struct ValueSeqType {
 class FastRecovery {
  public:
   explicit FastRecovery(const Options& options, const std::string& file_name,
-                         const std::string& output_dir, uint32_t num_column_families = 3);
+                         const std::string& output_dir, uint32_t num_column_families = 3,
+                         uint32_t num_map = 1);
 
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
@@ -97,6 +98,7 @@ class FastRecovery {
   std::string dbname_;
   std::string output_path_;
   uint32_t num_column_families_;
+  uint32_t num_map_;
   std::vector<ColumnFamilyDescriptor> column_families_;
   std::vector<ColumnFamilyHandle*> handles_;
   std::unique_ptr<Directory> output_dir_ = nullptr;
