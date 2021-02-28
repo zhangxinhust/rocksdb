@@ -3344,6 +3344,10 @@ void Version::AddLiveFiles(std::vector<FileDescriptor>* live) {
 
 std::string Version::DebugString(bool hex, bool print_stats) const {
   std::string r;
+  char buf[100];
+  int64_t icur_time;
+  env_->GetCurrentTime(&icur_time);
+  uint64_t cur_time = uint64_t(icur_time);
   for (int level = 0; level < storage_info_.num_levels_; level++) {
     // E.g.,
     //   --- level 1 ---
@@ -3362,6 +3366,11 @@ std::string Version::DebugString(bool hex, bool print_stats) const {
       r.push_back(' ');
       AppendNumberTo(&r, files[i]->fd.GetNumber());
       r.push_back(':');
+      if (files[i]->fd.table_reader && files[i]->fd.table_reader->GetTableProperties()) {
+        uint64_t creation_time = files[i]->fd.table_reader->GetTableProperties()->creation_time;
+        sprintf(buf, "%lu s, ", cur_time - creation_time);
+        r.append(buf);
+      }
       AppendNumberTo(&r, files[i]->fd.GetFileSize());
       r.append("[");
       AppendNumberTo(&r, files[i]->fd.smallest_seqno);

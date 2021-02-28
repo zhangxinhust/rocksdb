@@ -412,6 +412,58 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
 
+/// test print start
+  uint64_t max_output_files_num = 0, min_output_files_num = 1000, total_output_files_num = 0, input_files_num = start_level_inputs_.size();
+
+  // Ln+1 SST nums for every Ln SST
+  for(uint32_t i = 0; i < start_level_inputs_.size(); i++) {
+    CompactionInputFiles single_input_file;
+    single_input_file.files.push_back(start_level_inputs_[i]);
+
+    InternalKey smallest, largest;
+    compaction_picker_->GetRange(single_input_file, &smallest, &largest);
+
+    CompactionInputFiles output_level_inputs;
+    vstorage_->GetOverlappingInputs(output_level_, &smallest, &largest,
+                                    &output_level_inputs.files);
+
+    uint64_t output_files_num = output_level_inputs.size();
+    max_output_files_num = std::max(max_output_files_num, output_files_num);
+    min_output_files_num = std::min(min_output_files_num, output_files_num);
+    total_output_files_num += output_files_num;
+  }
+
+  // Total Ln+1 SST nums for all Ln SST
+  InternalKey smallest, largest;
+  compaction_picker_->GetRange(start_level_inputs_, &smallest, &largest);
+
+  CompactionInputFiles output_level_inputs;
+  vstorage_->GetOverlappingInputs(output_level_, &smallest, &largest,
+                                  &output_level_inputs.files);
+
+  uint64_t output_files_num = output_level_inputs.size();
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n"
+    "test-print-start-ln-ln+1-sst-num.\n"
+    "cur-time: %lu.\n"
+    "start-level: %d.\n"
+    "input-num: %lu.\n"
+    "output-num: %lu.\n"
+    "output-num-overlap: %lu.\n"
+    "output-num-min: %lu, max: %lu.\n"
+    "test-print-end-ln-ln+1-sst-num.\n",
+    ioptions_.env->NowMicros(),
+    start_level_,
+    input_files_num,
+    output_files_num,
+    total_output_files_num,
+    min_output_files_num, max_output_files_num
+  );
+  log_buffer_->FlushBufferToLog();
+
+/// test print end
   return c;
 }
 

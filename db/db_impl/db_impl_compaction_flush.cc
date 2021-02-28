@@ -2405,6 +2405,23 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
                                     LogBuffer* log_buffer,
                                     PrepickedCompaction* prepicked_compaction,
                                     Env::Priority thread_pri) {
+//// test print start
+  ROCKS_LOG_BUFFER(
+    log_buffer,
+    "\n"
+    "test-print-start-wal-realtime-size.\n"
+    "cur-time: %lu.\n"
+    "wal-real: %lu.\n"
+    "test-print-end-wal-realtime-size.\n",
+
+    env_->NowMicros(),
+    uint64_t(total_log_size_)
+
+    //compaction_queue_.size()
+  );
+
+
+//// test print end
   ManualCompactionState* manual_compaction =
       prepicked_compaction == nullptr
           ? nullptr

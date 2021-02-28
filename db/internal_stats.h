@@ -88,6 +88,8 @@ struct LevelStat {
 
 class InternalStats {
  public:
+  void AddLevelAndWalBytes(std::vector<std::vector<double>>& level_mb, double *wal_mb = nullptr);
+
   static const std::map<LevelStatType, LevelStat> compaction_level_stats;
 
   enum InternalCFStatsType {
@@ -406,6 +408,9 @@ class InternalStats {
   void DumpCFMapStats(
       std::map<int, std::map<LevelStatType, double>>* level_stats,
       CompactionStats* compaction_stats_sum);
+
+  void DumpCFMapStatsLight(std::map<int, std::map<LevelStatType, double>>* level_stats);
+
   void DumpCFMapStatsByPriority(
       std::map<int, std::map<LevelStatType, double>>* priorities_stats);
   void DumpCFMapStatsIOStalls(std::map<std::string, std::string>* cf_stats);

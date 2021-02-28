@@ -82,7 +82,7 @@ Status BuildTable(
     TableFileCreationReason reason, EventLogger* event_logger, int job_id,
     const Env::IOPriority io_priority, TableProperties* table_properties,
     int level, const uint64_t creation_time, const uint64_t oldest_key_time,
-    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time) {
+    Env::WriteLifeTimeHint write_hint, const uint64_t file_creation_time, LogBuffer* log_buffer) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -179,6 +179,23 @@ Status BuildTable(
 
     // Finish and check for builder errors
     tp = builder->GetTableProperties();
+/// test print start
+    if (level <= 1 && log_buffer) {
+      ROCKS_LOG_BUFFER(
+        log_buffer, 
+        "\n"
+        "test-print-start-new-sst.\n"
+        "cur-time: %lu.\n"
+        "level: %d.\n"
+        "data: %lu, index: %lu, filter: %lu.\n"
+        "test-print-end-new-sst\n",
+
+        env->NowMicros(),
+        level,
+        tp.data_size, tp.index_size, tp.filter_size
+      );
+    }
+/// test print end
     bool empty = builder->NumEntries() == 0 && tp.num_range_deletions == 0;
     s = c_iter.status();
     if (!s.ok() || empty) {

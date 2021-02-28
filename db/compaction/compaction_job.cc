@@ -744,6 +744,118 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
         stats.bytes_written / static_cast<double>(stats.micros);
   }
 
+//// test print start
+
+  uint64_t cur_time = env_->NowMicros();
+
+  // wal and level size size in MB of all column families together
+  // both realtime and cumulative level size
+  // but cumulative wal size only, realtime wal size printed in DBImpl::BackgroundCompaction
+  // Two ways to get cumulative wal size:
+  //   1. Statistics::getTickerCount(WAL_FILE_BYTES), DBImpl::stats_ or CompactionJob::stats_
+  //   2. InternalStats::AddLevelAndWalBytes->GetDBStats(InternalStats::kIntStatsWalFileBytes), need to do this for all cfs
+
+  uint64_t wal_cumul_stats = 0;
+  if (stats_) {
+    wal_cumul_stats = stats_->getTickerCount(WAL_FILE_BYTES) >> 20; // bytes to mbs
+  }
+  // double wal_cumul_internal = 0;
+  std::vector<std::vector<double>> level_mb(3, std::vector<double>(7, 0.0));
+  for (auto _cfd : *versions_->GetColumnFamilySet()) {
+    if (_cfd->IsDropped() || !_cfd->initialized() || _cfd->NumberLevels() < 1) {
+      continue;
+    }
+    _cfd->internal_stats()->AddLevelAndWalBytes(level_mb/*, &wal_cumul_internal*/);
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n"
+    "test-print-start-wal-level-size.\n"
+    "cur-time: %lu.\n"
+    // realtime
+    "level-real: %d, %.1lf.\n"
+    "level-real: %d, %.1lf.\n"
+    "level-real: %d, %.1lf.\n"
+    "level-real: %d, %.1lf.\n"
+    "level-real: %d, %.1lf.\n"
+    // cumulative:
+    "wal-cumul: %ld.\n"
+    "level-cumul: %d, %.1lf.\n"
+    "level-cumul: %d, %.1lf.\n"
+    "level-cumul: %d, %.1lf.\n"
+    "level-cumul: %d, %.1lf.\n"
+    "level-cumul: %d, %.1lf.\n"
+    "test-print-end-wal-level-size.\n",
+
+    cur_time,
+    0, level_mb[0][0],
+    1, level_mb[0][1],
+    2, level_mb[0][2],
+    3, level_mb[0][3],
+    4, level_mb[0][4],
+    wal_cumul_stats,
+    0, level_mb[1][0],
+    1, level_mb[1][1],
+    2, level_mb[1][2],
+    3, level_mb[1][3],
+    4, level_mb[1][4]
+  );
+
+  // compaction stats
+  ROCKS_LOG_BUFFER(
+    log_buffer_, 
+    "\n"
+    "test-print-start-compact-stats\n"
+    "cur-time: %lu.\n"
+    "micros: %lu.\n"
+    "read-level: %d.\n"
+    "write-level: %d.\n"
+    "read-size-input: %lu, output: %lu.\n"
+    "write-size: %lu, num: %d.\n"
+    "test-print-end-compact-stats\n",
+
+    cur_time,
+    compaction_stats_.micros,
+    compact_->compaction->start_level(),
+    compact_->compaction->output_level(),
+    compaction_stats_.bytes_read_non_output_levels, compaction_stats_.bytes_read_output_level,
+    compaction_stats_.bytes_written, compaction_stats_.num_output_files
+  );
+
+  //log_buffer_->FlushBufferToLog();
+
+  /// sst live time
+  std::string sst_live_time;
+  char buf[300];
+  int64_t icur_time;
+  env_->GetCurrentTime(&icur_time);
+  uint64_t cur_time = uint64_t(icur_time);
+  for (const CompactionInputFiles& input : *(compact_->compaction->inputs())) {
+    sprintf(buf, "level: %d:[", input.level);
+    sst_live_time.append(buf);
+    std::vector<FileMetaData*> files = input.files;
+    for (FileMetaData* file : input.files) {
+      if (file->fd.table_reader && file->fd.table_reader->GetTableProperties()) {
+        uint64_t creation_time = file->fd.table_reader->GetTableProperties()->creation_time;
+        sprintf(buf, ", %lu", cur_time - creation_time);
+        sst_live_time.append(buf);
+      }
+    }
+    sst_live_time.append("]\n");
+  }
+
+  ROCKS_LOG_BUFFER(
+    log_buffer_,
+    "\n"
+    "test-print-start-sst-live-time.\n"
+    "%s"
+    "test-print-end-sst-live-time.\n",
+    sst_live_time.c_str()
+  );
+
+//// test print end
+
   ROCKS_LOG_BUFFER(
       log_buffer_,
       "[%s] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "
@@ -1319,6 +1431,26 @@ Status CompactionJob::FinishCompactionOutputFile(
   TableProperties tp;
   if (s.ok()) {
     tp = sub_compact->builder->GetTableProperties();
+/// test print start
+    int l = compact_->compaction->start_level();
+    if (l <= 1) {
+      ROCKS_LOG_BUFFER(
+        log_buffer_, 
+        "\n"
+        "test-print-start-new-sst.\n"
+        "cur-time: %lu.\n"
+        "level: %d.\n"
+        "data: %lu, index: %lu, filter: %lu.\n"
+        "test-print-end-new-sst\n",
+
+        env_->NowMicros(),
+        l,
+        tp.data_size, tp.index_size, tp.filter_size
+      );
+    }
+
+
+/// test print end
   }
 
   if (s.ok() && current_entries == 0 && tp.num_range_deletions == 0) {
