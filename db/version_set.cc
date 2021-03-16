@@ -1191,12 +1191,13 @@ class BaseReferencedVersionBuilder {
 
 Status Version::GetTableProperties(std::shared_ptr<const TableProperties>* tp,
                                    const FileMetaData* file_meta,
-                                   const std::string* fname) const {
+                                   const std::string* fname,
+                                   bool no_io) const {
   auto table_cache = cfd_->table_cache();
   auto ioptions = cfd_->ioptions();
   Status s = table_cache->GetTableProperties(
       env_options_, cfd_->internal_comparator(), file_meta->fd, tp,
-      mutable_cf_options_.prefix_extractor.get(), true /* no io */);
+      mutable_cf_options_.prefix_extractor.get(), no_io);
   if (s.ok()) {
     return s;
   }
@@ -5139,20 +5140,6 @@ bool VersionSet::VerifyCompactionFileConsistency(Compaction* c) {
         "[%s] compaction output being applied to a different base version from"
         " input version",
         c->column_family_data()->GetName().c_str());
-
-    if (vstorage->compaction_style_ == kCompactionStyleLevel &&
-        c->start_level() == 0 && c->num_input_levels() > 2U) {
-      // We are doing a L0->base_level compaction. The assumption is if
-      // base level is not L1, levels from L1 to base_level - 1 is empty.
-      // This is ensured by having one compaction from L0 going on at the
-      // same time in level-based compaction. So that during the time, no
-      // compaction/flush can put files to those levels.
-      for (int l = c->start_level() + 1; l < c->output_level(); l++) {
-        if (vstorage->NumLevelFiles(l) != 0) {
-          return false;
-        }
-      }
-    }
   }
 
   for (size_t input = 0; input < c->num_input_levels(); ++input) {

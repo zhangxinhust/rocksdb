@@ -9,9 +9,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <unistd.h>
 
 #include "db/db_impl/db_impl.h"
 #include "port/port.h"
+#include "rocksdb/compaction_filter.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "test_util/sync_point.h"
@@ -59,6 +61,93 @@ class FlushedFileCollector : public EventListener {
   std::vector<std::string> flushed_files_;
   std::mutex mutex_;
 };
+
+class TestFilterFactory : public CompactionFilterFactory {
+ public:
+  std::shared_ptr<CompactionFilter::Context> context_;
+  std::shared_ptr<int> compaction_count_;
+
+  TestFilterFactory(std::shared_ptr<CompactionFilter::Context> context,
+                    std::shared_ptr<int> compaction_count) {
+    this->context_ = context;
+    this->compaction_count_ = compaction_count;
+  }
+
+  ~TestFilterFactory() {}
+
+  const char* Name() const {
+    return "TestFilterFactory";
+  }
+
+  std::unique_ptr<CompactionFilter> CreateCompactionFilter(
+      const CompactionFilter::Context& context) {
+    context_->start_key = context.start_key;
+    context_->end_key = context.end_key;
+    context_->is_end_key_inclusive = context.is_end_key_inclusive;
+    context_->file_numbers.clear();
+    context_->table_properties.clear();
+    for (size_t i = 0; i < context.file_numbers.size(); ++i) {
+        context_->file_numbers.push_back(context.file_numbers[i]);
+        context_->table_properties.push_back(context.table_properties[i]);
+    }
+    *compaction_count_.get() += 1;
+    return nullptr;
+  }
+};
+
+TEST_F(CompactFilesTest, FilterContext) {
+  Options options;
+  // to trigger compaction more easily
+  const int kWriteBufferSize = 10000;
+  const int kLevel0Trigger = 2;
+  options.create_if_missing = true;
+  options.compaction_style = kCompactionStyleLevel;
+  // Small slowdown and stop trigger for experimental purpose.
+  options.level0_slowdown_writes_trigger = 20;
+  options.level0_stop_writes_trigger = 20;
+  options.level0_stop_writes_trigger = 20;
+  options.write_buffer_size = kWriteBufferSize;
+  options.level0_file_num_compaction_trigger = kLevel0Trigger;
+  options.compression = kNoCompression;
+
+  std::shared_ptr<CompactionFilter::Context> expected_context(new CompactionFilter::Context);
+  std::shared_ptr<int> compaction_count(new int(0));
+  CompactionFilterFactory *factory = new TestFilterFactory(expected_context, compaction_count);
+  options.compaction_filter_factory = std::shared_ptr<CompactionFilterFactory>(factory);
+
+  DB* db = nullptr;
+  DestroyDB(db_name_, options);
+  Status s = DB::Open(options, db_name_, &db);
+  assert(s.ok());
+  assert(db);
+
+  // `Flush` is different from `Compaction`.
+  db->Put(WriteOptions(), ToString(1), "");
+  db->Put(WriteOptions(), ToString(51), "");
+  db->Flush(FlushOptions());
+  ASSERT_EQ(*compaction_count.get(), 0);
+
+  // Trigger a `Compaction`.
+  db->Put(WriteOptions(), ToString(50), "");
+  db->Put(WriteOptions(), ToString(99), "");
+  db->Flush(FlushOptions());
+  usleep(10000); // Wait for compaction start.
+  ASSERT_EQ(expected_context->start_key, Slice("1"));
+  ASSERT_EQ(expected_context->end_key, Slice("99"));
+  ASSERT_EQ(expected_context->is_end_key_inclusive, 1);
+  ASSERT_EQ(expected_context->file_numbers[0], 10);
+  ASSERT_EQ(expected_context->file_numbers.back(), 7);
+  ASSERT_EQ(*compaction_count.get(), 1);
+
+  db->CompactRange(CompactRangeOptions(), nullptr, nullptr);
+  usleep(10000); // Wait for compaction start.
+  ASSERT_EQ(expected_context->start_key, Slice("1"));
+  ASSERT_EQ(expected_context->is_end_key_inclusive, 1);
+  ASSERT_EQ(expected_context->file_numbers[0], 11);
+  ASSERT_EQ(*compaction_count.get(), 2);
+
+  delete(db);
+}
 
 TEST_F(CompactFilesTest, L0ConflictsFiles) {
   Options options;
@@ -114,6 +203,69 @@ TEST_F(CompactFilesTest, L0ConflictsFiles) {
     }
   }
   rocksdb::SyncPoint::GetInstance()->DisableProcessing();
+  delete db;
+}
+
+TEST_F(CompactFilesTest, MultipleLevel) {
+  Options options;
+  options.create_if_missing = true;
+  options.level_compaction_dynamic_level_bytes = true;
+  options.num_levels = 6;
+  // Add listener
+  FlushedFileCollector* collector = new FlushedFileCollector();
+  options.listeners.emplace_back(collector);
+
+  DB* db = nullptr;
+  DestroyDB(db_name_, options);
+  Status s = DB::Open(options, db_name_, &db);
+  ASSERT_OK(s);
+  ASSERT_NE(db, nullptr);
+
+  // create couple files in L0, L3, L4 and L5
+  for (int i = 5; i > 2; --i) {
+    collector->ClearFlushedFiles();
+    ASSERT_OK(db->Put(WriteOptions(), ToString(i), ""));
+    ASSERT_OK(db->Flush(FlushOptions()));
+    auto l0_files = collector->GetFlushedFiles();
+    ASSERT_OK(db->CompactFiles(CompactionOptions(), l0_files, i));
+
+    std::string prop;
+    ASSERT_TRUE(
+        db->GetProperty("rocksdb.num-files-at-level" + ToString(i), &prop));
+    ASSERT_EQ("1", prop);
+  }
+  ASSERT_OK(db->Put(WriteOptions(), ToString(0), ""));
+  ASSERT_OK(db->Flush(FlushOptions()));
+
+  rocksdb::ColumnFamilyMetaData meta;
+  db->GetColumnFamilyMetaData(&meta);
+  // Compact files except the file in L3
+  std::vector<std::string> files;
+  for (int i = 0; i < 6; ++i) {
+    if (i == 3) continue;
+    for (auto& file : meta.levels[i].files) {
+      files.push_back(file.db_path + "/" + file.name);
+    }
+  }
+
+  rocksdb::SyncPoint::GetInstance()->LoadDependency({
+      {"CompactionJob::Run():Start", "CompactFilesTest.MultipleLevel:0"},
+      {"CompactFilesTest.MultipleLevel:1", "CompactFilesImpl:3"},
+  });
+  rocksdb::SyncPoint::GetInstance()->EnableProcessing();
+
+  std::thread thread([&] {
+    TEST_SYNC_POINT("CompactFilesTest.MultipleLevel:0");
+    ASSERT_OK(db->Put(WriteOptions(), "bar", "v2"));
+    ASSERT_OK(db->Put(WriteOptions(), "foo", "v2"));
+    ASSERT_OK(db->Flush(FlushOptions()));
+    TEST_SYNC_POINT("CompactFilesTest.MultipleLevel:1");
+  });
+
+  ASSERT_OK(db->CompactFiles(rocksdb::CompactionOptions(), files, 5));
+  rocksdb::SyncPoint::GetInstance()->DisableProcessing();
+  thread.join();
+
   delete db;
 }
 
@@ -400,6 +552,86 @@ TEST_F(CompactFilesTest, GetCompactionJobInfo) {
   ASSERT_OK(compaction_job_info.status);
   // no assertion failure
   delete db;
+}
+
+TEST_F(CompactFilesTest, IsWriteStalled) {
+  class SlowFilter : public CompactionFilter {
+   public:
+    SlowFilter(std::atomic<bool>* would_block) { would_block_ = would_block; }
+
+    bool Filter(int /*level*/, const Slice& /*key*/, const Slice& /*value*/,
+                std::string* /*new_value*/, bool* /*value_changed*/) const
+        override {
+      while (would_block_->load(std::memory_order_relaxed)) {
+        usleep(10000);
+      }
+      return false;
+    }
+
+    const char* Name() const override { return "SlowFilter"; }
+
+   private:
+    std::atomic<bool>* would_block_;
+  };
+
+  Options options;
+  options.create_if_missing = true;
+
+  ColumnFamilyOptions cf_options;
+  cf_options.level0_slowdown_writes_trigger = 12;
+  cf_options.level0_stop_writes_trigger = 20;
+  cf_options.write_buffer_size = 1024 * 1024;
+
+  std::atomic<bool> compaction_would_block;
+  compaction_would_block.store(true, std::memory_order_relaxed);
+  cf_options.compaction_filter = new SlowFilter(&compaction_would_block);
+
+  std::vector<ColumnFamilyDescriptor> cfds;
+  cfds.push_back(ColumnFamilyDescriptor("default", cf_options));
+
+  DB* db = nullptr;
+  std::vector<ColumnFamilyHandle*> handles;
+  DestroyDB(db_name_, options);
+
+  Status s = DB::Open(options, db_name_, cfds, &handles, &db);
+  assert(s.ok());
+  assert(db);
+
+  int flushed_l0_files = 0;
+  for (; flushed_l0_files < 100;) {
+    WriteBatch wb;
+    for (int j = 0; j < 100; ++j) {
+      char key[16];
+      bzero(key, 16);
+      sprintf(key, "foo%.2d", j);
+      ASSERT_OK(wb.Put(handles[0], key, "bar"));
+    }
+
+    WriteOptions wopts;
+    wopts.no_slowdown = true;
+    s = db->Write(wopts, &wb);
+    if (s.ok()) {
+      FlushOptions fopts;
+      fopts.allow_write_stall = true;
+      ASSERT_OK(db->Flush(fopts));
+      ++flushed_l0_files;
+    } else {
+      ASSERT_EQ(s.code(), Status::Code::kIncomplete);
+      break;
+    }
+  }
+
+  // The write loop must be terminated by write stall.
+  ASSERT_EQ(flushed_l0_files, 12);
+  uint64_t stalled = false;
+  db->GetIntProperty(handles[0], "rocksdb.is-write-stalled", &stalled);
+  ASSERT_TRUE(stalled);
+
+  compaction_would_block.store(false, std::memory_order_relaxed);
+  for (size_t i = 0; i < handles.size(); ++i) {
+    delete handles[i];
+  }
+  delete (db);
 }
 
 }  // namespace rocksdb
