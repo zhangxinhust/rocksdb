@@ -32,6 +32,7 @@ enum FileType {
   kLogFile,
   kDBLockFile,
   kTableFile,
+  kDupTableFile,
   kDescriptorFile,
   kCurrentFile,
   kTempFile,

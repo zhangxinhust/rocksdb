@@ -257,7 +257,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                                     const std::string& path_to_sync,
                                     FileType type, uint64_t number) {
   Status file_deletion_status;
-  if (type == kTableFile || type == kLogFile) {
+  if (type == kTableFile || type == kDupTableFile || type == kLogFile) {
     file_deletion_status =
         DeleteDBFile(&immutable_db_options_, fname, path_to_sync,
                      /*force_bg=*/false, /*force_fg=*/!wal_in_db_path_);
@@ -284,7 +284,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                     job_id, fname.c_str(), type, number,
                     file_deletion_status.ToString().c_str());
   }
-  if (type == kTableFile) {
+  if (type == kTableFile || type == kDupTableFile) {
     EventHelpers::LogAndNotifyTableFileDeletion(
         &event_logger_, job_id, number, fname, file_deletion_status, GetName(),
         immutable_db_options_.listeners);
@@ -404,6 +404,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
         // (can happen during manifest roll)
         keep = (number >= state.manifest_file_number);
         break;
+      case kDupTableFile:
       case kTableFile:
         // If the second condition is not there, this makes
         // DontDeletePendingOutputs fail
@@ -460,6 +461,9 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
       // evict from cache
       TableCache::Evict(table_cache_.get(), number);
       fname = MakeTableFileName(candidate_file.file_path, number);
+      dir_to_sync = candidate_file.file_path;
+    } else if (type == kDupTableFile) {
+      fname = MakeDupTableFileName(candidate_file.file_path, number);
       dir_to_sync = candidate_file.file_path;
     } else {
       dir_to_sync =

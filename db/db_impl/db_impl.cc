@@ -2873,7 +2873,7 @@ Status DBImpl::DeleteFile(std::string name) {
   FileType type;
   WalFileType log_type;
   if (!ParseFileName(name, &number, &type, &log_type) ||
-      (type != kTableFile && type != kLogFile)) {
+      (type != kTableFile && type != kDupTableFile && type != kLogFile)) {
     ROCKS_LOG_ERROR(immutable_db_options_.info_log, "DeleteFile %s failed.\n",
                     name.c_str());
     return Status::InvalidArgument("Invalid file name");

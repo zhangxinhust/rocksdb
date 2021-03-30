@@ -50,7 +50,7 @@ TableBuilder* NewTableBuilder(
     uint64_t sample_for_compression, const CompressionOptions& compression_opts,
     int level, const bool skip_filters, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time) {
+    const uint64_t file_creation_time, WritableFileWriter* dup_file) {
   assert((column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          column_family_name.empty());
@@ -61,7 +61,7 @@ TableBuilder* NewTableBuilder(
                           skip_filters, column_family_name, level,
                           creation_time, oldest_key_time, target_file_size,
                           file_creation_time),
-      column_family_id, file);
+      column_family_id, file, dup_file);
 }
 
 Status BuildTable(
@@ -99,6 +99,8 @@ Status BuildTable(
 
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
+  std::string dup_fname = DupTableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
+                                    meta->fd.GetDupPathId());
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
       ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
@@ -108,6 +110,7 @@ Status BuildTable(
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
     TableBuilder* builder;
     std::unique_ptr<WritableFileWriter> file_writer;
+    std::unique_ptr<WritableFileWriter> dup_file_writer;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
     CompressionOptions compression_opts_for_flush(compression_opts);
@@ -115,6 +118,7 @@ Status BuildTable(
     compression_opts_for_flush.zstd_max_train_bytes = 0;
     {
       std::unique_ptr<WritableFile> file;
+      std::unique_ptr<WritableFile> dup_file;
 #ifndef NDEBUG
       bool use_direct_writes = env_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
@@ -126,19 +130,32 @@ Status BuildTable(
             job_id, meta->fd, tp, reason, s);
         return s;
       }
+      s = NewWritableFile(env, dup_fname, &dup_file, env_options);
+      if (!s.ok()) {
+        EventHelpers::LogAndNotifyTableFileCreationFinished(
+            event_logger, ioptions.listeners, dbname, column_family_name, dup_fname,
+            job_id, meta->fd, tp, reason, s);
+        return s;
+      }
       file->SetIOPriority(io_priority);
       file->SetWriteLifeTimeHint(write_hint);
+      dup_file->SetIOPriority(io_priority);
+      dup_file->SetWriteLifeTimeHint(write_hint);
 
       file_writer.reset(
           new WritableFileWriter(std::move(file), fname, env_options, env,
                                  ioptions.statistics, ioptions.listeners));
+      dup_file_writer.reset(
+          new WritableFileWriter(std::move(dup_file), dup_fname, env_options, env,
+                                 ioptions.statistics, ioptions.listeners));
+
       builder = NewTableBuilder(
           ioptions, mutable_cf_options, internal_comparator,
           int_tbl_prop_collector_factories, column_family_id,
           column_family_name, file_writer.get(), compression,
           sample_for_compression, compression_opts_for_flush, level,
           false /* skip_filters */, creation_time, oldest_key_time,
-          0 /*target_file_size*/, file_creation_time);
+          0 /*target_file_size*/, file_creation_time, dup_file_writer.get());
     }
 
     MergeHelper merge(env, internal_comparator.user_comparator(),
@@ -203,9 +220,15 @@ Status BuildTable(
     if (s.ok() && !empty) {
       StopWatch sw(env, ioptions.statistics, TABLE_SYNC_MICROS);
       s = file_writer->Sync(ioptions.use_fsync);
+      if (s.ok()) {
+        s = dup_file_writer->Sync(ioptions.use_fsync);
+      }
     }
     if (s.ok() && !empty) {
       s = file_writer->Close();
+      if (s.ok()) {
+        s = dup_file_writer->Close();
+      }
     }
 
     if (s.ok() && !empty) {
@@ -240,6 +263,7 @@ Status BuildTable(
 
   if (!s.ok() || meta->fd.GetFileSize() == 0) {
     env->DeleteFile(fname);
+    env->DeleteFile(dup_fname);
   }
 
   // Output to event logger and fire events.

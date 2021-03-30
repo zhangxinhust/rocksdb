@@ -35,19 +35,21 @@ struct FileDescriptor {
   // Table reader in table_reader_handle
   TableReader* table_reader;
   uint64_t packed_number_and_path_id;
+  uint32_t dup_path_id;
   uint64_t file_size;  // File size in bytes
   SequenceNumber smallest_seqno;  // The smallest seqno in this file
   SequenceNumber largest_seqno;   // The largest seqno in this file
 
-  FileDescriptor() : FileDescriptor(0, 0, 0) {}
+  FileDescriptor() : FileDescriptor(0, 0, 0, -1) {}
 
-  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size)
-      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0) {}
+  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, uint32_t dup_path_id = -1)
+      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0, dup_path_id) {}
 
   FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size,
-                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno)
+                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno, uint32_t _dup_path_id = -1)
       : table_reader(nullptr),
         packed_number_and_path_id(PackFileNumberAndPathId(number, path_id)),
+        dup_path_id(_dup_path_id),
         file_size(_file_size),
         smallest_seqno(_smallest_seqno),
         largest_seqno(_largest_seqno) {}
@@ -57,6 +59,7 @@ struct FileDescriptor {
   FileDescriptor& operator=(const FileDescriptor& fd) {
     table_reader = fd.table_reader;
     packed_number_and_path_id = fd.packed_number_and_path_id;
+    dup_path_id = fd.dup_path_id;
     file_size = fd.file_size;
     smallest_seqno = fd.smallest_seqno;
     largest_seqno = fd.largest_seqno;
@@ -69,6 +72,9 @@ struct FileDescriptor {
   uint32_t GetPathId() const {
     return static_cast<uint32_t>(
         packed_number_and_path_id / (kFileNumberMask + 1));
+  }
+  uint32_t GetDupPathId() const {
+    return dup_path_id;
   }
   uint64_t GetFileSize() const { return file_size; }
 };

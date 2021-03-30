@@ -216,7 +216,8 @@ Compaction::Compaction(VersionStorageInfo* vstorage,
                        std::vector<FileMetaData*> _grandparents,
                        bool _manual_compaction, double _score,
                        bool _deletion_compaction,
-                       CompactionReason _compaction_reason)
+                       CompactionReason _compaction_reason,
+                       uint32_t _output_dup_path_id)
     : input_vstorage_(vstorage),
       start_level_(_inputs[0].level),
       output_level_(_output_level),
@@ -229,6 +230,7 @@ Compaction::Compaction(VersionStorageInfo* vstorage,
       number_levels_(vstorage->num_levels()),
       cfd_(nullptr),
       output_path_id_(_output_path_id),
+      output_dup_path_id_(_output_dup_path_id)
       output_compression_(_compression),
       output_compression_opts_(_compression_opts),
       deletion_compaction_(_deletion_compaction),

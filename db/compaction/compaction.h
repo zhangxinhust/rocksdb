@@ -79,7 +79,8 @@ class Compaction {
              std::vector<FileMetaData*> grandparents,
              bool manual_compaction = false, double score = -1,
              bool deletion_compaction = false,
-             CompactionReason compaction_reason = CompactionReason::kUnknown);
+             CompactionReason compaction_reason = CompactionReason::kUnknown,
+             uint32_t output_dup_path_id = -1);
 
   // No copying allowed
   Compaction(const Compaction&) = delete;
@@ -167,6 +168,7 @@ class Compaction {
 
   // Whether need to write output file to second DB path.
   uint32_t output_path_id() const { return output_path_id_; }
+  uint32_t output_dup_path_id() const { return output_dup_path_id_; }
 
   // Is this a trivial compaction that can be implemented by just
   // moving a single input file to the next level (no merging or splitting)
@@ -340,6 +342,7 @@ class Compaction {
   Arena arena_;  // Arena used to allocate space for file_levels_
 
   const uint32_t output_path_id_;
+  const uint32_t output_dup_path_id_;
   CompressionType output_compression_;
   CompressionOptions output_compression_opts_;
   // If true, then the comaction can be done by simply deleting input files.

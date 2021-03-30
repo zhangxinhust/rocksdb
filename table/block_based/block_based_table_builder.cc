@@ -281,6 +281,7 @@ struct BlockBasedTableBuilder::Rep {
   const BlockBasedTableOptions table_options;
   const InternalKeyComparator& internal_comparator;
   WritableFileWriter* file;
+  WritableFileWriter* dup_file;
   uint64_t offset = 0;
   Status status;
   size_t alignment;
@@ -365,12 +366,13 @@ struct BlockBasedTableBuilder::Rep {
       const CompressionOptions& _compression_opts, const bool skip_filters,
       const std::string& _column_family_name, const uint64_t _creation_time,
       const uint64_t _oldest_key_time, const uint64_t _target_file_size,
-      const uint64_t _file_creation_time)
+      const uint64_t _file_creation_time, WritableFileWriter* dup_f)
       : ioptions(_ioptions),
         moptions(_moptions),
         table_options(table_opt),
         internal_comparator(icomparator),
         file(f),
+        dup_file(dup_f),
         alignment(table_options.block_align
                       ? std::min(table_options.block_size, kDefaultPageSize)
                       : 0),
@@ -456,7 +458,7 @@ BlockBasedTableBuilder::BlockBasedTableBuilder(
     const CompressionOptions& compression_opts, const bool skip_filters,
     const std::string& column_family_name, const uint64_t creation_time,
     const uint64_t oldest_key_time, const uint64_t target_file_size,
-    const uint64_t file_creation_time) {
+    const uint64_t file_creation_time, WritableFileWriter* dup_file) {
   BlockBasedTableOptions sanitized_table_options(table_options);
   if (sanitized_table_options.format_version == 0 &&
       sanitized_table_options.checksum != kCRC32c) {
@@ -474,7 +476,7 @@ BlockBasedTableBuilder::BlockBasedTableBuilder(
               int_tbl_prop_collector_factories, column_family_id, file,
               compression_type, sample_for_compression, compression_opts,
               skip_filters, column_family_name, creation_time, oldest_key_time,
-              target_file_size, file_creation_time);
+              target_file_size, file_creation_time, dup_file);
 
   if (rep_->filter_builder != nullptr) {
     rep_->filter_builder->StartBlock(0);
@@ -724,6 +726,9 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
   handle->set_size(block_contents.size());
   assert(r->status.ok());
   r->status = r->file->Append(block_contents);
+  if (r->status.ok() && r->dup_file) {
+    r->status = r->dup_file->Append(block_contents);
+  }
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
@@ -766,6 +771,9 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
         "BlockBasedTableBuilder::WriteRawBlock:TamperWithChecksum",
         static_cast<char*>(trailer));
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
+    if (r->status.ok() && r->dup_file) {
+      r->status = r->dup_file->Append(Slice(trailer, kBlockTrailerSize));
+    }
     if (r->status.ok()) {
       r->status = InsertBlockInCache(block_contents, type, handle);
     }
@@ -777,6 +785,9 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
                              (r->alignment - 1))) &
             (r->alignment - 1);
         r->status = r->file->Pad(pad_bytes);
+        if (r->status.ok() && r->dup_file) {
+          r->status = r->dup_file->Pad(pad_bytes);
+        }
         if (r->status.ok()) {
           r->offset += pad_bytes;
         }
@@ -1052,6 +1063,9 @@ void BlockBasedTableBuilder::WriteFooter(BlockHandle& metaindex_block_handle,
   footer.EncodeTo(&footer_encoding);
   assert(r->status.ok());
   r->status = r->file->Append(footer_encoding);
+  if (r->status.ok() && r->dup_file) {
+    r->status = r->dup_file->Append(footer_encoding);
+  }
   if (r->status.ok()) {
     r->offset += footer_encoding.size();
   }

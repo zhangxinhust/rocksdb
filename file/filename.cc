@@ -22,6 +22,7 @@
 namespace rocksdb {
 
 static const std::string kRocksDbTFileExt = "sst";
+static const std::string kRocksDbDupTFileExt = "dupsst";
 static const std::string kLevelDbTFileExt = "ldb";
 static const std::string kRocksDBBlobFileExt = "blob";
 static const std::string kUnencryptedTempFileNameSuffix = "dbtmp.plain";
@@ -121,6 +122,10 @@ std::string MakeTableFileName(const std::string& path, uint64_t number) {
   return MakeFileName(path, number, kRocksDbTFileExt.c_str());
 }
 
+std::string MakeDupTableFileName(const std::string& path, uint64_t number) {
+  return MakeFileName(path, number, kRocksDbDupTFileExt.c_str());
+}
+
 std::string Rocks2LevelTableFileName(const std::string& fullname) {
   assert(fullname.size() > kRocksDbTFileExt.size() + 1);
   if (fullname.size() <= kRocksDbTFileExt.size() + 1) {
@@ -151,6 +156,18 @@ std::string TableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
     path = db_paths[path_id].path;
   }
   return MakeTableFileName(path, number);
+}
+
+std::string DupTableFileName(const std::vector<DbPath>& db_paths, uint64_t number,
+                          uint32_t path_id) {
+  assert(number > 0);
+  std::string path;
+  if (path_id >= db_paths.size()) {
+    path = db_paths.back().path;
+  } else {
+    path = db_paths[path_id].path;
+  }
+  return MakeDupTableFileName(path, number);
 }
 
 void FormatFileNumber(uint64_t number, uint32_t path_id, char* out_buf,
@@ -374,6 +391,8 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
     } else if (suffix == Slice(kRocksDbTFileExt) ||
                suffix == Slice(kLevelDbTFileExt)) {
       *type = kTableFile;
+    } else if (suffix == Slice(kRocksDbDupTFileExt)) {
+      *type = kDupTableFile;
     } else if (suffix == Slice(kRocksDBBlobFileExt)) {
       *type = kBlobFile;
     } else if (suffix == Slice(kTempFileNameSuffix)) {

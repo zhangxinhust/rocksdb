@@ -127,7 +127,9 @@ struct CompactionJob::SubcompactionState {
   // State kept for output being generated
   std::vector<Output> outputs;
   std::unique_ptr<WritableFileWriter> outfile;
+  std::unique_ptr<WritableFileWriter> dup_outfile;
   std::unique_ptr<TableBuilder> builder;
+  std::unique_ptr<TableBuilder> dup_builder;
   Output* current_output() {
     if (outputs.empty()) {
       // This subcompaction's outptut could be empty if compaction was aborted
@@ -1354,6 +1356,13 @@ Status CompactionJob::FinishCompactionOutputFile(
                       meta->fd.GetNumber(), meta->fd.GetPathId());
     env_->DeleteFile(fname);
 
+    if (sub_compact->compaction->output_level() <= 1) {
+      std::string dup_fname =
+          TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
+                        meta->fd.GetNumber(), meta->fd.GetDupPathId());
+      env_->DeleteFile(dup_fname);
+    }
+
     // Also need to remove the file from outputs, or it will be added to the
     // VersionEdit.
     assert(!sub_compact->outputs.empty());
@@ -1466,9 +1475,15 @@ Status CompactionJob::OpenCompactionOutputFile(
   assert(sub_compact->builder == nullptr);
   // no need to lock because VersionSet::next_file_number_ is atomic
   uint64_t file_number = versions_->NewFileNumber();
+  bool is_output_level_01 = sub_compact->compaction->output_level() <= 1;
   std::string fname =
       TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                     file_number, sub_compact->compaction->output_path_id());
+  std::string dup_fname;
+  if (is_output_level_01) {
+    dup_fname = DupTableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
+                    file_number, sub_compact->compaction->output_dup_path_id());
+  }
   // Fire events.
   ColumnFamilyData* cfd = sub_compact->compaction->column_family_data();
 #ifndef ROCKSDB_LITE
@@ -1478,6 +1493,7 @@ Status CompactionJob::OpenCompactionOutputFile(
 #endif  // !ROCKSDB_LITE
   // Make the output file
   std::unique_ptr<WritableFile> writable_file;
+  std::unique_ptr<WritableFile> dup_writable_file;
 #ifndef NDEBUG
   bool syncpoint_arg = env_options_.use_direct_writes;
   TEST_SYNC_POINT_CALLBACK("CompactionJob::OpenCompactionOutputFile",
@@ -1499,20 +1515,45 @@ Status CompactionJob::OpenCompactionOutputFile(
     return s;
   }
 
+  if (is_output_level_01) {
+    s = NewWritableFile(env_, dup_fname, &dup_writable_file, env_options_);
+    if (!s.ok()) {
+      ROCKS_LOG_ERROR(
+          db_options_.info_log,
+          "[%s] [JOB %d] OpenCompactionOutputFiles for table #%" PRIu64
+          " fails at NewWritableFile with status %s",
+          sub_compact->compaction->column_family_data()->GetName().c_str(),
+          job_id_, file_number, s.ToString().c_str());
+      LogFlush(db_options_.info_log);
+      EventHelpers::LogAndNotifyTableFileCreationFinished(
+          event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(),
+          dup_fname, job_id_, FileDescriptor(), TableProperties(),
+          TableFileCreationReason::kCompaction, s);
+      return s;
+    }
+  }
+
   SubcompactionState::Output out;
   out.meta.fd =
-      FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0);
+      FileDescriptor(file_number, sub_compact->compaction->output_path_id(), 0, sub_compact->compaction->output_dup_path_id());
   out.finished = false;
 
   sub_compact->outputs.push_back(out);
+  uint64_t pre_alloc_size = sub_compact->compaction->OutputFilePreallocationSize();
   writable_file->SetIOPriority(Env::IO_LOW);
   writable_file->SetWriteLifeTimeHint(write_hint_);
-  writable_file->SetPreallocationBlockSize(static_cast<size_t>(
-      sub_compact->compaction->OutputFilePreallocationSize()));
+  writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
+  dup_writable_file->SetIOPriority(Env::IO_LOW);
+  dup_writable_file->SetWriteLifeTimeHint(write_hint_);
+  dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
+
   const auto& listeners =
       sub_compact->compaction->immutable_cf_options()->listeners;
   sub_compact->outfile.reset(
       new WritableFileWriter(std::move(writable_file), fname, env_options_,
+                             env_, db_options_.statistics.get(), listeners));
+  sub_compact->dup_outfile.reset(
+      new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
                              env_, db_options_.statistics.get(), listeners));
 
   // If the Column family flag is to only optimize filters for hits,
