@@ -42,8 +42,8 @@ struct FileDescriptor {
 
   FileDescriptor() : FileDescriptor(0, 0, 0, -1) {}
 
-  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, uint32_t dup_path_id = -1)
-      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0, dup_path_id) {}
+  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, uint32_t _dup_path_id = -1)
+      : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0, _dup_path_id) {}
 
   FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size,
                  SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno, uint32_t _dup_path_id = -1)

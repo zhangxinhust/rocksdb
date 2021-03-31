@@ -230,7 +230,7 @@ Compaction::Compaction(VersionStorageInfo* vstorage,
       number_levels_(vstorage->num_levels()),
       cfd_(nullptr),
       output_path_id_(_output_path_id),
-      output_dup_path_id_(_output_dup_path_id)
+      output_dup_path_id_(_output_dup_path_id),
       output_compression_(_compression),
       output_compression_opts_(_compression_opts),
       deletion_compaction_(_deletion_compaction),

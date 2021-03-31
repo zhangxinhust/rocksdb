@@ -209,7 +209,7 @@ Status BlockBasedTableFactory::NewTableReader(
 
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file) const {
+    WritableFileWriter* file, WritableFileWriter* dup_file) const {
   auto table_builder = new BlockBasedTableBuilder(
       table_builder_options.ioptions, table_builder_options.moptions,
       table_options_, table_builder_options.internal_comparator,
@@ -222,7 +222,8 @@ TableBuilder* BlockBasedTableFactory::NewTableBuilder(
       table_builder_options.creation_time,
       table_builder_options.oldest_key_time,
       table_builder_options.target_file_size,
-      table_builder_options.file_creation_time);
+      table_builder_options.file_creation_time,
+      dup_file);
 
   return table_builder;
 }
