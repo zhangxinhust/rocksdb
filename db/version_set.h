@@ -729,7 +729,7 @@ struct ObsoleteFileInfo {
 
   ObsoleteFileInfo() noexcept : metadata(nullptr) {}
   ObsoleteFileInfo(FileMetaData* f, const std::string& file_path, const std::string& dup_file_path = "")
-      : metadata(f), path(file_path) {}
+      : metadata(f), path(file_path), dup_path(dup_file_path) {}
 
   ObsoleteFileInfo(const ObsoleteFileInfo&) = delete;
   ObsoleteFileInfo& operator=(const ObsoleteFileInfo&) = delete;

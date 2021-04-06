@@ -1543,19 +1543,22 @@ Status CompactionJob::OpenCompactionOutputFile(
   writable_file->SetIOPriority(Env::IO_LOW);
   writable_file->SetWriteLifeTimeHint(write_hint_);
   writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
-  dup_writable_file->SetIOPriority(Env::IO_LOW);
-  dup_writable_file->SetWriteLifeTimeHint(write_hint_);
-  dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
+  if (is_output_level_01) {
+    dup_writable_file->SetIOPriority(Env::IO_LOW);
+    dup_writable_file->SetWriteLifeTimeHint(write_hint_);
+    dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
+  }
 
   const auto& listeners =
       sub_compact->compaction->immutable_cf_options()->listeners;
   sub_compact->outfile.reset(
       new WritableFileWriter(std::move(writable_file), fname, env_options_,
                              env_, db_options_.statistics.get(), listeners));
-  sub_compact->dup_outfile.reset(
-      new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
-                             env_, db_options_.statistics.get(), listeners));
-
+  if (is_output_level_01) {
+    sub_compact->dup_outfile.reset(
+        new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
+                               env_, db_options_.statistics.get(), listeners));
+  }
   // If the Column family flag is to only optimize filters for hits,
   // we can skip creating filters if this is the bottommost_level where
   // data is going to be found

@@ -753,6 +753,9 @@ Version::~Version() {
         vset_->obsolete_files_.push_back(
             ObsoleteFileInfo(f, cfd_->ioptions()->cf_paths[path_id].path,
             dup_path_id != kDisablePathId ? cfd_->ioptions()->cf_paths[dup_path_id].path : ""));
+        if (dup_path_id != kDisablePathId) {
+          fprintf(stdout, "dup_path: %s.\n", cfd_->ioptions()->cf_paths[dup_path_id].path.c_str());
+        }
       }
     }
   }

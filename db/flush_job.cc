@@ -185,7 +185,7 @@ void FlushJob::PickMemTable() {
 
   // path 0 for level 0 file.
   meta_.fd = FileDescriptor(versions_->NewFileNumber(), 0, 0, 1);
-  fprintf(stdout, "PickMemTable FileMetaData, num: %lu, path: %lu, dup_path: %lu", meta_.fd.GetNumber(),
+  fprintf(stdout, "PickMemTable FileMetaData, num: %lu, path: %u, dup_path: %u.\n", meta_.fd.GetNumber(),
             meta_.fd.GetPathId(), meta_.fd.GetDupPathId());
 
   base_ = cfd_->current();
