@@ -747,9 +747,12 @@ Version::~Version() {
       if (f->refs <= 0) {
         assert(cfd_ != nullptr);
         uint32_t path_id = f->fd.GetPathId();
+        uint32_t dup_path_id = f->fd.GetDupPathId();
+        fprintf(stdout, "~Version DupPathId: %u, level: %d, num: %lu.\n", dup_path_id, level, f->fd.GetNumber());
         assert(path_id < cfd_->ioptions()->cf_paths.size());
         vset_->obsolete_files_.push_back(
-            ObsoleteFileInfo(f, cfd_->ioptions()->cf_paths[path_id].path));
+            ObsoleteFileInfo(f, cfd_->ioptions()->cf_paths[path_id].path,
+            dup_path_id != kDisablePathId ? cfd_->ioptions()->cf_paths[dup_path_id].path : ""));
       }
     }
   }
@@ -4896,7 +4899,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
           edit.AddFile(level, f->fd.GetNumber(), f->fd.GetPathId(),
                        f->fd.GetFileSize(), f->smallest, f->largest,
                        f->fd.smallest_seqno, f->fd.largest_seqno,
-                       f->marked_for_compaction);
+                       f->marked_for_compaction, f->fd.GetDupPathId());
         }
       }
       edit.SetLogNumber(cfd->GetLogNumber());

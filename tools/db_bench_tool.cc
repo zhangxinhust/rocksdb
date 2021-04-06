@@ -259,6 +259,9 @@ DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
 DEFINE_int64(batch_size, 1, "Batch size");
 
+DEFINE_string(db_paths, "", "The path for L0 and L1");
+DEFINE_string(db_paths2, "", "The path for L2 and upper levels");
+
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
 }
@@ -3450,6 +3453,12 @@ class Benchmark {
     options.use_direct_reads = FLAGS_use_direct_reads;
     options.use_direct_io_for_flush_and_compaction =
         FLAGS_use_direct_io_for_flush_and_compaction;
+    if (FLAGS_db_paths.length() && FLAGS_db_paths2.length()) {
+      options.db_paths = std::vector<rocksdb::DbPath>();
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths, 2l * FLAGS_max_bytes_for_level_base));
+      options.db_paths.push_back(rocksdb::DbPath(FLAGS_db_paths2, 100l * FLAGS_max_bytes_for_level_base));
+    }
+
 #ifndef ROCKSDB_LITE
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(

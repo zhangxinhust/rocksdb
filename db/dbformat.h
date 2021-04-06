@@ -88,6 +88,8 @@ inline bool IsExtendedValueType(ValueType t) {
   return IsValueType(t) || t == kTypeRangeDeletion;
 }
 
+static const uint32_t kDisablePathId = port::kMaxUint32;
+
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
 static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1);

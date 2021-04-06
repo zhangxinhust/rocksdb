@@ -1105,6 +1105,8 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
   auto pending_outputs_inserted_elem =
       CaptureCurrentFileNumberInPendingOutputs();
   meta.fd = FileDescriptor(versions_->NewFileNumber(), 0, 0, 1);
+  fprintf(stdout, "FileMetaData from recovery, num: %lu, path: %u, dup_path: %u", meta.fd.GetNumber(),
+            meta.fd.GetPathId(), meta.fd.GetDupPathId());
   ReadOptions ro;
   ro.total_order_seek = true;
   Arena arena;
@@ -1175,7 +1177,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
     edit->AddFile(level, meta.fd.GetNumber(), meta.fd.GetPathId(),
                   meta.fd.GetFileSize(), meta.smallest, meta.largest,
                   meta.fd.smallest_seqno, meta.fd.largest_seqno,
-                  meta.marked_for_compaction);
+                  meta.marked_for_compaction, meta.fd.GetDupPathId());
   }
 
   InternalStats::CompactionStats stats(CompactionReason::kFlush, 1);

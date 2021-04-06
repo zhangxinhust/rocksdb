@@ -146,7 +146,10 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
         // https://github.com/facebook/rocksdb/issues/3573
         if (!ParseFileName(file, &number, info_log_prefix.prefix, &type) ||
             !ShouldPurge(number)) {
+          fprintf(stdout, "parse fail or shouldn't purge in full scan: %s.\n", file.c_str());
           continue;
+        } else if (type == kDupTableFile) {
+          fprintf(stdout, "kDupTableFile %lu added in full scan.\n", number);
         }
 
         // TODO(icanadi) clean up this mess to avoid having one-off "/" prefixes
@@ -322,6 +325,14 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
     candidate_files.emplace_back(
         MakeTableFileName(kDumbDbName, file.metadata->fd.GetNumber()),
         file.path);
+    if (file.dup_path != "") { // file.metadata->fd.GetDupPathId() != -1
+       fprintf(stdout, "file.dup_path: %s, %lu.\n", file.dup_path.c_str(), file.metadata->fd.GetNumber());
+       candidate_files.emplace_back(
+          MakeDupTableFileName(kDumbDbName, file.metadata->fd.GetNumber()),
+          file.dup_path);
+    } else {
+      fprintf(stdout, "file.dup_path is null, %lu.\n", file.metadata->fd.GetNumber());
+    }
     if (file.metadata->table_reader_handle) {
       table_cache_->Release(file.metadata->table_reader_handle);
     }

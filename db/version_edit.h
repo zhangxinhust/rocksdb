@@ -40,13 +40,13 @@ struct FileDescriptor {
   SequenceNumber smallest_seqno;  // The smallest seqno in this file
   SequenceNumber largest_seqno;   // The largest seqno in this file
 
-  FileDescriptor() : FileDescriptor(0, 0, 0, -1) {}
+  FileDescriptor() : FileDescriptor(0, 0, 0, kDisablePathId) {}
 
-  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, uint32_t _dup_path_id = -1)
+  FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size, uint32_t _dup_path_id = kDisablePathId)
       : FileDescriptor(number, path_id, _file_size, kMaxSequenceNumber, 0, _dup_path_id) {}
 
   FileDescriptor(uint64_t number, uint32_t path_id, uint64_t _file_size,
-                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno, uint32_t _dup_path_id = -1)
+                 SequenceNumber _smallest_seqno, SequenceNumber _largest_seqno, uint32_t _dup_path_id = kDisablePathId)
       : table_reader(nullptr),
         packed_number_and_path_id(PackFileNumberAndPathId(number, path_id)),
         dup_path_id(_dup_path_id),
@@ -248,11 +248,11 @@ class VersionEdit {
                uint64_t file_size, const InternalKey& smallest,
                const InternalKey& largest, const SequenceNumber& smallest_seqno,
                const SequenceNumber& largest_seqno,
-               bool marked_for_compaction) {
+               bool marked_for_compaction, uint32_t dup_file_path_id = kDisablePathId) {
     assert(smallest_seqno <= largest_seqno);
     FileMetaData f;
     f.fd = FileDescriptor(file, file_path_id, file_size, smallest_seqno,
-                          largest_seqno);
+                          largest_seqno, dup_file_path_id);
     f.smallest = smallest;
     f.largest = largest;
     f.fd.smallest_seqno = smallest_seqno;

@@ -185,6 +185,8 @@ void FlushJob::PickMemTable() {
 
   // path 0 for level 0 file.
   meta_.fd = FileDescriptor(versions_->NewFileNumber(), 0, 0, 1);
+  fprintf(stdout, "PickMemTable FileMetaData, num: %lu, path: %lu, dup_path: %lu", meta_.fd.GetNumber(),
+            meta_.fd.GetPathId(), meta_.fd.GetDupPathId());
 
   base_ = cfd_->current();
   base_->Ref();  // it is likely that we do not need this reference
@@ -408,7 +410,7 @@ Status FlushJob::WriteLevel0Table() {
     edit_->AddFile(0 /* level */, meta_.fd.GetNumber(), meta_.fd.GetPathId(),
                    meta_.fd.GetFileSize(), meta_.smallest, meta_.largest,
                    meta_.fd.smallest_seqno, meta_.fd.largest_seqno,
-                   meta_.marked_for_compaction);
+                   meta_.marked_for_compaction, meta_.fd.GetDupPathId());
   }
 #ifndef ROCKSDB_LITE
   // Piggyback FlushJobInfo on the first first flushed memtable.

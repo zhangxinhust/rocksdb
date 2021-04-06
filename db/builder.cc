@@ -101,6 +101,9 @@ Status BuildTable(
                                     meta->fd.GetPathId());
   std::string dup_fname = DupTableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetDupPathId());
+  fprintf(stdout, "BuildTable num: %lu, path: %lu, dup_path: %u.\n", meta->fd.GetNumber(),
+        meta->fd.GetPathId(), meta->fd.GetDupPathId());
+
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
       ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
