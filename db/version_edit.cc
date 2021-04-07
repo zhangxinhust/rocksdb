@@ -56,6 +56,7 @@ enum CustomTag : uint32_t {
   // removed when manifest becomes forward-comptabile.
   kMinLogNumberToKeepHack = 3,
   kPathId = 65,
+  kDupPathId,
 };
 // If this bit for the custom tag is set, opening DB should fail if
 // we don't know this field.
@@ -135,6 +136,7 @@ bool VersionEdit::EncodeTo(std::string* dst) const {
       PutVarint32(dst, kNewFile3);
     }
     PutVarint32Varint64(dst, new_files_[i].first /* level */, f.fd.GetNumber());
+    PutVarint32(dst, f.fd.GetDupPathId());
     if (f.fd.GetPathId() != 0 && !has_customized_fields) {
       // kNewFile3
       PutVarint32(dst, f.fd.GetPathId());
@@ -244,6 +246,7 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
   FileMetaData f;
   uint64_t number;
   uint32_t path_id = 0;
+  uint32_t dup_path_id = kDisablePathId;
   uint64_t file_size;
   SequenceNumber smallest_seqno;
   SequenceNumber largest_seqno;
@@ -251,6 +254,7 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
   // extension into this record. When we do, we set this boolean to distinguish
   // the record from the normal NewFile records.
   if (GetLevel(input, &level, &msg) && GetVarint64(input, &number) &&
+      GetVarint32(input, &dup_path_id) &&
       GetVarint64(input, &file_size) && GetInternalKey(input, &f.smallest) &&
       GetInternalKey(input, &f.largest) &&
       GetVarint64(input, &smallest_seqno) &&
@@ -304,7 +308,7 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
     return "new-file4 entry";
   }
   f.fd =
-      FileDescriptor(number, path_id, file_size, smallest_seqno, largest_seqno);
+      FileDescriptor(number, path_id, file_size, smallest_seqno, largest_seqno, dup_path_id);
   new_files_.push_back(std::make_pair(level, f));
   return nullptr;
 }
@@ -423,17 +427,19 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
       }
       case kNewFile2: {
         uint64_t number;
+        uint32_t dup_path_id = kDisablePathId;
         uint64_t file_size;
         SequenceNumber smallest_seqno;
         SequenceNumber largest_seqno;
         if (GetLevel(&input, &level, &msg) && GetVarint64(&input, &number) &&
+            GetVarint32(&input, &dup_path_id) &&
             GetVarint64(&input, &file_size) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest) &&
             GetVarint64(&input, &smallest_seqno) &&
             GetVarint64(&input, &largest_seqno)) {
           f.fd = FileDescriptor(number, 0, file_size, smallest_seqno,
-                                largest_seqno);
+                                largest_seqno, dup_path_id);
           new_files_.push_back(std::make_pair(level, f));
         } else {
           if (!msg) {
@@ -446,17 +452,19 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
       case kNewFile3: {
         uint64_t number;
         uint32_t path_id;
+        uint32_t dup_path_id = kDisablePathId;
         uint64_t file_size;
         SequenceNumber smallest_seqno;
         SequenceNumber largest_seqno;
         if (GetLevel(&input, &level, &msg) && GetVarint64(&input, &number) &&
+            GetVarint32(&input, &dup_path_id) &&
             GetVarint32(&input, &path_id) && GetVarint64(&input, &file_size) &&
             GetInternalKey(&input, &f.smallest) &&
             GetInternalKey(&input, &f.largest) &&
             GetVarint64(&input, &smallest_seqno) &&
             GetVarint64(&input, &largest_seqno)) {
           f.fd = FileDescriptor(number, path_id, file_size, smallest_seqno,
-                                largest_seqno);
+                                largest_seqno, dup_path_id);
           new_files_.push_back(std::make_pair(level, f));
         } else {
           if (!msg) {
