@@ -716,6 +716,87 @@ void BlockBasedTableBuilder::WriteBlock(const Slice& raw_block_contents,
   }
 }
 
+  struct FileAppendArg {
+    WritableFileWriter *file;
+    Slice contents;
+    char *data;
+    size_t size;
+    //const char trailor[kBlockTrailerSize];
+    Status *s;
+    bool is_pad;
+    size_t pad_bytes;
+
+    FileAppendArg () {
+      file = nullptr;
+      data = nullptr;
+      size = 0;
+      s = nullptr;
+      is_pad = false;
+      pad_bytes = 0;
+    }
+
+    FileAppendArg(const Slice& slice) {
+      file = nullptr;
+      size = slice.size();
+      data = new char[size + 1];
+      strncpy(data, slice.data(), size);
+      contents = std::move(Slice(data, size));
+      fprintf(stdout, "slice size: %lu, size: %lu, content.size: %lu.\n",
+            slice.size(), size, contents.size());
+      is_pad = false;
+      pad_bytes = 0;
+    }
+
+    FileAppendArg(const char *d, size_t n) {
+      file = nullptr;
+      size = n;
+      data = new char[size + 1];
+      strncpy(data, d, size);
+      contents = std::move(Slice(data, size));
+      fprintf(stdout, "n: %lu, size: %lu, content.size: %lu.\n",
+            n, size, contents.size());
+      is_pad = false;
+      pad_bytes = 0;
+    }
+
+    FileAppendArg (const FileAppendArg& faa) {
+      *this = faa;
+    }
+
+    FileAppendArg& operator= (const FileAppendArg& faa) { // ??
+      file = faa.file;
+      contents = faa.contents;
+      data = faa.data;
+      size = faa.size;
+      s = faa.s;
+      is_pad = faa.is_pad;
+      pad_bytes = faa.pad_bytes;
+      return *this;
+    }
+  };
+
+void BlockBasedTableBuilder::BGWorkFileAppend(void* arg) {
+  FileAppendArg faa = *(reinterpret_cast<FileAppendArg*>(arg));
+  //delete reinterpret_cast<FileAppendArg*>(arg);
+
+  //IOSTATS_SET_THREAD_POOL_ID(Env::Priority::HIGH);
+  TEST_SYNC_POINT("BlockBasedTableBuilder::BGWorkFileAppend");
+  if (!faa.is_pad) {
+    //*(faa.s) = reinterpret_cast<WritableFileWriter*>(faa.file)->Append(*(faa.contents));
+    fprintf(stdout, "BGWorkFileAppend1 size: %lu.\n", faa.contents.size());
+    *(faa.s) = faa.file->Append(faa.contents);
+  } else {
+    fprintf(stdout, "BGWorkFileAppend2 size: %lu.\n", faa.pad_bytes);
+    *(faa.s) = faa.file->Pad(faa.pad_bytes);
+  }
+  TEST_SYNC_POINT("BlockBasedTableBuilder::BGWorkFileAppend:done");
+}
+
+void BlockBasedTableBuilder::UnscheduleFileAppendCallBack(void* arg) {
+  //delete reinterpret_cast<FileAppendArg*>(arg);
+  TEST_SYNC_POINT("BlockBasedTableBuilder::UnscheduleFileAppendCallBack");
+}
+
 void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
                                            CompressionType type,
                                            BlockHandle* handle,
@@ -725,10 +806,27 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
   handle->set_offset(r->offset);
   handle->set_size(block_contents.size());
   assert(r->status.ok());
+  bool should_write_dup_file = r->dup_file && r->ioptions.env;
+
   r->status = r->file->Append(block_contents);
   if (r->status.ok() && r->dup_file) {
     r->status = r->dup_file->Append(block_contents);
   }
+  /*
+  if (r->status.ok() && should_write_dup_file) {
+    std::unique_ptr<FileAppendArg> faa1(new FileAppendArg(block_contents));
+    faa1->file = r->dup_file;
+    faa1->s = &r->status;
+    faa1->is_pad = false;
+    if (faa1->contents.size() == 0) {
+      fprintf(stdout, "schedule 1, contents null.\n");
+    }
+    //fprintf(stdout, "Schedule 1, size: %lu.  ", block_contents.size());
+    r->ioptions.env->Schedule(&BlockBasedTableBuilder::BGWorkFileAppend, faa1.get(), Env::Priority::HIGH, this,
+                              &BlockBasedTableBuilder::UnscheduleFileAppendCallBack);
+  }
+  */
+
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
@@ -774,6 +872,21 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
     if (r->status.ok() && r->dup_file) {
       r->status = r->dup_file->Append(Slice(trailer, kBlockTrailerSize));
     }
+    /*
+    if (r->status.ok() && should_write_dup_file) {
+      std::unique_ptr<FileAppendArg> faa2(new FileAppendArg(trailer, kBlockTrailerSize));
+      faa2->file = r->dup_file;
+      faa2->s = &r->status;
+      faa2->is_pad = false;
+      if (faa2->contents.size() == 0) {
+        fprintf(stdout, "schedule 2, contents null.\n");
+      }
+      //fprintf(stdout, "Schedule 2, size: %lu.  ", contents.size());
+      r->ioptions.env->Schedule(&BlockBasedTableBuilder::BGWorkFileAppend, faa2.get(), Env::Priority::HIGH, this,
+                                &BlockBasedTableBuilder::UnscheduleFileAppendCallBack);
+    }
+    */
+
     if (r->status.ok()) {
       r->status = InsertBlockInCache(block_contents, type, handle);
     }
@@ -788,6 +901,21 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
         if (r->status.ok() && r->dup_file) {
           r->status = r->dup_file->Pad(pad_bytes);
         }
+        /*
+        if (r->status.ok() && should_write_dup_file) {
+          std::unique_ptr<FileAppendArg> faa3(new FileAppendArg);
+          //faa.reset(new FileAppendArg);
+          faa3->file = r->dup_file;
+          faa3->s = &r->status;
+          faa3->is_pad = true;
+          //faa3->contents = nullptr;
+          faa3->pad_bytes = pad_bytes;
+          fprintf(stdout, "Schedule 3, size: %lu.  ", pad_bytes);
+          r->ioptions.env->Schedule(&BlockBasedTableBuilder::BGWorkFileAppend, faa3.get(), Env::Priority::HIGH, this,
+                                    &BlockBasedTableBuilder::UnscheduleFileAppendCallBack);
+        }
+        */
+
         if (r->status.ok()) {
           r->offset += pad_bytes;
         }

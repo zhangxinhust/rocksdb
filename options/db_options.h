@@ -43,6 +43,7 @@ struct ImmutableDBOptions {
   uint64_t wal_ttl_seconds;
   uint64_t wal_size_limit_mb;
   size_t manifest_preallocation_size;
+  bool use_double_write;
   bool allow_mmap_reads;
   bool allow_mmap_writes;
   bool use_direct_reads;

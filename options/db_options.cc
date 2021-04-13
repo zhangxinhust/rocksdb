@@ -41,6 +41,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       recycle_log_file_num(options.recycle_log_file_num),
       max_manifest_file_size(options.max_manifest_file_size),
       table_cache_numshardbits(options.table_cache_numshardbits),
+      use_double_write(options.use_double_write),
       wal_ttl_seconds(options.WAL_ttl_seconds),
       wal_size_limit_mb(options.WAL_size_limit_MB),
       manifest_preallocation_size(options.manifest_preallocation_size),

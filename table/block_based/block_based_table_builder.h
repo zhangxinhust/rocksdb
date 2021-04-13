@@ -105,6 +105,10 @@ class BlockBasedTableBuilder : public TableBuilder {
   // Compress and write block content to the file.
   void WriteBlock(const Slice& block_contents, BlockHandle* handle,
                   bool is_data_block);
+
+  static void BGWorkFileAppend(void* arg);
+  static void UnscheduleFileAppendCallBack(void* arg);
+
   // Directly write data to the file.
   void WriteRawBlock(const Slice& data, CompressionType, BlockHandle* handle,
                      bool is_data_block = false);

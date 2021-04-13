@@ -654,6 +654,10 @@ struct DBOptions {
   uint64_t WAL_ttl_seconds = 0;
   uint64_t WAL_size_limit_MB = 0;
 
+  // Write a duplication of L0 & L1 SST to the second path
+  // Default: false
+  bool use_double_write = false;
+
   // Number of bytes to preallocate (via fallocate) the manifest
   // files.  Default is 4mb, which is reasonable to reduce random IO
   // as well as prevent overallocation for mounts that preallocate

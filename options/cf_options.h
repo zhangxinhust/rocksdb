@@ -60,6 +60,8 @@ struct ImmutableCFOptions {
 
   Env* env;
 
+  bool use_double_write;
+
   // Allow the OS to mmap file for reading sst tables. Default: false
   bool allow_mmap_reads;
 
