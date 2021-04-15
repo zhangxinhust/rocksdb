@@ -290,6 +290,91 @@ class PosixEnv : public Env {
     return s;
   }
 
+    virtual Status OpenWritableFile(const std::string& fname,
+                                    WritableFile** result,
+                                    const EnvOptions& options,
+                                    bool reopen = false) {
+      *result = nullptr;
+      Status s;
+      int fd = -1;
+      int flags = (reopen) ? (O_CREAT | O_APPEND) : (O_CREAT | O_TRUNC);
+      // Direct IO mode with O_DIRECT flag or F_NOCAHCE (MAC OSX)
+      if (options.use_direct_writes && !options.use_mmap_writes) {
+        // Note: we should avoid O_APPEND here due to ta the following bug:
+        // POSIX requires that opening a file with the O_APPEND flag should
+        // have no affect on the location at which pwrite() writes data.
+        // However, on Linux, if a file is opened with O_APPEND, pwrite()
+        // appends data to the end of the file, regardless of the value of
+        // offset.
+        // More info here: https://linux.die.net/man/2/pwrite
+#ifdef ROCKSDB_LITE
+        return Status::IOError(fname, "Direct I/O not supported in RocksDB lite");
+#endif  // ROCKSDB_LITE
+        flags |= O_WRONLY;
+#if !defined(OS_MACOSX) && !defined(OS_OPENBSD) && !defined(OS_SOLARIS)
+        flags |= O_DIRECT;
+#endif
+        TEST_SYNC_POINT_CALLBACK("NewWritableFile:O_DIRECT", &flags);
+      } else if (options.use_mmap_writes) {
+        // non-direct I/O
+        flags |= O_RDWR;
+      } else {
+        flags |= O_WRONLY;
+      }
+  
+      flags = cloexec_flags(flags, &options);
+  
+      do {
+        IOSTATS_TIMER_GUARD(open_nanos);
+        fd = open(fname.c_str(), flags, GetDBFileMode(allow_non_owner_access_));
+      } while (fd < 0 && errno == EINTR);
+  
+      if (fd < 0) {
+        s = IOError("While open a file for appending", fname, errno);
+        return s;
+      }
+      SetFD_CLOEXEC(fd, &options);
+  
+      if (options.use_mmap_writes) {
+        if (!checkedDiskForMmap_) {
+          // this will be executed once in the program's lifetime.
+          // do not use mmapWrite on non ext-3/xfs/tmpfs systems.
+          if (!SupportsFastAllocate(fname)) {
+            forceMmapOff_ = true;
+          }
+          checkedDiskForMmap_ = true;
+        }
+      }
+      if (options.use_mmap_writes && !forceMmapOff_) {
+        *result = new PosixMmapFile(fname, fd, page_size_, options);
+      } else if (options.use_direct_writes && !options.use_mmap_writes) {
+#ifdef OS_MACOSX
+        if (fcntl(fd, F_NOCACHE, 1) == -1) {
+          close(fd);
+          s = IOError("While fcntl NoCache an opened file for appending", fname,
+                      errno);
+          return s;
+        }
+#elif defined(OS_SOLARIS)
+        if (directio(fd, DIRECTIO_ON) == -1) {
+          if (errno != ENOTTY) { // ZFS filesystems don't support DIRECTIO_ON
+            close(fd);
+            s = IOError("While calling directio()", fname, errno);
+            return s;
+          }
+        }
+#endif
+        *result = new PosixWritableFile(fname, fd, options);
+      } else {
+        // disable mmap writes
+        EnvOptions no_mmap_writes_options = options;
+        no_mmap_writes_options.use_mmap_writes = false;
+        *result = new PosixWritableFile(fname, fd, no_mmap_writes_options);
+      }
+      return s;
+    }
+
+
   virtual Status OpenWritableFile(const std::string& fname,
                                   std::unique_ptr<WritableFile>* result,
                                   const EnvOptions& options,
@@ -373,6 +458,14 @@ class PosixEnv : public Env {
     }
     return s;
   }
+
+  /*
+  Status NewWritableFile(const std::string& fname,
+                         WritableFile** result,
+                         const EnvOptions& options) override {
+    return OpenWritableFile(fname, result, options, false);
+  }
+  */
 
   Status NewWritableFile(const std::string& fname,
                          std::unique_ptr<WritableFile>* result,

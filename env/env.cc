@@ -108,6 +108,7 @@ RandomAccessFile::~RandomAccessFile() {
 }
 
 WritableFile::~WritableFile() {
+  //fprintf(stdout, "~WritableFile.\n");
 }
 
 MemoryMappedFileBuffer::~MemoryMappedFileBuffer() {}

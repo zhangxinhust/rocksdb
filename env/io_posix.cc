@@ -792,6 +792,7 @@ PosixWritableFile::~PosixWritableFile() {
   if (fd_ >= 0) {
     PosixWritableFile::Close();
   }
+  fprintf(stdout, "%s ~PosixWritableFile.\n", filename_.c_str());
 }
 
 Status PosixWritableFile::Append(const Slice& data) {

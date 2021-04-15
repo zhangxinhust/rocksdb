@@ -198,6 +198,14 @@ class Env {
                                  std::unique_ptr<WritableFile>* result,
                                  const EnvOptions& options) = 0;
 
+  /*
+  virtual Status NewWritableFile(const std::string& fname,
+                                 WritableFile** result,
+                                 const EnvOptions& options) {
+    return Status::OK();
+  }
+  */
+
   // Create an object that writes to a new file with the specified
   // name.  Deletes any existing file with the same name and creates a
   // new file.  On success, stores a pointer to the new file in

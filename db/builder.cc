@@ -97,23 +97,31 @@ Status BuildTable(
     range_del_agg->AddTombstones(std::move(range_del_iter));
   }
 
+  bool is_double_write = ioptions.use_double_write && level <= 1;
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
-  std::string dup_fname = DupTableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
-                                    meta->fd.GetDupPathId());
+  std::string dup_fname;
+  if (is_double_write) {
+    dup_fname = DupTableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
+                                 meta->fd.GetDupPathId());
+  }
   fprintf(stdout, "BuildTable num: %lu, path: %u, dup_path: %u.\n", meta->fd.GetNumber(),
         meta->fd.GetPathId(), meta->fd.GetDupPathId());
 
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
       ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
+  if (is_double_write) {
+    EventHelpers::NotifyTableFileCreationStarted(
+        ioptions.listeners, dbname, column_family_name, fname, job_id, reason);
+  }
 #endif  // !ROCKSDB_LITE
   TableProperties tp;
 
   if (iter->Valid() || !range_del_agg->IsEmpty()) {
-    TableBuilder* builder;
+    TableBuilder* builder = nullptr;
     std::unique_ptr<WritableFileWriter> file_writer;
-    std::unique_ptr<WritableFileWriter> dup_file_writer;
+    WritableFileWriter* dup_file_writer = nullptr;
     // Currently we only enable dictionary compression during compaction to the
     // bottommost level.
     CompressionOptions compression_opts_for_flush(compression_opts);
@@ -122,6 +130,7 @@ Status BuildTable(
     {
       std::unique_ptr<WritableFile> file;
       std::unique_ptr<WritableFile> dup_file;
+      //WritableFile* dup_file;
 #ifndef NDEBUG
       bool use_direct_writes = env_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
@@ -133,24 +142,30 @@ Status BuildTable(
             job_id, meta->fd, tp, reason, s);
         return s;
       }
-      s = NewWritableFile(env, dup_fname, &dup_file, env_options);
-      if (!s.ok()) {
-        EventHelpers::LogAndNotifyTableFileCreationFinished(
-            event_logger, ioptions.listeners, dbname, column_family_name, dup_fname,
-            job_id, meta->fd, tp, reason, s);
-        return s;
+      if (is_double_write) {
+        s = NewWritableFile(env, dup_fname, &dup_file, env_options);
+        //s = env->NewWritableFile(dup_fname, &dup_file, env_options);
+        if (!s.ok()) {
+          EventHelpers::LogAndNotifyTableFileCreationFinished(
+              event_logger, ioptions.listeners, dbname, column_family_name, dup_fname,
+              job_id, meta->fd, tp, reason, s);
+          return s;
+        }
       }
       file->SetIOPriority(io_priority);
       file->SetWriteLifeTimeHint(write_hint);
-      dup_file->SetIOPriority(io_priority);
-      dup_file->SetWriteLifeTimeHint(write_hint);
-
       file_writer.reset(
           new WritableFileWriter(std::move(file), fname, env_options, env,
                                  ioptions.statistics, ioptions.listeners));
-      dup_file_writer.reset(
-          new WritableFileWriter(std::move(dup_file), dup_fname, env_options, env,
-                                 ioptions.statistics, ioptions.listeners));
+      if (is_double_write) {
+        dup_file->SetIOPriority(io_priority);
+        dup_file->SetWriteLifeTimeHint(write_hint);
+        dup_file_writer = new WritableFileWriter(std::move(dup_file), dup_fname, env_options, env,
+                              ioptions.statistics, ioptions.listeners);
+        //dup_file_writer.reset(
+        //    new WritableFileWriter(std::move(dup_file), dup_fname, env_options, env,
+        //                           ioptions.statistics, ioptions.listeners));
+      }
 
       builder = NewTableBuilder(
           ioptions, mutable_cf_options, internal_comparator,
@@ -158,7 +173,7 @@ Status BuildTable(
           column_family_name, file_writer.get(), compression,
           sample_for_compression, compression_opts_for_flush, level,
           false /* skip_filters */, creation_time, oldest_key_time,
-          0 /*target_file_size*/, file_creation_time, dup_file_writer.get());
+          0 /*target_file_size*/, file_creation_time, dup_file_writer);
     }
 
     MergeHelper merge(env, internal_comparator.user_comparator(),
@@ -217,21 +232,23 @@ Status BuildTable(
         *table_properties = tp;
       }
     }
-    delete builder;
+    if (!is_double_write) {
+      delete builder;
+    }
 
     // Finish and check for file errors
     if (s.ok() && !empty) {
       StopWatch sw(env, ioptions.statistics, TABLE_SYNC_MICROS);
       s = file_writer->Sync(ioptions.use_fsync);
-      if (s.ok()) {
-        s = dup_file_writer->Sync(ioptions.use_fsync);
-      }
+      //if (s.ok() && is_double_write) {
+      //  s = dup_file_writer->Sync(ioptions.use_fsync);
+      //}
     }
     if (s.ok() && !empty) {
       s = file_writer->Close();
-      if (s.ok()) {
-        s = dup_file_writer->Close();
-      }
+      //if (s.ok() && is_double_write) {
+      //  s = dup_file_writer->Close();
+      //}
     }
 
     if (s.ok() && !empty) {
@@ -273,7 +290,11 @@ Status BuildTable(
   EventHelpers::LogAndNotifyTableFileCreationFinished(
       event_logger, ioptions.listeners, dbname, column_family_name, fname,
       job_id, meta->fd, tp, reason, s);
-
+  if (is_double_write) {
+    EventHelpers::LogAndNotifyTableFileCreationFinished(
+        event_logger, ioptions.listeners, dbname, column_family_name, fname,
+        job_id, meta->fd, tp, reason, s);
+  }
   return s;
 }
 

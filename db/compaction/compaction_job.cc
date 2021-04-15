@@ -127,9 +127,10 @@ struct CompactionJob::SubcompactionState {
   // State kept for output being generated
   std::vector<Output> outputs;
   std::unique_ptr<WritableFileWriter> outfile;
-  std::unique_ptr<WritableFileWriter> dup_outfile;
-  std::unique_ptr<TableBuilder> builder;
-  std::unique_ptr<TableBuilder> dup_builder;
+  //std::unique_ptr<WritableFileWriter> dup_outfile;
+  WritableFileWriter* dup_outfile = nullptr;
+  //std::unique_ptr<TableBuilder> builder;
+  TableBuilder* builder = nullptr;
   Output* current_output() {
     if (outputs.empty()) {
       // This subcompaction's outptut could be empty if compaction was aborted
@@ -165,6 +166,7 @@ struct CompactionJob::SubcompactionState {
         start(_start),
         end(_end),
         outfile(nullptr),
+        dup_outfile(nullptr),
         builder(nullptr),
         current_output_file_size(0),
         total_bytes(0),
@@ -186,7 +188,8 @@ struct CompactionJob::SubcompactionState {
     status = std::move(o.status);
     outputs = std::move(o.outputs);
     outfile = std::move(o.outfile);
-    builder = std::move(o.builder);
+    dup_outfile = o.dup_outfile;
+    builder = o.builder;
     current_output_file_size = std::move(o.current_output_file_size);
     total_bytes = std::move(o.total_bytes);
     num_input_records = std::move(o.num_input_records);
@@ -1140,6 +1143,10 @@ Status CompactionJob::FinishCompactionOutputFile(
     CompactionRangeDelAggregator* range_del_agg,
     CompactionIterationStats* range_del_out_stats,
     const Slice* next_table_min_key /* = nullptr */) {
+  std::string outfile_name = sub_compact->outfile->file_name();
+  fprintf(stdout, "%s FinishCompactionOutputFile, builder: %p.\n", outfile_name.c_str(), sub_compact->builder);
+  bool is_double_write = sub_compact->compaction->output_level() <= 1 &&
+            sub_compact->compaction->immutable_cf_options()->use_double_write;
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_SYNC_FILE);
   assert(sub_compact != nullptr);
@@ -1344,9 +1351,9 @@ Status CompactionJob::FinishCompactionOutputFile(
 
   TableProperties tp;
   if (s.ok()) {
+    // TODO: segmentation fault here because builder was freed in BGWorkFileAppend!!!
     tp = sub_compact->builder->GetTableProperties();
   }
-
   if (s.ok() && current_entries == 0 && tp.num_range_deletions == 0) {
     // If there is nothing to output, no necessary to generate a sst file.
     // This happens when the output level is bottom level, at the same time
@@ -1356,7 +1363,7 @@ Status CompactionJob::FinishCompactionOutputFile(
                       meta->fd.GetNumber(), meta->fd.GetPathId());
     env_->DeleteFile(fname);
 
-    if (sub_compact->compaction->output_level() <= 1) {
+    if (is_double_write) {
       std::string dup_fname =
           TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                         meta->fd.GetNumber(), meta->fd.GetDupPathId());
@@ -1381,7 +1388,9 @@ Status CompactionJob::FinishCompactionOutputFile(
                    current_entries, current_bytes,
                    meta->marked_for_compaction ? " (need compaction)" : "");
   }
+
   std::string fname;
+  std::string dup_fname;
   FileDescriptor output_fd;
   if (meta != nullptr) {
     fname =
@@ -1391,9 +1400,24 @@ Status CompactionJob::FinishCompactionOutputFile(
   } else {
     fname = "(nil)";
   }
+
   EventHelpers::LogAndNotifyTableFileCreationFinished(
       event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(), fname,
       job_id_, output_fd, tp, TableFileCreationReason::kCompaction, s);
+
+  if (is_double_write) {
+    if (meta != nullptr) {
+      dup_fname =
+          DupTableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
+                        meta->fd.GetNumber(), meta->fd.GetDupPathId());
+    } else {
+      dup_fname = "(nil)";
+    }
+    EventHelpers::LogAndNotifyTableFileCreationFinished(
+        event_logger_, cfd->ioptions()->listeners, dbname_, cfd->GetName(), fname,
+        job_id_, output_fd, tp, TableFileCreationReason::kCompaction, s);
+  }
+
 
 #ifndef ROCKSDB_LITE
   // Report new file to SstFileManagerImpl
@@ -1414,7 +1438,14 @@ Status CompactionJob::FinishCompactionOutputFile(
   }
 #endif
 
-  sub_compact->builder.reset();
+  //sub_compact->builder.reset();
+  if (!is_double_write) {
+    delete sub_compact->builder;
+  } else {
+    // delete dup_outfile and builder after dupsst written
+  }
+  sub_compact->builder = nullptr;
+  sub_compact->dup_outfile = nullptr;
   sub_compact->current_output_file_size = 0;
   return s;
 }
@@ -1475,12 +1506,13 @@ Status CompactionJob::OpenCompactionOutputFile(
   assert(sub_compact->builder == nullptr);
   // no need to lock because VersionSet::next_file_number_ is atomic
   uint64_t file_number = versions_->NewFileNumber();
-  bool is_output_level_01 = sub_compact->compaction->output_level() <= 1;
+  bool is_double_write = sub_compact->compaction->output_level() <= 1 && 
+                sub_compact->compaction->immutable_cf_options()->use_double_write;
   std::string fname =
       TableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                     file_number, sub_compact->compaction->output_path_id());
   std::string dup_fname;
-  if (is_output_level_01) {
+  if (is_double_write) {
     dup_fname = DupTableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                     file_number, sub_compact->compaction->output_dup_path_id());
   }
@@ -1490,6 +1522,11 @@ Status CompactionJob::OpenCompactionOutputFile(
   EventHelpers::NotifyTableFileCreationStarted(
       cfd->ioptions()->listeners, dbname_, cfd->GetName(), fname, job_id_,
       TableFileCreationReason::kCompaction);
+  if (is_double_write) {
+    EventHelpers::NotifyTableFileCreationStarted(
+        cfd->ioptions()->listeners, dbname_, cfd->GetName(), dup_fname, job_id_,
+        TableFileCreationReason::kCompaction);
+  }
 #endif  // !ROCKSDB_LITE
   // Make the output file
   std::unique_ptr<WritableFile> writable_file;
@@ -1515,7 +1552,7 @@ Status CompactionJob::OpenCompactionOutputFile(
     return s;
   }
 
-  if (is_output_level_01) {
+  if (is_double_write) {
     s = NewWritableFile(env_, dup_fname, &dup_writable_file, env_options_);
     if (!s.ok()) {
       ROCKS_LOG_ERROR(
@@ -1543,7 +1580,7 @@ Status CompactionJob::OpenCompactionOutputFile(
   writable_file->SetIOPriority(Env::IO_LOW);
   writable_file->SetWriteLifeTimeHint(write_hint_);
   writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
-  if (is_output_level_01) {
+  if (is_double_write) {
     dup_writable_file->SetIOPriority(Env::IO_LOW);
     dup_writable_file->SetWriteLifeTimeHint(write_hint_);
     dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(pre_alloc_size));
@@ -1554,10 +1591,14 @@ Status CompactionJob::OpenCompactionOutputFile(
   sub_compact->outfile.reset(
       new WritableFileWriter(std::move(writable_file), fname, env_options_,
                              env_, db_options_.statistics.get(), listeners));
-  if (is_output_level_01) {
-    sub_compact->dup_outfile.reset(
-        new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
-                               env_, db_options_.statistics.get(), listeners));
+  if (is_double_write) {
+    sub_compact->dup_outfile = new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
+                               env_, db_options_.statistics.get(), listeners);
+    //sub_compact->dup_outfile.reset(
+    //    new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
+    //                           env_, db_options_.statistics.get(), listeners));
+  } else {
+    sub_compact->dup_outfile = nullptr;
   }
   // If the Column family flag is to only optimize filters for hits,
   // we can skip creating filters if this is the bottommost_level where
@@ -1581,16 +1622,29 @@ Status CompactionJob::OpenCompactionOutputFile(
     latest_key_time = current_time;
   }
 
+  /*
   sub_compact->builder.reset(NewTableBuilder(
       *cfd->ioptions(), *(sub_compact->compaction->mutable_cf_options()),
       cfd->internal_comparator(), cfd->int_tbl_prop_collector_factories(),
       cfd->GetID(), cfd->GetName(), sub_compact->outfile.get(),
       sub_compact->compaction->output_compression(),
-      0 /*sample_for_compression */,
+      0, // sample_for_compression
       sub_compact->compaction->output_compression_opts(),
       sub_compact->compaction->output_level(), skip_filters, latest_key_time,
-      0 /* oldest_key_time */, sub_compact->compaction->max_output_file_size(),
-      current_time, sub_compact->dup_outfile.get()));
+      0, sub_compact->compaction->max_output_file_size(),
+      current_time, sub_compact->dup_outfile));
+  */
+  sub_compact->builder = NewTableBuilder(
+      *cfd->ioptions(), *(sub_compact->compaction->mutable_cf_options()),
+      cfd->internal_comparator(), cfd->int_tbl_prop_collector_factories(),
+      cfd->GetID(), cfd->GetName(), sub_compact->outfile.get(),
+      sub_compact->compaction->output_compression(),
+      0, // sample_for_compression
+      sub_compact->compaction->output_compression_opts(),
+      sub_compact->compaction->output_level(), skip_filters, latest_key_time,
+      0, sub_compact->compaction->max_output_file_size(),
+      current_time, sub_compact->dup_outfile);
+
   LogFlush(db_options_.info_log);
   return s;
 }
@@ -1602,7 +1656,8 @@ void CompactionJob::CleanupCompaction() {
     if (sub_compact.builder != nullptr) {
       // May happen if we get a shutdown call in the middle of compaction
       sub_compact.builder->Abandon();
-      sub_compact.builder.reset();
+      //sub_compact.builder.reset();
+      sub_compact.builder = nullptr; // dont delete builder here because the dupsst maybe not written yet
     } else {
       assert(!sub_status.ok() || sub_compact.outfile == nullptr);
     }

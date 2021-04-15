@@ -3113,8 +3113,6 @@ Status DBImpl::CheckConsistency() {
             "Can't access " + md.name + ": " + s.ToString() + "\n";
       }
       */
-      corruption_messages +=
-        "Can't access " + md.name + ": " + s.ToString() + "\n";
     } else if (fsize != md.size) {
       corruption_messages += "Sst file size mismatch: " + file_path +
                              ". Size recorded in manifest " +

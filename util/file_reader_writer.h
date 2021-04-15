@@ -270,7 +270,11 @@ class WritableFileWriter {
 
   WritableFileWriter& operator=(const WritableFileWriter&) = delete;
 
-  ~WritableFileWriter() { Close(); }
+  ~WritableFileWriter() { 
+    Close(); 
+    //fprintf(stdout, "%s ~WritableFileWriter.\n", file_name_.c_str());
+    fprintf(stdout, "~WritableFileWriter.\n");
+  }
 
   std::string file_name() const { return file_name_; }
 

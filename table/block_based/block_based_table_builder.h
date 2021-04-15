@@ -111,7 +111,7 @@ class BlockBasedTableBuilder : public TableBuilder {
 
   // Directly write data to the file.
   void WriteRawBlock(const Slice& data, CompressionType, BlockHandle* handle,
-                     bool is_data_block = false);
+                     bool is_data_block = false, bool is_last_write = false);
   Status InsertBlockInCache(const Slice& block_contents,
                             const CompressionType type,
                             const BlockHandle* handle);
