@@ -29,11 +29,10 @@ Status CuckooTableFactory::NewTableReader(
 
 TableBuilder* CuckooTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file, WritableFileWriter* dup_file) const {
+    WritableFileWriter* file) const {
   // Ignore the skipFIlters flag. Does not apply to this file format
   //
 
-  (void)dup_file;
   // TODO: change builder to take the option struct
   return new CuckooTableBuilder(
       file, table_options_.hash_table_ratio, 64,

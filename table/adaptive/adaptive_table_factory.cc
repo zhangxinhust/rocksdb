@@ -70,9 +70,9 @@ Status AdaptiveTableFactory::NewTableReader(
 
 TableBuilder* AdaptiveTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file, WritableFileWriter* dup_file) const {
+    WritableFileWriter* file) const {
   return table_factory_to_write_->NewTableBuilder(table_builder_options,
-                                                  column_family_id, file, dup_file);
+                                                  column_family_id, file);
 }
 
 std::string AdaptiveTableFactory::GetPrintableTableOptions() const {

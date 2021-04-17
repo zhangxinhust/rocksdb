@@ -34,12 +34,11 @@ Status PlainTableFactory::NewTableReader(
 
 TableBuilder* PlainTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options, uint32_t column_family_id,
-    WritableFileWriter* file, WritableFileWriter* dup_file) const {
+    WritableFileWriter* file) const {
   // Ignore the skip_filters flag. PlainTable format is optimized for small
   // in-memory dbs. The skip_filters optimization is not useful for plain
   // tables
   //
-  (void)dup_file;
   return new PlainTableBuilder(
       table_builder_options.ioptions, table_builder_options.moptions,
       table_builder_options.int_tbl_prop_collector_factories, column_family_id,

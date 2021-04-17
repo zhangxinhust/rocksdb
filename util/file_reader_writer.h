@@ -30,6 +30,36 @@ class HistogramImpl;
 // In addition, it also exposed NewReadaheadRandomAccessFile, NewWritableFile,
 // and ReadOneLine primitives.
 
+struct SstCopyArg {
+  WritableFileWriter *writer;
+  SequentialFileReader *reader;
+
+  SstCopyArg () {
+    writer = nullptr;
+    reader = nullptr;
+  }
+
+  SstCopyArg(WritableFileWriter *wrtr, SequentialFileReader *rdr) :
+    writer(wrtr),
+    reader(rdr)
+  {}
+
+  SstCopyArg (const SstCopyArg& sca) {
+    *this = sca;
+  }
+
+  SstCopyArg& operator= (const SstCopyArg& sca) {
+    writer = sca.writer;
+    reader = sca.reader;
+    return *this;
+  }
+
+  ~SstCopyArg () {
+    if (writer) delete writer;
+    if (reader) delete reader;
+  }
+};
+
 // NewReadaheadRandomAccessFile provides a wrapper over RandomAccessFile to
 // always prefetch additional data with every read. This is mainly used in
 // Compaction Table Readers.
