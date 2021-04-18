@@ -26,6 +26,7 @@
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
 #include "db/log_reader.h"
+#include "db/log_format.h"
 #include "db/log_writer.h"
 #include "db/memtable.h"
 #include "db/memtable_list.h"
@@ -50,6 +51,7 @@
 #include "rocksdb/table.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_factory.h"
+#include "table/block_based/block_based_table_builder.h"
 #include "table/merging_iterator.h"
 #include "table/table_builder.h"
 #include "test_util/sync_point.h"
@@ -1419,7 +1421,7 @@ Status CompactionJob::FinishCompactionOutputFile(
   if (is_double_write) {
     std::string dup_fname = DupTableFileName(sub_compact->compaction->immutable_cf_options()->cf_paths,
                                              meta->fd.GetNumber(), meta->fd.GetDupPathId());
-    unique_ptr<WritableFile> dup_writable_file;
+    std::unique_ptr<WritableFile> dup_writable_file;
     WritableFileWriter *dup_outfile = nullptr;
     s = NewWritableFile(env_, dup_fname, &dup_writable_file, env_options_);
     if (!s.ok()) {
@@ -1428,7 +1430,7 @@ Status CompactionJob::FinishCompactionOutputFile(
           "[%s] [JOB %d] FinishCompactionOutputFiles for table #%" PRIu64
           " fails at NewWritableFile with status %s",
           sub_compact->compaction->column_family_data()->GetName().c_str(),
-          job_id_, file_number, s.ToString().c_str());
+          job_id_, meta->fd.GetNumber(), s.ToString().c_str());
       LogFlush(db_options_.info_log);
       /*
       EventHelpers::LogAndNotifyTableFileCreationFinished(
@@ -1440,7 +1442,7 @@ Status CompactionJob::FinishCompactionOutputFile(
     }
     dup_writable_file->SetIOPriority(Env::IO_LOW);
     dup_writable_file->SetWriteLifeTimeHint(write_hint_);
-    dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(meta->fd.GetFileSize));
+    dup_writable_file->SetPreallocationBlockSize(static_cast<size_t>(meta->fd.GetFileSize()));
     const auto& listeners = sub_compact->compaction->immutable_cf_options()->listeners;
     dup_outfile = new WritableFileWriter(std::move(dup_writable_file), dup_fname, env_options_,
                              env_, db_options_.statistics.get(), listeners);
@@ -1448,16 +1450,16 @@ Status CompactionJob::FinishCompactionOutputFile(
     std::unique_ptr<SequentialFile> reader;
     SequentialFileReader *file_reader = nullptr;
     Status status;
-    status = env_->NewSequentialFile(dup_fname, &reader, env_->OptimizeForCompactionTableRead(env_options_));
+    status = env_->NewSequentialFile(fname, &reader, env_->OptimizeForCompactionTableRead(env_options_, db_options_));
     if (!status.ok()) {
       return status;
     }
 
-    file_reader = new SequentialFileReader(std::move(reader), dup_fname, log::kBlockSize);
+    file_reader = new SequentialFileReader(std::move(reader), fname, log::kBlockSize);
 
-    SstCopyArg* fca = new SstCopyArg(dup_outfile, file_reader);
+    SstCopyArg* sca = new SstCopyArg(dup_outfile, file_reader, sub_compact->compaction->immutable_cf_options()->use_fsync);
     sub_compact->compaction->immutable_cf_options()->env->Schedule(
-                              &BlockBasedTableBuilder::BGWorkSstCopy, fca, Env::Priority::HIGH, this,
+                              &BlockBasedTableBuilder::BGWorkSstCopy, sca, Env::Priority::HIGH, nullptr,
                               &BlockBasedTableBuilder::UnscheduleSstCopyCallBack);
     /*
         Do we have to call LogAndNotifyTableFileCreationFinished?

@@ -30,36 +30,6 @@ class HistogramImpl;
 // In addition, it also exposed NewReadaheadRandomAccessFile, NewWritableFile,
 // and ReadOneLine primitives.
 
-struct SstCopyArg {
-  WritableFileWriter *writer;
-  SequentialFileReader *reader;
-
-  SstCopyArg () {
-    writer = nullptr;
-    reader = nullptr;
-  }
-
-  SstCopyArg(WritableFileWriter *wrtr, SequentialFileReader *rdr) :
-    writer(wrtr),
-    reader(rdr)
-  {}
-
-  SstCopyArg (const SstCopyArg& sca) {
-    *this = sca;
-  }
-
-  SstCopyArg& operator= (const SstCopyArg& sca) {
-    writer = sca.writer;
-    reader = sca.reader;
-    return *this;
-  }
-
-  ~SstCopyArg () {
-    if (writer) delete writer;
-    if (reader) delete reader;
-  }
-};
-
 // NewReadaheadRandomAccessFile provides a wrapper over RandomAccessFile to
 // always prefetch additional data with every read. This is mainly used in
 // Compaction Table Readers.
@@ -303,7 +273,7 @@ class WritableFileWriter {
   ~WritableFileWriter() { 
     Close(); 
     //fprintf(stdout, "%s ~WritableFileWriter.\n", file_name_.c_str());
-    fprintf(stdout, "~WritableFileWriter.\n");
+    //fprintf(stdout, "~WritableFileWriter.\n");
   }
 
   std::string file_name() const { return file_name_; }
@@ -422,6 +392,40 @@ class FilePrefetchBuffer {
   // If true, track minimum `offset` ever passed to TryReadFromCache(), which
   // can be fetched from min_offset_read().
   bool track_min_offset_;
+};
+
+struct SstCopyArg {
+  WritableFileWriter *writer;
+  SequentialFileReader *reader;
+  bool use_fsync;
+
+  SstCopyArg () {
+    writer = nullptr;
+    reader = nullptr;
+    use_fsync = false;
+  }
+
+  SstCopyArg(WritableFileWriter *wrtr, SequentialFileReader *rdr, bool fsync = false) :
+    writer(wrtr),
+    reader(rdr),
+    use_fsync(fsync)
+  {}
+
+  SstCopyArg (const SstCopyArg& sca) {
+    *this = sca;
+  }
+
+  SstCopyArg& operator= (const SstCopyArg& sca) {
+    writer = sca.writer;
+    reader = sca.reader;
+    use_fsync = sca.use_fsync;
+    return *this;
+  }
+
+  ~SstCopyArg () {
+    if (writer) delete writer;
+    if (reader) delete reader;
+  }
 };
 
 // Returns a WritableFile.

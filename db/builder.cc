@@ -15,6 +15,7 @@
 
 #include "db/compaction/compaction_iterator.h"
 #include "db/dbformat.h"
+#include "db/log_format.h"
 #include "db/event_helpers.h"
 #include "db/internal_stats.h"
 #include "db/merge_helper.h"
@@ -293,15 +294,15 @@ Status BuildTable(
     std::unique_ptr<SequentialFile> reader;
     SequentialFileReader *file_reader = nullptr;
     Status status;
-    status = env->NewSequentialFile(dup_fname, &reader, env->OptimizeForCompactionTableRead(env_options));
+    status = env->NewSequentialFile(fname, &reader, env_options); // OptimizeForCompactionTableRead
     if (!status.ok()) {
       return status;
     }
   
-    file_reader = new SequentialFileReader(std::move(reader), dup_fname, log::kBlockSize);
+    file_reader = new SequentialFileReader(std::move(reader), fname, log::kBlockSize);
 
-    SstCopyArg* fca = new SstCopyArg(dup_outfile, file_reader);
-    env->Schedule(&BlockBasedTableBuilder::BGWorkSstCopy, fca, Env::Priority::HIGH, this,
+    SstCopyArg* sca = new SstCopyArg(dup_file_writer, file_reader, ioptions.use_fsync);
+    env->Schedule(&BlockBasedTableBuilder::BGWorkSstCopy, sca, Env::Priority::HIGH, nullptr,
                   &BlockBasedTableBuilder::UnscheduleSstCopyCallBack);
   }
   return s;
