@@ -152,6 +152,7 @@ void ThreadPoolImpl::Impl::JoinThreads(bool wait_for_jobs_to_complete) {
   std::unique_lock<std::mutex> lock(mu_);
   assert(!exit_all_threads_);
 
+  fprintf(stdout, "JoinThreads: %d.\n", wait_for_jobs_to_complete);
   wait_for_jobs_to_complete_ = wait_for_jobs_to_complete;
   exit_all_threads_ = true;
   // prevent threads from being recreated right after they're joined, in case
@@ -430,7 +431,8 @@ ThreadPoolImpl::~ThreadPoolImpl() {
 }
 
 void ThreadPoolImpl::JoinAllThreads() {
-  impl_->JoinThreads(false);
+  //impl_->JoinThreads(false);
+  impl_->JoinThreads(true);
 }
 
 void ThreadPoolImpl::SetBackgroundThreads(int num) {

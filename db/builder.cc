@@ -102,8 +102,8 @@ Status BuildTable(
   std::string fname = TableFileName(ioptions.cf_paths, meta->fd.GetNumber(),
                                     meta->fd.GetPathId());
 
-  fprintf(stdout, "BuildTable num: %lu, path: %u, dup_path: %u.\n", meta->fd.GetNumber(),
-        meta->fd.GetPathId(), meta->fd.GetDupPathId());
+  //fprintf(stdout, "BuildTable num: %lu, path: %u, dup_path: %u.\n", meta->fd.GetNumber(),
+  //      meta->fd.GetPathId(), meta->fd.GetDupPathId());
 
 #ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(
@@ -304,6 +304,7 @@ Status BuildTable(
     SstCopyArg* sca = new SstCopyArg(dup_file_writer, file_reader, ioptions.use_fsync);
     env->Schedule(&BlockBasedTableBuilder::BGWorkSstCopy, sca, Env::Priority::HIGH, nullptr,
                   &BlockBasedTableBuilder::UnscheduleSstCopyCallBack);
+    fprintf(stdout, "schedule1 %s.\n", dup_fname.c_str());
   }
   return s;
 }

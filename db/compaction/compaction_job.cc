@@ -1461,6 +1461,7 @@ Status CompactionJob::FinishCompactionOutputFile(
     sub_compact->compaction->immutable_cf_options()->env->Schedule(
                               &BlockBasedTableBuilder::BGWorkSstCopy, sca, Env::Priority::HIGH, nullptr,
                               &BlockBasedTableBuilder::UnscheduleSstCopyCallBack);
+    fprintf(stdout, "schedule2 %s.\n", dup_fname.c_str());
     /*
         Do we have to call LogAndNotifyTableFileCreationFinished?
     */

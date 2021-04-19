@@ -724,6 +724,7 @@ void BlockBasedTableBuilder::BGWorkSstCopy(void* arg) {
 
   //IOSTATS_SET_THREAD_POOL_ID(Env::Priority::HIGH);
   TEST_SYNC_POINT("BlockBasedTableBuilder::BGWorkSstCopy");
+  fprintf(stdout, "%s copy begin.\n", sca->writer->file_name().c_str());
 
   Status s;
   Slice result;
@@ -750,9 +751,7 @@ void BlockBasedTableBuilder::BGWorkSstCopy(void* arg) {
     }
   }
   fprintf(stdout, "read count: %lu, bytes: %lu, write counts: %lu.\n", read_counts, read_bytes, write_counts);
-  if (!s.ok()) {
-    
-  }
+
   sca->writer->Sync(sca->use_fsync);
   sca->writer->Close();
 

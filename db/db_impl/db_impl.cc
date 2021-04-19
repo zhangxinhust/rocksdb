@@ -607,6 +607,7 @@ DBImpl::~DBImpl() {
   if (!closed_) {
     closed_ = true;
     CloseHelper();
+    sleep(60);
   }
 }
 
