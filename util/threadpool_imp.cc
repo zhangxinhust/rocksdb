@@ -431,8 +431,8 @@ ThreadPoolImpl::~ThreadPoolImpl() {
 }
 
 void ThreadPoolImpl::JoinAllThreads() {
-  //impl_->JoinThreads(false);
-  impl_->JoinThreads(true);
+  impl_->JoinThreads(false);
+  //impl_->JoinThreads(true);
 }
 
 void ThreadPoolImpl::SetBackgroundThreads(int num) {

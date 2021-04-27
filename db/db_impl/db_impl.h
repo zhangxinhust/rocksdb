@@ -497,6 +497,8 @@ class DBImpl : public DB {
   // match to our in-memory records
   virtual Status CheckConsistency();
 
+  void CopySst(SstCopyArg *sca);
+
   // max_file_num_to_ignore allows bottom level compaction to filter out newly
   // compacted SST files. Setting max_file_num_to_ignore to kMaxUint64 will
   // disable the filtering

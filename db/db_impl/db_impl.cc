@@ -3073,11 +3073,46 @@ void DBImpl::GetColumnFamilyMetaData(ColumnFamilyHandle* column_family,
 
 #endif  // ROCKSDB_LITE
 
+void DBImpl::CopySst(SstCopyArg *sca) {
+    Status s;
+    Slice result;
+    size_t block_size = static_cast<size_t>(log::kBlockSize);
+    char *scratch = new char[block_size];
+    uint64_t read_bytes = 0, read_counts = 0, write_counts = 0;
+    
+    while (true) {
+      s = sca->reader->Read(block_size, &result, scratch);
+      if (!s.ok()) {
+        fprintf(stdout, "BGWorkSstCopy read: %s.\n", s.ToString().c_str());
+        break;
+      }
+      read_counts++;
+      s = sca->writer->Append(result);
+      if (!s.ok()) {
+        fprintf(stdout, "BGWorkSstCopy write: %s.\n", s.ToString().c_str());
+        break;
+      }
+      write_counts++;
+      read_bytes += result.size();
+      if (result.size() < block_size) { // end of file
+        break;
+      }
+    }
+    fprintf(stdout, "read count: %lu, bytes: %lu, write counts: %lu.\n", read_counts, read_bytes, write_counts);
+    
+    sca->writer->Sync(sca->use_fsync);
+    sca->writer->Close();
+    
+    delete sca;
+}
+
 Status DBImpl::CheckConsistency() {
   mutex_.AssertHeld();
   std::vector<LiveFileMetaData> metadata;
   versions_->GetLiveFilesMetaData(&metadata);
   TEST_SYNC_POINT("DBImpl::CheckConsistency:AfterGetLiveFilesMetaData");
+
+  std::vector<port::Thread> thread_pool;
 
   std::string corruption_messages;
   for (const auto& md : metadata) {
@@ -3088,39 +3123,105 @@ Status DBImpl::CheckConsistency() {
     TEST_SYNC_POINT("DBImpl::CheckConsistency:BeforeGetFileSize");
     Status s = env_->GetFileSize(file_path, &fsize);
     if (!s.ok() &&
-        env_->GetFileSize(Rocks2LevelTableFileName(file_path), &fsize).ok()) {
+        env_->GetFileSize(Rocks2LevelTableFileName(file_path), &fsize).ok()) { // for leveldb
       s = Status::OK();
     }
-    if (!s.ok()) {
-      /*
-      if (immutable_db_options_.use_double_write && md.level <= 1) {
-        uint64_t number;
-        FileType type;
-        if (ParseFileName(md.name, &number, &type)) {
-          ColumnFamilyData *cfd = versions_->GetColumnFamilySet()->GetColumnFamily(md.column_family_name);
-          VersionEdit edit;
-          edit.SetColumnFamily(cfd->GetID());
-          edit.DeleteFile(md.level, number);
-          s = versions_->LogAndApply(cfd, *cfd->GetLatestMutableCFOptions(),
-                                     &edit, &mutex_, directories_.GetDbDir());
-          if (!s.ok()) {
-            corruption_messages += "Cant't delete " + md.name + ": " + s.ToString() + "\n";
+
+    std::string dup_file_path = md.dup_db_path + md.dup_name;
+    uint64_t dup_fsize = 0;
+    Status s2, s3;
+    bool is_double_write = immutable_db_options_.use_double_write && md.level <= 1;
+    if (is_double_write) {
+      s2 = env_->GetFileSize(dup_file_path, &dup_fsize);
+      if (!s.ok()) { // sst miss
+        if (!s2.ok() || dup_fsize != md.size) { // dupsst miss or size not ok
+          uint64_t number;
+          FileType type;
+          if (ParseFileName(md.name, &number, &type)) { // get number from file name
+            ColumnFamilyData *cfd = versions_->GetColumnFamilySet()->GetColumnFamily(md.column_family_name);
+            VersionEdit edit;
+            edit.SetColumnFamily(cfd->GetID());
+            edit.DeleteFile(md.level, number);
+            s3 = versions_->LogAndApply(cfd, *cfd->GetLatestMutableCFOptions(),
+                                       &edit, &mutex_, directories_.GetDbDir());
+            if (!s3.ok()) {
+              corruption_messages += "Cant't delete " + md.name + ": " + s.ToString() + " from manifest\n";
+            }
+          } else {
+            corruption_messages += "Cant parse file " + md.name + "\n";
           }
-        } else {
-          corruption_messages += "Cant parse file " + md.name + "\n";
+        } else { // dupsst ok, recover from dupsst
+          std::unique_ptr<WritableFile> file;
+          WritableFileWriter* file_writer = nullptr;
+          s3 = NewWritableFile(env_, file_path, &file, env_options_);
+          if (!s3.ok()) {
+            corruption_messages += "New writer: " + s3.ToString() + "\n";
+            continue;
+          }
+          file->SetIOPriority(Env::IO_HIGH);
+          file->SetWriteLifeTimeHint(Env::WLTH_MEDIUM); // L0 and L0 medium, cfd->CalculateSSTWriteHint
+          file_writer = new WritableFileWriter(std::move(file), file_path, env_options_, env_,
+                              immutable_db_options_.statistics.get(), immutable_db_options_.listeners);
+
+          std::unique_ptr<SequentialFile> reader;
+          SequentialFileReader *file_reader = nullptr;
+          s3 = env_->NewSequentialFile(dup_file_path, &reader, env_options_); // OptimizeForCompactionTableRead
+          if (!s3.ok()) {
+            corruption_messages += "New reader: " + s3.ToString() + "\n";
+            continue;
+          }
+          file_reader = new SequentialFileReader(std::move(reader), dup_file_path, log::kBlockSize);
+          SstCopyArg* sca = new SstCopyArg(file_writer, file_reader, immutable_db_options_.use_fsync);
+          thread_pool.emplace_back(&DBImpl::CopySst, this, sca);
         }
-      } else {
+      } else { // sst ok
+        if (!s2.ok() || dup_fsize != md.size) { // dupsst miss or size not ok, copy from sst
+          std::unique_ptr<WritableFile> file;
+          WritableFileWriter* file_writer = nullptr;
+          s3 = NewWritableFile(env_, dup_file_path, &file, env_options_);
+          if (!s3.ok()) {
+            corruption_messages += "New writer: " + s3.ToString() + "\n";
+            continue;
+          }
+          file->SetIOPriority(Env::IO_HIGH);
+          file->SetWriteLifeTimeHint(Env::WLTH_MEDIUM); // L0 and L0 medium, cfd->CalculateSSTWriteHint
+          file_writer = new WritableFileWriter(std::move(file), dup_file_path, env_options_, env_,
+                              immutable_db_options_.statistics.get(), immutable_db_options_.listeners);
+
+          std::unique_ptr<SequentialFile> reader;
+          SequentialFileReader *file_reader = nullptr;
+          s3 = env_->NewSequentialFile(file_path, &reader, env_options_); // OptimizeForCompactionTableRead
+          if (!s3.ok()) {
+            corruption_messages += "New reader: " + s3.ToString() + "\n";
+            continue;
+          }
+          file_reader = new SequentialFileReader(std::move(reader), file_path, log::kBlockSize);
+          SstCopyArg* sca = new SstCopyArg(file_writer, file_reader, immutable_db_options_.use_fsync);
+          thread_pool.emplace_back(&DBImpl::CopySst, this, sca);
+        } else { // dupsst ok
+          // both ok, nothing to do
+        }
+      }
+    } else {
+      if (!s.ok()) {
         corruption_messages +=
             "Can't access " + md.name + ": " + s.ToString() + "\n";
+      } else if (fsize != md.size) {
+        corruption_messages += "Sst file size mismatch: " + file_path +
+                               ". Size recorded in manifest " +
+                               ToString(md.size) + ", actual size " +
+                               ToString(fsize) + "\n";
+      } else {
+        // nothing to do
       }
-      */
-    } else if (fsize != md.size) {
-      corruption_messages += "Sst file size mismatch: " + file_path +
-                             ". Size recorded in manifest " +
-                             ToString(md.size) + ", actual size " +
-                             ToString(fsize) + "\n";
     }
   }
+
+  // Wait for all other threads (if there are any) to finish execution
+  for (auto& thread : thread_pool) {
+    thread.join();
+  }
+
   if (corruption_messages.size() == 0) {
     return Status::OK();
   } else {

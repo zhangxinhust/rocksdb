@@ -56,7 +56,9 @@ struct SstFileMetaData {
   SstFileMetaData()
       : size(0),
         name(""),
+        dup_name(""),
         db_path(""),
+        dup_db_path(""),
         smallest_seqno(0),
         largest_seqno(0),
         smallestkey(""),
@@ -64,17 +66,21 @@ struct SstFileMetaData {
         num_reads_sampled(0),
         being_compacted(false),
         num_entries(0),
-        num_deletions(0) {}
+        num_deletions(0)
+        {}
 
   SstFileMetaData(const std::string& _file_name, const std::string& _path,
                   size_t _size, SequenceNumber _smallest_seqno,
                   SequenceNumber _largest_seqno,
                   const std::string& _smallestkey,
                   const std::string& _largestkey, uint64_t _num_reads_sampled,
-                  bool _being_compacted)
+                  bool _being_compacted, std::string _dup_file_name = "",
+                  std::string _dup_path = "")
       : size(_size),
         name(_file_name),
+        dup_name(_dup_file_name),
         db_path(_path),
+        dup_db_path(_dup_path),
         smallest_seqno(_smallest_seqno),
         largest_seqno(_largest_seqno),
         smallestkey(_smallestkey),
@@ -82,14 +88,17 @@ struct SstFileMetaData {
         num_reads_sampled(_num_reads_sampled),
         being_compacted(_being_compacted),
         num_entries(0),
-        num_deletions(0) {}
+        num_deletions(0)
+        {}
 
   // File size in bytes.
   size_t size;
   // The name of the file.
   std::string name;
+  std::string dup_name;
   // The full path where the file locates.
   std::string db_path;
+  std::string dup_db_path;
 
   SequenceNumber smallest_seqno;  // Smallest sequence number in file.
   SequenceNumber largest_seqno;   // Largest sequence number in file.
