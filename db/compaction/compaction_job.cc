@@ -1624,8 +1624,7 @@ void CompactionJob::CleanupCompaction() {
     if (sub_compact.builder != nullptr) {
       // May happen if we get a shutdown call in the middle of compaction
       sub_compact.builder->Abandon();
-      //sub_compact.builder.reset();
-      sub_compact.builder = nullptr; // dont delete builder here because the dupsst maybe not written yet
+      sub_compact.builder.reset();
     } else {
       assert(!sub_status.ok() || sub_compact.outfile == nullptr);
     }
