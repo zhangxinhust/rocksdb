@@ -1031,9 +1031,9 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
   log::Writer* new_log = nullptr;
   MemTable* new_mem = nullptr;
 
-  MemTable* new_mem_hot = nullptr;
+  //MemTable* new_mem_hot = nullptr;
   MemTable* old_mem_cold = nullptr;
-  bool coldMapValid;
+  bool coldMapValid = false;
 
   // In case of pipelined write is enabled, wait for all pending memtable
   // writers.
@@ -1121,7 +1121,7 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
     SequenceNumber seq = versions_->LastSequence();
     MemTable* cur_mem = cfd->mem();
 
-    new_mem_hot = cfd->ConstructNewMemtable(mutable_cf_options, seq);
+    //new_mem_hot = cfd->ConstructNewMemtable(mutable_cf_options, seq);
     old_mem_cold = cfd->ConstructNewMemtable(mutable_cf_options, seq);
 
     ReadOptions read_options;

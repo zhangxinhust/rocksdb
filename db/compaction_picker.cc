@@ -25,6 +25,7 @@
 #include "util/random.h"
 #include "util/string_util.h"
 #include "util/sync_point.h"
+#include "util/hyperloglog.h"
 
 namespace rocksdb {
 
@@ -1232,7 +1233,7 @@ bool LevelCompactionBuilder::SetupOtherInputsIfNeeded() {
     //if(total_keys > 2000) {fflush(stdout); int * p = 0; *p = 1;};
     
     if (reclaim_ratio < 0.4 && vstorage_->LevelFiles(start_level_).size() <= 4) {
-      fprintf(stdout, "delayed reclaim ratio=%f size=%d\n", reclaim_ratio, vstorage_->LevelFiles(start_level_).size());
+      fprintf(stdout, "delayed reclaim ratio=%f size=%lu\n", reclaim_ratio, vstorage_->LevelFiles(start_level_).size());
       return false;
     }
 

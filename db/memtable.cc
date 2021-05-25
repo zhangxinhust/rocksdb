@@ -519,7 +519,7 @@ std::map<std::string, uint32_t> MemTable::SelectHotKeysWithMean(std::map<std::st
     if( it->second >= mean_update_frequency ){
       selectedHotMap[it -> first] = it -> second;
     }
-    if (selectedHotMap.size() >= max_elements){
+    if (int(selectedHotMap.size()) >= max_elements){
       break;
     }
   }
@@ -585,7 +585,7 @@ bool MemTable::GetHotColdKeys(MemTable* hot_key_mem, MemTable* cold_key_mem, Rea
   //PRINT printf("ColdKeys size: %lu\n", cold_key_mem->num_entries());
   if (cold_key_mem->num_entries() < 100) {
     coldKeyMapCreated = false;
-    auto iter = new MemTableIterator(*cold_key_mem, read_options, nullptr);
+    iter = new MemTableIterator(*cold_key_mem, read_options, nullptr);
     iter->SeekToFirst();
     while(iter->Valid()){
 
