@@ -230,6 +230,15 @@ std::string HistogramStat::ToString() const {
   return r;
 }
 
+std::string HistogramStat::ToStringSimple() const {
+  std::string r;
+  char buf[100];
+  sprintf(buf, "Average: %.4f, P99: %.2f, P99.99: %.2f",
+           Average(), Percentile(99), Percentile(99.99));
+  r.append(buf);
+  return r;
+}
+
 void HistogramStat::Data(HistogramData * const data) const {
   assert(data);
   data->median = Median();
@@ -282,6 +291,10 @@ double HistogramImpl::StandardDeviation() const {
 
 std::string HistogramImpl::ToString() const {
   return stats_.ToString();
+}
+
+std::string HistogramImpl::ToStringSimple() const {
+  return stats_.ToStringSimple();
 }
 
 void HistogramImpl::Data(HistogramData * const data) const {
