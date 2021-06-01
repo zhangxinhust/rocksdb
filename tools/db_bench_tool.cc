@@ -31,6 +31,12 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <queue>
+#include <ctime>
+#include <ratio>
+#include <chrono>
+#include <unistd.h>
+#include <string>
 
 #include "db/db_impl.h"
 #include "db/version_set.h"
@@ -104,6 +110,7 @@ DEFINE_string(
     "readwhilewriting,"
     "readwhilemerging,"
     "readrandomwriterandom,"
+    "longpeak,"
     "updaterandom,"
     "randomwithverify,"
     "fill100K,"
@@ -230,6 +237,9 @@ DEFINE_int32(seek_nexts, 0,
 DEFINE_bool(reverse_iterator, false,
             "When true use Prev rather than Next for iterators that do "
             "Seek and then Next");
+
+DEFINE_bool(enable_silk_thread0, true,
+            "If true, silk thread 0 work. If false, silk thread 0 does nothing");
 
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
@@ -801,7 +811,28 @@ DEFINE_int32(rate_limit_delay_max_milliseconds, 1000,
              "When hard_rate_limit is set then this is the max time a put will"
              " be stalled.");
 
+DEFINE_int32(SILK_bandwidth_check_interval, 10000,
+             "How  much time to wait between sampling the bandwidth and adjusting compaction rate in SILK");
+
 DEFINE_uint64(rate_limiter_bytes_per_sec, 0, "Set options.rate_limiter value.");
+
+DEFINE_bool(sine_write_rate, false,
+            "Use a sine wave write_rate_limit");
+
+DEFINE_uint64(sine_write_rate_interval_milliseconds, 10000,
+              "Interval of which the sine wave write_rate_limit is recalculated");
+
+DEFINE_double(sine_a, 1,
+             "A in f(x) = A sin(bx + c) + d");
+
+DEFINE_double(sine_b, 1,
+             "B in f(x) = A sin(bx + c) + d");
+
+DEFINE_double(sine_c, 0,
+             "C in f(x) = A sin(bx + c) + d");
+
+DEFINE_double(sine_d, 1,
+             "D in f(x) = A sin(bx + c) + d");
 
 DEFINE_bool(rate_limit_bg_reads, false,
             "Use options.rate_limiter on compaction reads");
@@ -1376,6 +1407,7 @@ class Stats {
  private:
   int id_;
   uint64_t start_;
+  uint64_t sine_interval_;
   uint64_t finish_;
   double seconds_;
   uint64_t done_;
@@ -1408,6 +1440,7 @@ class Stats {
     bytes_ = 0;
     seconds_ = 0;
     start_ = FLAGS_env->NowMicros();
+    sine_interval_ = FLAGS_env->NowMicros();
     finish_ = start_;
     last_report_finish_ = start_;
     message_.clear();
@@ -1480,6 +1513,18 @@ class Stats {
     }
   }
 
+  void ResetSineInterval() {
+    sine_interval_ = FLAGS_env->NowMicros();
+  }
+
+  uint64_t GetSineInterval() {
+    return sine_interval_;
+  }
+
+  uint64_t GetStart() {
+    return start_;
+  }
+
   void ResetLastOpTime() {
     // Set to now to avoid latency from calls to SleepForMicroseconds
     last_op_finish_ = FLAGS_env->NowMicros();
@@ -1532,6 +1577,9 @@ class Stats {
           next_report_ += FLAGS_stats_interval;
 
         } else {
+          //s = s.substr(s.find("write.micros"), 105); // output write latency per sec
+          fprintf(stdout, "+++++++++++++++++++\n%s*****************\n", dbstats->getHistogramString(DB_WRITE).c_str());
+          dbstats->Reset();
 
           fprintf(stderr,
                   "%s ... thread %d: (%" PRIu64 ",%" PRIu64 ") ops and "
@@ -1752,6 +1800,12 @@ struct SharedState {
   long num_done;
   bool start;
 
+  std::queue<std::pair<int, std::chrono::microseconds>> op_queues[5][8]; //only used in QueuingMeasurements
+  int send_low_workload; //only used in FluctuatingThroughput test for generating high and low throughput
+  int peak_sleep_time; //only used in ProductionWorkloadTest test for generating high and low throughput
+  int high_peak; // used in LongPeakTest test for generating a high peak
+  long cur_ops_interval;
+
   SharedState() : cv(&mu), perf_level(FLAGS_perf_level) { }
 };
 
@@ -1761,7 +1815,11 @@ struct ThreadState {
   Random64 rand;         // Has different seeds for different threads
   Stats stats;
   SharedState* shared;
+  int last_thread_bucket1;//only used in QueuingMeasurements test for load generator thread
+  int last_thread_bucket2;//only used in QueuingMeasurements test for load generator thread
 
+  //int queue[1000000];
+  bool init =false;
   /* implicit */ ThreadState(int index)
       : tid(index),
         rand((FLAGS_seed ? FLAGS_seed : 1000) + index) {
@@ -2428,7 +2486,9 @@ void VerifyDBFromDB(std::string& truth_db_name) {
         method = &Benchmark::ReadWhileMerging;
       } else if (name == "readrandomwriterandom") {
         method = &Benchmark::ReadRandomWriteRandom;
-      } else if (name == "readrandommergerandom") {
+      } /* (else if (name == "longpeak") {
+        method = &Benchmark::LongPeakTest;
+      } */ else if (name == "readrandommergerandom") {
         if (FLAGS_merge_operator.empty()) {
           fprintf(stdout, "%-12s : skipped (--merge_operator is unknown)\n",
                   name.c_str());
@@ -2600,6 +2660,7 @@ void VerifyDBFromDB(std::string& truth_db_name) {
     shared.total = n;
     shared.num_initialized = 0;
     shared.num_done = 0;
+    shared.send_low_workload = 0;
     shared.start = false;
     if (FLAGS_benchmark_write_rate_limit > 0) {
       shared.write_rate_limiter.reset(
@@ -3217,6 +3278,9 @@ void VerifyDBFromDB(std::string& truth_db_name) {
       FLAGS_env->LowerThreadPoolIOPriority(Env::HIGH);
     }
     options.env = FLAGS_env;
+    if (FLAGS_sine_write_rate) {
+      FLAGS_benchmark_write_rate_limit = static_cast<uint64_t>(SineRate(0));
+    }
 
     if (FLAGS_num_multi_db <= 1) {
       OpenDb(options, FLAGS_db, &db_);
@@ -3407,6 +3471,10 @@ void VerifyDBFromDB(std::string& truth_db_name) {
     }
   }
 
+  double SineRate(double x) {
+    return FLAGS_sine_a*sin((FLAGS_sine_b*x) + FLAGS_sine_c) + FLAGS_sine_d;
+  }
+
   void DoWrite(ThreadState* thread, WriteMode write_mode) {
     const int test_duration = write_mode == RANDOM ? FLAGS_duration : 0;
     const int64_t num_ops = writes_ == 0 ? num_ : writes_;
@@ -3554,6 +3622,28 @@ void VerifyDBFromDB(std::string& truth_db_name) {
       }
       thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db,
                                 entries_per_batch_, kWrite);
+      if (FLAGS_sine_write_rate) {
+        uint64_t now = FLAGS_env->NowMicros();
+
+        uint64_t usecs_since_last;
+        if (now > thread->stats.GetSineInterval()) {
+          usecs_since_last = now - thread->stats.GetSineInterval();
+        } else {
+          usecs_since_last = 0;
+        }
+
+        if (usecs_since_last >
+            (FLAGS_sine_write_rate_interval_milliseconds * uint64_t{1000})) {
+          double usecs_since_start =
+                  static_cast<double>(now - thread->stats.GetStart());
+          thread->stats.ResetSineInterval();
+          uint64_t write_rate =
+                  static_cast<uint64_t>(SineRate(usecs_since_start / 1000000.0));
+          thread->shared->write_rate_limiter.reset(
+                  NewGenericRateLimiter(write_rate));
+        }
+      }
+
       if (!s.ok()) {
         fprintf(stderr, "put error: %s\n", s.ToString().c_str());
         exit(1);
@@ -4560,6 +4650,166 @@ void VerifyDBFromDB(std::string& truth_db_name) {
              reads_done, writes_done, readwrites_, found);
     thread->stats.AddMessage(msg);
   }
+
+// IMPORTANT: Need 15 threads for this to work: 
+// Thread 0 is the SILK thread -- adjust compaction bandwidth accordin to user workload. 
+// Threads 1 -- 8 are the worker threads who take stuff from queues
+// Threads 9 -- 13 are the workload generator threads
+// Thread 14 is the one that controls throughput fluctuations
+/*
+void LongPeakTest(ThreadState* thread) {
+    printf("Starting LongPeakTest test\n");
+
+    ReadOptions options(FLAGS_verify_checksum, true);
+    RandomGenerator gen;
+    Duration duration(FLAGS_duration, readwrites_);
+    std::string value;
+    long vals_generated = 0;
+    long writes_done = 0;
+    long reads_done = 0;
+    int cur_queue = 0;
+    int workerthread = 1;
+    bool pausedcompaction = false;
+    long prev_bandwidth_compaction_MBPS = 0;
+
+    int steady_workload_time = 0;
+
+    while (!duration.Done(1)) {
+        DB* db = SelectDB(thread);
+        if (!thread->init){
+            if(thread->tid != 0 ) {
+                //
+            } else {
+                thread->shared->high_peak = 0;
+                thread->shared->send_low_workload = 1;
+                thread->last_thread_bucket1 = 0;
+                thread->last_thread_bucket2 = 3;
+            }  
+            thread->init = true;
+        }
+
+        // thread tid=0 SILK thread. Responsible for dynamic compaction bandiwdth. 
+        if (thread->tid == 0) {
+            if (FLAGS_enable_silk_thread0 == false) {
+              continue;
+            }
+
+            // //check the current bandwidth for user operations 
+            long cur_throughput = thread->shared->cur_ops_interval * 8 ; // 8 worker threads
+            long cur_bandwidth_user_ops_MBPS = cur_throughput * FLAGS_value_size / 1000000;
+
+            // SILK TESTING the Pause compaction work functionality
+            if (!pausedcompaction && cur_bandwidth_user_ops_MBPS > 150){
+                //SILK Consider this a load peak
+                printf("->>>>??? Pausing compaction work from SILK\n");
+                db->PauseCompactionWork();
+                pausedcompaction = true;
+            } else if (pausedcompaction && cur_bandwidth_user_ops_MBPS <= 150) {
+                printf("->>>>??? Resuming compaction work from SILK\n");
+                db->ContinueCompactionWork();
+                pausedcompaction = false;
+            }
+
+            long cur_bandiwdth_compaction_MBPS = 200 - cur_bandwidth_user_ops_MBPS; //measured 200MB/s SSD bandwidth on XEON.
+            if (cur_bandiwdth_compaction_MBPS < 10) {
+                cur_bandiwdth_compaction_MBPS = 10;
+            }
+
+            if (FLAGS_dynamic_compaction_rate && 
+                abs(prev_bandwidth_compaction_MBPS - cur_bandiwdth_compaction_MBPS) >= 10 ) {
+                printf("Adjust-compaction-rate; current-client-bandwidth: %d ops/s; Bandwidth-taken: %d MB/s; Left-for-compaction: %d\n", 
+                    cur_throughput, cur_bandwidth_user_ops_MBPS, cur_bandiwdth_compaction_MBPS);
+                //DB* db = SelectDB(thread);
+                db->GetOptions().rate_limiter->SetBytesPerSecond(cur_bandiwdth_compaction_MBPS * 1000 * 1000);
+                prev_bandwidth_compaction_MBPS = cur_bandiwdth_compaction_MBPS;
+            }
+
+            usleep(FLAGS_SILK_bandwidth_check_interval); // sleep 10ms by default
+        // END COMMENT TO TOGGLE SILK TESTING 
+        } else if (thread->tid > 8 && thread->tid < 14) {
+            //printf("I'm the load generator!\n");
+            //Generate a random number
+            int val_size = FLAGS_value_size;;
+            std::chrono::microseconds ms = std::chrono::duration_cast< std::chrono::milliseconds >
+                (std::chrono::system_clock::now().time_since_epoch());
+            
+            std::pair<int, std::chrono::microseconds> val_timestamp_tuple(val_size, ms);
+            thread->shared->op_queues[thread->tid - 9][workerthread].push(val_timestamp_tuple);        
+            workerthread = (workerthread + 1) % 8;
+
+            vals_generated++;
+
+            //std::this_thread::sleep_for(std::chrono::microseconds(200)); // equivalent to 5k request/s per load generating thread
+            if (thread->shared->send_low_workload == 1) {
+                usleep(700);
+            } else{
+                usleep(70);
+            }
+        } else if (thread->tid == 14) {
+          // throughput fluctuation thread.
+            int sleep_time = 10000000;
+            if (steady_workload_time > 200) {
+                if (thread->shared->send_low_workload == 1) {
+                    thread->shared->send_low_workload = 0;
+                    printf("... thread 0 Switched to FAST workload\n");
+                    sleep_time = 50000000; // 50s peak
+                } else {
+                    thread->shared->send_low_workload = 1;
+                    printf("... thread 0 Switched to SLOW workload\n");
+                    sleep_time = 10000000; // 10s time between peaks
+                }
+            }
+            steady_workload_time += 10;
+            std::this_thread::sleep_for(std::chrono::microseconds(sleep_time)); //sleep for 10s
+        } else {
+            //Worker thread
+            //if my queue isn't empty, I pop the first element and I perform an operation on the DB 
+            if (!thread->shared->op_queues[cur_queue][thread->tid - 1].empty()) {
+                std::pair<int, std::chrono::microseconds> pair_val_time = 
+                    thread->shared->op_queues[cur_queue][thread->tid - 1].front();
+                thread->shared->op_queues[cur_queue][thread->tid - 1].pop();
+                std::chrono::microseconds out_of_queue_time = std::chrono::duration_cast< std::chrono::microseconds >
+                (std::chrono::system_clock::now().time_since_epoch());
+
+                std::unique_ptr<const char[]> key_guard;
+                Slice key = AllocateKey(&key_guard);
+
+                std::string a;
+                int rand_key = thread->rand.Next() % FLAGS_num;
+
+                //GenerateKeyFromInt(rand_key, FLAGS_num, &key);
+                a = std::to_string(rand_key);
+                a += '\0';
+                key = Slice(a.c_str()); 
+
+                int op_prob = thread->rand.Next() % 100;
+
+                if (op_prob < 50) {
+                    Status s = db->Put(write_options_, key, gen.Generate(pair_val_time.first));
+                    if (!s.ok()) {
+                        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
+                        exit(1);
+                    }
+                    writes_done++;
+                    long curops = thread->stats.FinishedOpsQUEUES(nullptr, db, 1, (pair_val_time.second).count(), kWrite);
+                    if (curops != 0 && thread->tid == 1) {
+                        thread->shared->cur_ops_interval = curops;
+                    }
+
+                } else {
+                    Status s = db->Get(options, key, &value);
+                    reads_done++;
+                    long curops =  thread->stats.FinishedOpsQUEUES(nullptr, db, 1, (pair_val_time.second).count(), kRead);
+                    if (curops != 0 && thread->tid == 1) {
+                        thread->shared->cur_ops_interval = curops;
+                    }
+                }
+            }
+            cur_queue = (cur_queue + 1)%5;
+        }
+    }
+}
+*/
 
   //
   // Read-modify-write for random keys

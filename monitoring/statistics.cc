@@ -69,6 +69,11 @@ std::string StatisticsImpl::getHistogramString(uint32_t histogramType) const {
   return getHistogramImplLocked(histogramType)->ToString();
 }
 
+std::string StatisticsImpl::getHistogramStringSimple(uint32_t histogramType) const {
+  MutexLock lock(&aggregate_lock_);
+  return getHistogramImplLocked(histogramType)->ToStringSimple();
+}
+
 void StatisticsImpl::setTickerCount(uint32_t tickerType, uint64_t count) {
   {
     MutexLock lock(&aggregate_lock_);

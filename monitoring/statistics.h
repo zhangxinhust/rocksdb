@@ -45,6 +45,7 @@ class StatisticsImpl : public Statistics {
   virtual void histogramData(uint32_t histogram_type,
                              HistogramData* const data) const override;
   std::string getHistogramString(uint32_t histogram_type) const override;
+  std::string getHistogramStringSimple(uint32_t histogram_type) const override;
 
   virtual void setTickerCount(uint32_t ticker_type, uint64_t count) override;
   virtual uint64_t getAndResetTickerCount(uint32_t ticker_type) override;

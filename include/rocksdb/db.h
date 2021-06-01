@@ -798,6 +798,8 @@ class DB {
   // UnblockBackgroundWork is called
   virtual Status PauseBackgroundWork() = 0;
   virtual Status ContinueBackgroundWork() = 0;
+  virtual Status PauseCompactionWork() {return Status::OK();};
+  virtual Status ContinueCompactionWork() {return Status::OK();};
 
   // This function will enable automatic compactions for the given column
   // families if they were previously disabled. The function will first set the

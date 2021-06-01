@@ -636,6 +636,33 @@ Status DBImpl::ContinueBackgroundWork() {
   return Status::OK();
 }
 
+Status DBImpl::PauseCompactionWork() {
+  printf(" ->>>>??? Pausing compaction from DB\n");
+  InstrumentedMutexLock guard_lock(&mutex_);
+  bg_compaction_paused_++;
+  while (bg_compaction_scheduled_ > 0 ) {
+    bg_cv_.Wait();
+  }
+  bg_compaction_paused_++;
+  return Status::OK();
+}
+
+Status DBImpl::ContinueCompactionWork() {
+  printf(" ->>>>??? Resuming compaction from DB\n");
+  InstrumentedMutexLock guard_lock(&mutex_);
+  if (bg_compaction_paused_ == 0) {
+    return Status::InvalidArgument();
+  }
+  assert(bg_compaction_paused_ > 0);
+  bg_compaction_paused_--;
+  // It's sufficient to check just bg_work_paused_ here since
+  // bg_work_paused_ is always no greater than bg_compaction_paused_
+  if (bg_compaction_paused_ == 0) {
+    MaybeScheduleFlushOrCompaction();
+  }
+  return Status::OK();
+}
+
 void DBImpl::NotifyOnCompactionCompleted(
     ColumnFamilyData* cfd, Compaction *c, const Status &st,
     const CompactionJobStats& compaction_job_stats,
