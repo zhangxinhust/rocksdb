@@ -1578,9 +1578,10 @@ class Stats {
 
         } else {
           //s = s.substr(s.find("write.micros"), 105); // output write latency per sec
-          fprintf(stdout, "+++++++++++++++++++\n%s*****************\n", dbstats->getHistogramString(DB_WRITE).c_str());
+          fprintf(stdout, "%s\n", dbstats->getHistogramStringSimple(DB_WRITE).c_str());
           dbstats->Reset();
 
+          /*
           fprintf(stderr,
                   "%s ... thread %d: (%" PRIu64 ",%" PRIu64 ") ops and "
                   "(%.1f,%.1f) ops/second in (%.6f,%.6f) seconds\n",
@@ -1592,6 +1593,7 @@ class Stats {
                   done_ / ((now - start_) / 1000000.0),
                   (now - last_report_finish_) / 1000000.0,
                   (now - start_) / 1000000.0);
+          */
 
           if (id_ == 0 && FLAGS_stats_per_interval) {
             std::string stats;

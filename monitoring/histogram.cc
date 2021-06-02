@@ -233,7 +233,7 @@ std::string HistogramStat::ToString() const {
 std::string HistogramStat::ToStringSimple() const {
   std::string r;
   char buf[100];
-  sprintf(buf, "Average: %.4f, P99: %.2f, P99.99: %.2f\n",
+  sprintf(buf, "Average: %.4f, P99: %.2f, P99.99: %.2f",
            Average(), Percentile(99), Percentile(99.99));
   r.append(buf);
   return r;
