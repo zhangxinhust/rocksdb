@@ -1611,11 +1611,11 @@ class Stats {
           // Don't check again for this many operations
           next_report_ += FLAGS_stats_interval;
         } else {
-          std::string s = dbstats->ToString();
-          s = s.substr(s.find("write.micros"), 105); // output write latency per sec
-          fprintf(stdout, "STATISTICS:\n%s\n",s.c_str());
+          //s = s.substr(s.find("write.micros"), 105); // output write latency per sec
+          fprintf(stdout, "%s\n", dbstats->getHistogramStringSimple(DB_WRITE).c_str());
           dbstats->Reset();
 
+          /*
           fprintf(stderr,
                   "%s ... thread %d: (%" PRIu64 ",%" PRIu64 ") ops and "
                   "(%.1f,%.1f) ops/second in (%.6f,%.6f) seconds\n",
@@ -1627,6 +1627,7 @@ class Stats {
                   done_ / ((now - start_) / 1000000.0),
                   (now - last_report_finish_) / 1000000.0,
                   (now - start_) / 1000000.0);
+          */
 
           for (auto it = hist_.begin(); it != hist_.end(); ++it) {
                 fprintf(stdout, "Microseconds per %s %d :\n%.200s\n",
@@ -1752,12 +1753,13 @@ class Stats {
                   (now - last_report_finish_) / 1000000.0,
                   (now - start_) / 1000000.0);
           */
-
+          /*
           for (auto it = hist_.begin(); it != hist_.end(); ++it) {
                 fprintf(stdout, "Microseconds per %s %d :\n%.200s\n",
                 OperationTypeString[it->first].c_str(), id_,
                 it->second->ToString().c_str());
-           }
+          }
+          */
           //TODO: maybe reset the histogram?
 
           if (id_ == 1 && FLAGS_stats_per_interval) {
